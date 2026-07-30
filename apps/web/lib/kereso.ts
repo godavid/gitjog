@@ -3,7 +3,8 @@
 // használata miatt a meleg kérések azonnaliak). Óránként újraépül.
 
 import MiniSearch from "minisearch";
-import { getJogszabalyok, getSzoveg, type JogszabalyTetel } from "./adat.js";
+import { getJogszabalyok, getSzoveg, type JogszabalyTetel } from "./adat";
+import { horgonyId } from "./md";
 
 export interface KeresoDok {
   id: number;
@@ -27,8 +28,6 @@ interface IndexCsomag {
   dokumentumok: Map<number, KeresoDok>;
   epult: number;
 }
-
-import { horgonyId } from "./md.js";
 
 function szakaszokraBont(tetel: JogszabalyTetel, md: string, kezdoId: number): KeresoDok[] {
   const nev = tetel.rovidites ? `${tetel.rovidites} (${tetel.megjeloles})` : tetel.megjeloles;
@@ -73,8 +72,11 @@ async function epit(): Promise<IndexCsomag> {
     storeFields: [],
     searchOptions: { boost: { szakasz: 3 }, prefix: true, fuzzy: 0.1, combineWith: "AND" },
   });
-  for (const tetel of jogszabalyok) {
-    const md = await getSzoveg(tetel.slug);
+  // a 37 szöveg párhuzamosan töltődik — szekvenciálisan ~5-6 mp lenne az index-építés
+  const szovegek = await Promise.all(
+    jogszabalyok.map(async (tetel) => ({ tetel, md: await getSzoveg(tetel.slug) })),
+  );
+  for (const { tetel, md } of szovegek) {
     if (!md) continue;
     const dokok = szakaszokraBont(tetel, md, kovId);
     kovId += dokok.length + 1;
