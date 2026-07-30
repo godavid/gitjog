@@ -1,0 +1,15 @@
+{
+  "name": "gitjog",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Nyílt Jogtár — a magyar jogrendszer git-natív, publikus verziókövetése (kód-monorepo)",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "pnpm -r test",
+    "backfill": "pnpm --filter @nyilt-jogtar/pipeline backfill",
+    "delta": "pnpm --filter @nyilt-jogtar/pipeline delta"
+  }
+}

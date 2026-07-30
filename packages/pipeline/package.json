@@ -1,0 +1,22 @@
+{
+  "name": "@nyilt-jogtar/pipeline",
+  "private": true,
+  "version": "0.1.0",
+  "description": "njt.jog.gov.hu crawler + determinisztikus normalizáló + git commit-pipeline",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "backfill": "tsx src/backfill.ts",
+    "delta": "tsx src/delta.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}
