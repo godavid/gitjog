@@ -81,9 +81,15 @@ export function metaJson(
   );
 }
 
-/** slug → (datum → commit SHA) térkép a szoveg.md history-jából */
+/**
+ * slug → (datum → commit SHA) térkép a jogszabály KÖNYVTÁRÁNAK history-jából.
+ * Szándékosan a könyvtár és nem a szoveg.md: van olyan njt-verzió, ahol a
+ * szöveg nem változik (csak lábjegyzet, amit kiszűrünk) — ilyenkor csak a
+ * meta.json módosul, de az állapotnak akkor is szerepelnie kell az indexben,
+ * különben a napi delta örökké "újként" látná (fantom-állapot hurok).
+ */
 export async function allapotShaTerkep(slug: string): Promise<Map<string, string>> {
-  const ki = await git(["log", "--reverse", "--format=%H|%cs", "--", `jogszabalyok/${slug}/szoveg.md`]);
+  const ki = await git(["log", "--reverse", "--format=%H|%cs", "--", `jogszabalyok/${slug}/`]);
   const terkep = new Map<string, string>();
   for (const sor of ki.trim().split("\n")) {
     if (!sor) continue;

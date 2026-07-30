@@ -211,4 +211,5 @@ export const ISMERT_OSZTALYOK = new Set([
   "idezet",
   "idezetElo",
   "idezetZaro",
+  "idezetUto",
 ]);

@@ -104,7 +104,7 @@ async function fut(): Promise<void> {
         terjedelemEllenorzes(regi.length, md.length, js.slug);
       }
       const allapotok = [
-        ...(ismertNyers[js.slug] ?? []),
+        ...(ismertNyers[js.slug] ?? []).filter((a) => a.datum !== allapot.hatalyba),
         { datum: allapot.hatalyba, verzio: allapot.version },
       ].sort((a, b) => (a.datum < b.datum ? -1 : 1));
       ismertNyers[js.slug] = allapotok;
