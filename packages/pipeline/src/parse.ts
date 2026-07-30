@@ -18,6 +18,8 @@ export interface Elem {
   jel: string;
   /** a tisztított szöveg (lábjegyzet-hivatkozások nélkül, normalizált szóközökkel) */
   szoveg: string;
+  /** az elembe ágyazott táblázatok, kész Markdown-blokként (| cella | …) */
+  tablazatok: string[];
 }
 
 export interface ParsoltSnapshot {
@@ -37,6 +39,32 @@ export function szovegTisztitas(s: string): string {
   return s.replace(/[   ]/g, " ").replace(/\s+/g, " ").trim();
 }
 
+function cellaTisztitas(s: string): string {
+  return szovegTisztitas(s).replace(/\|/g, "\\|");
+}
+
+/** <table> → determinisztikus Markdown pipe-tábla (colspan/rowspan lapítva) */
+function tablazatMd($: cheerio.CheerioAPI, table: cheerio.Element): string {
+  const sorok: string[] = [];
+  let oszlopok = 0;
+  $(table)
+    .find("tr")
+    .each((sorIdx, tr) => {
+      const cellak = $(tr)
+        .children("th,td")
+        .toArray()
+        .map((c) => {
+          $(c).find("sup.fnSup").remove();
+          return cellaTisztitas($(c).text());
+        });
+      if (cellak.length === 0) return;
+      if (sorIdx === 0) oszlopok = cellak.length;
+      sorok.push(`| ${cellak.join(" | ")} |`);
+      if (sorIdx === 0) sorok.push(`|${" --- |".repeat(oszlopok)}`);
+    });
+  return sorok.join("\n");
+}
+
 function elemFeldolgozas($: cheerio.CheerioAPI, el: cheerio.Element): Elem {
   const $el = $(el);
   const osztaly = ($el.attr("class") ?? "")
@@ -47,14 +75,21 @@ function elemFeldolgozas($: cheerio.CheerioAPI, el: cheerio.Element): Elem {
   $el.find("sup.fnSup").remove();
   const jel = szovegTisztitas($el.find("span.jel").first().text());
   $el.find("span.jel").remove();
-  // több belső <p> esetén (pl. Alaptörvény preambuluma) bekezdésenként bontunk,
-  // különben a szövegek szóköz nélkül folynának össze
-  const pk = $el.find("p").toArray();
+  // beágyazott táblázatok külön Markdown-blokká, a folyószövegből kivéve
+  const tablazatok = $el
+    .find("table")
+    .toArray()
+    .map((t) => tablazatMd($, t))
+    .filter(Boolean);
+  $el.find("div.TABLE, table").remove();
+  // több belső blokk (<p> vagy <div>, pl. Alaptörvény-preambulum, mellékletek)
+  // esetén bekezdésenként bontunk, különben a szövegek összefolynának
+  const blokkok = $el.find("p, div").toArray().filter((b) => $(b).find("p, div").length === 0);
   const szoveg =
-    pk.length > 1
-      ? pk.map((p) => szovegTisztitas($(p).text())).filter(Boolean).join("\n\n")
+    blokkok.length > 1
+      ? blokkok.map((b) => szovegTisztitas($(b).text())).filter(Boolean).join("\n\n")
       : szovegTisztitas($el.text());
-  return { osztaly, jel, szoveg };
+  return { osztaly, jel, szoveg, tablazatok };
 }
 
 function tartalomElemek($: cheerio.CheerioAPI, documentId: string): cheerio.Element[] {
@@ -162,4 +197,13 @@ export const ISMERT_OSZTALYOK = new Set([
   "rendelkezes",
   "szelet",
   "szoveg",
+  "mellekletCimke",
+  "mellekletTitle",
+  "mellekletTagolo",
+  "mellekletPont",
+  "mellekletBetusPont",
+  "tablazat",
+  "idezet",
+  "idezetElo",
+  "idezetZaro",
 ]);

@@ -51,8 +51,8 @@ describe("mini fixture (hálózat és cache nélkül)", () => {
 // szándékosan változik, a hasheket újra kell generálni (parse-proba + shasum).
 const GOLDEN: { nev: string; documentId: string; verzio: number; sha256: string }[] = [
   { nev: "Ptk. v44", documentId: "2013-5-00-00", verzio: 44, sha256: "02474bb035a17d59aeb7b4fb04beb71f33e84b86038b9a7cf608122e430bbbe7" },
-  { nev: "Btk. v82", documentId: "2012-100-00-00", verzio: 82, sha256: "3b663379778e7ff220ac7f213fdaac0061e68911538704aeea3c1fe04fb60533" },
-  { nev: "Mt. v38", documentId: "2012-1-00-00", verzio: 38, sha256: "4a3eece4bc123a5dc5321c733a5032f75342f3023817b645f28adfd8d6c804ca" },
+  { nev: "Btk. v82", documentId: "2012-100-00-00", verzio: 82, sha256: "e41978c3c9bde87dab52e1a1b412c54063f0d8303d26004794218c9768121ba0" },
+  { nev: "Mt. v38", documentId: "2012-1-00-00", verzio: 38, sha256: "32b9c855d9259aeb108420ba2aa0432c062b37d15be46c6862cd8d087ae3ce0d" },
   { nev: "Alaptörvény v26", documentId: "2011-4301-02-00", verzio: 26, sha256: "746c6f53936daa9a03c0861c5e91d2c2b6f48e014678afb02709c3036b1352fe" },
 ];
 

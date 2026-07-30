@@ -1,0 +1,24 @@
+{
+  "name": "@nyilt-jogtar/web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Nyílt Jogtár weboldal — jogszabály-böngésző, idővonal, diff",
+  "license": "MIT",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "diff": "^7.0.0",
+    "minisearch": "^7.1.0",
+    "next": "^15.4.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/diff": "^7.0.0",
+    "@types/react": "^19.0.0",
+    "typescript": "^5.6.0"
+  }
+}
