@@ -26,6 +26,9 @@
   cache-elődik, így az újrafuttatás olcsó.
 - `delta.ts` — napi növekmény, idempotens. Az Actions futtatja, de lokálisan is megy:
   `NYILT_ADAT_REPO_DIR=<adat-repo-klón> pnpm delta -- --no-push`.
+  Megszakadt LOKÁLIS futás után mindig friss klónból futtasd újra (a részben
+  commitolt napok + az elmaradt index-frissítés miatt); az Actions-futásnál ez
+  nem gond, mert minden futás friss checkoutot kap.
 - `health.ts` — riasztás (Issue) + terjedelem-anomália-őr.
 
 ## Ha törik a parser (njt-átdizájn)

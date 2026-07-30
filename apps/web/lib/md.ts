@@ -32,6 +32,7 @@ export function mdRender(md: string): { html: string; jegyzek: Szakaszjegyzek[] 
   const sorok = md.split("\n");
   const ki: string[] = [];
   const jegyzek: Szakaszjegyzek[] = [];
+  const hasznaltIdk = new Map<string, number>(); // horgony-ütközések feloldásához
   let listaSzint = 0; // 0: nincs lista, 1: <ul>, 2: <ul><ul>
   let tablaban = false;
   let tablaSor = 0;
@@ -65,7 +66,11 @@ export function mdRender(md: string): { html: string; jegyzek: Szakaszjegyzek[] 
       if (szint === 1) {
         ki.push(`<h1>${esc(cim)}</h1>`);
       } else {
-        const id = horgonyId(cim);
+        // ismétlődő cím (pl. több "Értelmező rendelkezések" alcím) sorszámot kap
+        const alap = horgonyId(cim);
+        const eddig = hasznaltIdk.get(alap) ?? 0;
+        hasznaltIdk.set(alap, eddig + 1);
+        const id = eddig === 0 ? alap : `${alap}-${eddig + 1}`;
         jegyzek.push({ id, cim, szint: Math.min(szint, 4) as 2 | 3 | 4 });
         ki.push(
           `<h${szint} id="${id}">${esc(cim)}<a class="horgony" href="#${id}" aria-label="Hivatkozás: ${esc(cim)}">¶</a></h${szint}>`,
@@ -81,11 +86,9 @@ export function mdRender(md: string): { html: string; jegyzek: Szakaszjegyzek[] 
         tablaban = true;
         tablaSor = 0;
       }
-      if (/^\|( ---+ \|)+$/.test(sor.replace(/\|(\s*---+\s*\|)+/, (m) => m))) {
-        // elválasztó sor: az előző sor volt a fejléc — itt egyszerűen átugorjuk
-        continue;
-      }
-      if (/^\|\s*-/.test(sor)) continue;
+      // elválasztó sor (minden cellája csak kötőjel): átugorjuk — de a
+      // kötőjellel KEZDŐDŐ valós adatcella (pl. "| -5% |") nem elválasztó!
+      if (/^\|(?: *:?-{3,}:? *\|)+ *$/.test(sor)) continue;
       const cellak = sor
         .slice(1, sor.endsWith("|") ? -1 : undefined)
         .split(" | ")

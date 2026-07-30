@@ -20,8 +20,8 @@ export interface Jogszabaly {
 export const NJT_BASE = "https://njt.jog.gov.hu";
 export const USER_AGENT =
   "NyiltJogtar/0.1 (+https://jogtar.remenyfarm.hu; info@remenyfarm.hu)";
-/** két kérésindítás között legalább ennyi telik el (udvarias crawl) */
-export const RATE_LIMIT_MS = 1100;
+/** két kérésindítás között legalább ennyi telik el (udvarias crawl, ~1,8 kérés/mp) */
+export const RATE_LIMIT_MS = 550;
 export const ADAT_REPO = "godavid/magyar-jogtar";
 export const ADAT_REPO_URL = `https://github.com/${ADAT_REPO}.git`;
 

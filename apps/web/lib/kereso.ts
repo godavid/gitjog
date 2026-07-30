@@ -49,7 +49,12 @@ function szakaszokraBont(tetel: JogszabalyTetel, md: string, kezdoId: number): K
       lezar();
       cim = h[1]!;
     } else if (sor && !sor.startsWith("# ")) {
-      sorok.push(sor.replace(/^ *- /, ""));
+      if (/^\|(?: *:?-{3,}:? *\|)+ *$/.test(sor)) continue; // táblázat-elválasztó
+      // táblázat-sorból a cső-szintaxist szedjük ki, a cellatartalom marad
+      const tiszta = sor.startsWith("| ")
+        ? sor.replace(/^\| | \|$/g, "").split(" | ").join(" · ")
+        : sor.replace(/^ *- /, "");
+      sorok.push(tiszta);
     }
   }
   lezar();
@@ -81,11 +86,19 @@ async function epit(): Promise<IndexCsomag> {
 
 async function getIndex(): Promise<IndexCsomag> {
   if (cache && Date.now() - cache.epult < 3_600_000) return cache;
-  epitesFolyamatban ??= epit().then((cs) => {
-    cache = cs;
-    epitesFolyamatban = null;
-    return cs;
-  });
+  // hibás építés után az ígéretet el KELL dobni, különben minden későbbi
+  // keresés ugyanazt az elutasított Promise-t kapná a példány élete végéig
+  epitesFolyamatban ??= epit().then(
+    (cs) => {
+      cache = cs;
+      epitesFolyamatban = null;
+      return cs;
+    },
+    (hiba) => {
+      epitesFolyamatban = null;
+      throw hiba;
+    },
+  );
   return epitesFolyamatban;
 }
 

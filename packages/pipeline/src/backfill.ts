@@ -8,7 +8,13 @@
 
 import { existsSync } from "node:fs";
 import { JOGSZABALYOK, NJT_BASE, type Jogszabaly } from "./config.js";
-import { getIdoallapotok, getTeljesSnapshot, type Idoallapot } from "./crawl.js";
+import {
+  getIdoallapotok,
+  getTeljesSnapshot,
+  maiNapBudapest,
+  napiGyoztesek,
+  type Idoallapot,
+} from "./crawl.js";
 import { markdownGeneralas } from "./normalize.js";
 import { parsolSnapshot } from "./parse.js";
 import {
@@ -24,7 +30,7 @@ import {
 import { DISCLAIMER_MD, GITATTRIBUTES, LICENSE_TXT, README_MD } from "./sablonok.js";
 
 const push = process.argv.includes("--push");
-const ma = new Date().toISOString().slice(0, 10);
+const ma = maiNapBudapest();
 
 // füstteszthez: NYILT_CSAK="2012-1-00-00,2013-5-00-00" — csak e documentId-k
 const csak = process.env.NYILT_CSAK?.split(",").map((s) => s.trim());
@@ -45,28 +51,6 @@ await commit("Adat-repo váz: README, DISCLAIMER, LICENSE");
 console.log("Váz commitolva.");
 
 // ── 2. enumerálás ───────────────────────────────────────────────────────────
-// Azonos napon hatályba lépő és aznap felül is írt (0 napot élt) állapotok
-// közül a ténylegesen érvényesült marad: előbb a 0 napos vesztesek, aztán
-// verziószám szerint — a csoport utolsó eleme a győztes.
-function napiGyoztesek(allapotok: Idoallapot[]): Idoallapot[] {
-  const csoportok = new Map<string, Idoallapot[]>();
-  for (const a of allapotok) {
-    const cs = csoportok.get(a.hatalyba) ?? [];
-    cs.push(a);
-    csoportok.set(a.hatalyba, cs);
-  }
-  const ki: Idoallapot[] = [];
-  for (const cs of csoportok.values()) {
-    cs.sort((x, y) => {
-      const xElt = x.hatalyatVeszti === x.hatalyba ? 0 : 1;
-      const yElt = y.hatalyatVeszti === y.hatalyba ? 0 : 1;
-      return xElt - yElt || x.version - y.version;
-    });
-    ki.push(cs[cs.length - 1]!);
-  }
-  return ki.sort((a, b) => (a.hatalyba < b.hatalyba ? -1 : 1));
-}
-
 interface Esemeny {
   js: Jogszabaly;
   allapot: Idoallapot;

@@ -64,9 +64,11 @@ export default function DiffNezet({ regiUrl, ujUrl }: Props) {
         if (b.tipus === "kontextus") {
           const elso = i === 0;
           const utolso = i === allapot.blokkok.length - 1;
-          const eleje = elso ? [] : b.sorok.slice(0, KONTEXTUS);
-          const vege = utolso ? [] : b.sorok.slice(-KONTEXTUS);
-          const kihagyva = b.sorok.length - eleje.length - vege.length;
+          // rövid blokknál nincs mit kihagyni — átfedő szeletek duplikálnának
+          const rovid = b.sorok.length <= 2 * KONTEXTUS;
+          const eleje = elso ? [] : rovid ? b.sorok : b.sorok.slice(0, KONTEXTUS);
+          const vege = utolso || (rovid && !elso) ? [] : rovid ? b.sorok : b.sorok.slice(-KONTEXTUS);
+          const kihagyva = rovid && !(elso && utolso) ? 0 : b.sorok.length - eleje.length - vege.length;
           return (
             <div key={i}>
               {!elso &&

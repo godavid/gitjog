@@ -77,6 +77,36 @@ function napra(iso: string): string {
   return iso.slice(0, 10);
 }
 
+/** a mai nap magyar helyi idő szerint (az njt hatálydátumaival ez vethető össze) */
+export function maiNapBudapest(): string {
+  return new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Budapest" });
+}
+
+/**
+ * Azonos napon hatályba lépő és aznap felül is írt (0 napot élt) állapotok
+ * közül a ténylegesen érvényesült győz: előbb a 0 napos vesztesek, aztán
+ * verziószám szerint — a csoport utolsó eleme a győztes. A verziószám önmagában
+ * NEM megbízható döntő, mert nem monoton a dátummal.
+ */
+export function napiGyoztesek(allapotok: Idoallapot[]): Idoallapot[] {
+  const csoportok = new Map<string, Idoallapot[]>();
+  for (const a of allapotok) {
+    const cs = csoportok.get(a.hatalyba) ?? [];
+    cs.push(a);
+    csoportok.set(a.hatalyba, cs);
+  }
+  const ki: Idoallapot[] = [];
+  for (const cs of csoportok.values()) {
+    cs.sort((x, y) => {
+      const xElt = x.hatalyatVeszti === x.hatalyba ? 0 : 1;
+      const yElt = y.hatalyatVeszti === y.hatalyba ? 0 : 1;
+      return xElt - yElt || x.version - y.version;
+    });
+    ki.push(cs[cs.length - 1]!);
+  }
+  return ki.sort((a, b) => (a.hatalyba < b.hatalyba ? -1 : 1));
+}
+
 /**
  * Egy jogszabály összes időállapota, hatálybalépés szerint növekvő sorrendben.
  * FIGYELEM: az njt verziószáma NEM monoton a dátummal, ezért mindig a

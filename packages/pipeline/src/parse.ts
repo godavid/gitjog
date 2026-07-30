@@ -9,6 +9,7 @@
 // border UTÁN), hangosan hibázunk, nem csendben rossz sorrendet írunk.
 
 import * as cheerio from "cheerio";
+import type { Element } from "domhandler";
 import type { TeljesSnapshot } from "./crawl.js";
 
 export interface Elem {
@@ -43,20 +44,24 @@ function cellaTisztitas(s: string): string {
   return szovegTisztitas(s).replace(/\|/g, "\\|");
 }
 
-/** <table> → determinisztikus Markdown pipe-tábla (colspan/rowspan lapítva) */
-function tablazatMd($: cheerio.CheerioAPI, table: cheerio.Element): string {
+/**
+ * <table> → determinisztikus Markdown pipe-tábla.
+ * A colspan üres cellákkal pótolva (az oszlopok nem csúsznak el);
+ * a rowspan lapítva marad (a cella csak az első sorában jelenik meg).
+ */
+function tablazatMd($: cheerio.CheerioAPI, table: Element): string {
   const sorok: string[] = [];
   let oszlopok = 0;
   $(table)
     .find("tr")
     .each((sorIdx, tr) => {
-      const cellak = $(tr)
-        .children("th,td")
-        .toArray()
-        .map((c) => {
-          $(c).find("sup.fnSup").remove();
-          return cellaTisztitas($(c).text());
-        });
+      const cellak: string[] = [];
+      for (const c of $(tr).children("th,td").toArray()) {
+        $(c).find("sup.fnSup").remove();
+        cellak.push(cellaTisztitas($(c).text()));
+        const colspan = Number($(c).attr("colspan") ?? "1");
+        for (let i = 1; i < colspan; i++) cellak.push("");
+      }
       if (cellak.length === 0) return;
       if (sorIdx === 0) oszlopok = cellak.length;
       sorok.push(`| ${cellak.join(" | ")} |`);
@@ -65,7 +70,7 @@ function tablazatMd($: cheerio.CheerioAPI, table: cheerio.Element): string {
   return sorok.join("\n");
 }
 
-function elemFeldolgozas($: cheerio.CheerioAPI, el: cheerio.Element): Elem {
+function elemFeldolgozas($: cheerio.CheerioAPI, el: Element): Elem {
   const $el = $(el);
   const osztaly = ($el.attr("class") ?? "")
     .split(/\s+/)
@@ -92,7 +97,7 @@ function elemFeldolgozas($: cheerio.CheerioAPI, el: cheerio.Element): Elem {
   return { osztaly, jel, szoveg, tablazatok };
 }
 
-function tartalomElemek($: cheerio.CheerioAPI, documentId: string): cheerio.Element[] {
+function tartalomElemek($: cheerio.CheerioAPI, documentId: string): Element[] {
   return $(`[id^="sc${documentId}-"]`).toArray();
 }
 

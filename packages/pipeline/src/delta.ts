@@ -9,7 +9,13 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { JOGSZABALYOK, NJT_BASE } from "./config.js";
-import { getIdoallapotok, getTeljesSnapshot, type Idoallapot } from "./crawl.js";
+import {
+  getIdoallapotok,
+  getTeljesSnapshot,
+  maiNapBudapest,
+  napiGyoztesek,
+  type Idoallapot,
+} from "./crawl.js";
 import { markdownGeneralas } from "./normalize.js";
 import { parsolSnapshot } from "./parse.js";
 import { riaszt, terjedelemEllenorzes } from "./health.js";
@@ -24,7 +30,7 @@ import {
 } from "./commit.js";
 
 const push = !process.argv.includes("--no-push");
-const ma = new Date().toISOString().slice(0, 10);
+const ma = maiNapBudapest();
 
 interface UjEsemeny {
   js: (typeof JOGSZABALYOK)[number];
@@ -46,8 +52,9 @@ async function fut(): Promise<void> {
     const ismertek = new Set((ismertNyers[js.slug] ?? []).map((a) => a.datum));
     ismertTerkep.set(js.slug, ismertek);
     const mind = await getIdoallapotok(js.documentId, { fresh: true });
-    for (const a of mind) {
-      if (a.hatalyba <= ma && !ismertek.has(a.hatalyba)) ujak.push({ js, allapot: a });
+    // ugyanaz a napi-győztes logika, mint a backfillben (0 napot élt állapot veszít)
+    for (const a of napiGyoztesek(mind.filter((x) => x.hatalyba <= ma))) {
+      if (!ismertek.has(a.hatalyba)) ujak.push({ js, allapot: a });
     }
   }
   if (ujak.length === 0) {
@@ -55,14 +62,7 @@ async function fut(): Promise<void> {
     return;
   }
 
-  // azonos (jogszabály, nap) duplikátumok: a magasabb verzió győz
-  const kulcsTerkep = new Map<string, UjEsemeny>();
-  for (const u of ujak) {
-    const kulcs = `${u.js.slug}|${u.allapot.hatalyba}`;
-    const eddigi = kulcsTerkep.get(kulcs);
-    if (!eddigi || u.allapot.version > eddigi.allapot.version) kulcsTerkep.set(kulcs, u);
-  }
-  const esemenyek = [...kulcsTerkep.values()].sort((a, b) =>
+  const esemenyek = ujak.sort((a, b) =>
     a.allapot.hatalyba < b.allapot.hatalyba
       ? -1
       : a.allapot.hatalyba > b.allapot.hatalyba
