@@ -20,8 +20,12 @@ const BOT_EMAIL = "info@remenyfarm.hu";
 export async function git(args: string[], opts: { datum?: string } = {}): Promise<string> {
   const env = { ...process.env };
   if (opts.datum) {
+    // A git nem tud 1970 előtti (negatív epoch) commit-dátumot tárolni, ezért a
+    // történeti (pl. 1902-es) hatálybalépések a korszakhatárra kerülnek — a valós
+    // dátum a commit-üzenetben és a meta.json allapotok-listájában él.
+    const datum = opts.datum < "1970-01-01" ? "1970-01-01" : opts.datum;
     // dél, magyar idő szerint — így a nap minden időzónában stabil
-    const stamp = `${opts.datum}T12:00:00+01:00`;
+    const stamp = `${datum}T12:00:00+01:00`;
     env.GIT_AUTHOR_DATE = stamp;
     env.GIT_COMMITTER_DATE = stamp;
   }
