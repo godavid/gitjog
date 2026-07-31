@@ -47,21 +47,40 @@ export function szovegTisztitas(s: string): string {
  * címet is tartalmazza — az illesztett prefix utáni maradékot címként adjuk
  * vissza (ott jellemzően nincs külön h2).
  */
+/**
+ * Megengedő római-érték számítás az illesztéshez: a szabványostól eltérő, de
+ * történetileg hivatalos alakokat is elfogadja (pl. "IL" = 49, "IC" = 99).
+ */
+function romaiErtekLazan(s: string): number | null {
+  const ertekek: Record<string, number> = { i: 1, v: 5, x: 10, l: 50, c: 100, d: 500, m: 1000 };
+  const t = s.toLowerCase();
+  let osszeg = 0;
+  for (let i = 0; i < t.length; i++) {
+    const a = ertekek[t[i]!];
+    if (!a) return null;
+    const b = ertekek[t[i + 1] ?? ""] ?? 0;
+    osszeg += a < b ? -a : a;
+  }
+  return osszeg > 0 ? osszeg : null;
+}
+
 export function megjelolesIllesztes(
   vart: string,
   kapott: string,
 ): { ok: boolean; maradekCim: string } {
   const kepletes = vart.toLowerCase().match(/^(\d{4})\. évi ([ivxlcdm]+)\. törvény$/);
-  let re: RegExp;
   if (kepletes) {
-    // Szerkezeti illesztés: az év és a római szám a lényeg. Az írásjelek az njt
-    // adatában is hibásak lehetnek ("1991 évi ..."), ezért pont/szóköz rugalmas;
-    // az archaikus végződések ("törvénycikk", "törvény-czikk") elfogadva.
-    re = new RegExp(`^${kepletes[1]}\\.?\\s*évi\\s+${kepletes[2]}\\.?\\s*törvény(?:-?cz?ikk)?`, "i");
-  } else {
-    // nem képletes megjelölés (pl. Alaptörvény): egyszerű prefix-egyezés
-    re = new RegExp(`^${vart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i");
+    // Szerkezeti illesztés: az év és a római szám ÉRTÉKE a mérvadó — az njt
+    // írásjel-hibái ("1991 évi …"), az archaikus végződések ("törvény-czikk")
+    // és a nem szabványos, de hivatalos számalakok ("IL" = XLIX) is átmennek.
+    const m = kapott.match(/^(\d{4})\.?\s*évi\s+([IVXLCDMivxlcdm]+)\.?\s*törvény(?:-?cz?ikk)?/i);
+    if (!m) return { ok: false, maradekCim: "" };
+    if (m[1] !== kepletes[1]) return { ok: false, maradekCim: "" };
+    if (romaiErtekLazan(m[2]!) !== romaiErtekLazan(kepletes[2]!)) return { ok: false, maradekCim: "" };
+    return { ok: true, maradekCim: kapott.slice(m[0].length).replace(/^[\s,.—–-]+/, "").trim() };
   }
+  // nem képletes megjelölés (pl. Alaptörvény): egyszerű prefix-egyezés
+  const re = new RegExp(`^${vart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i");
   const m = kapott.match(re);
   if (!m) return { ok: false, maradekCim: "" };
   return { ok: true, maradekCim: kapott.slice(m[0].length).replace(/^[\s,.—–-]+/, "").trim() };

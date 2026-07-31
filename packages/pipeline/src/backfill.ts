@@ -130,6 +130,8 @@ console.log(`Összesen ${esemenyek.length} esemény, ${new Set(esemenyek.map((e)
 // ── 3. visszajátszás dátum szerint ──────────────────────────────────────────
 const cimek = new Map<string, string>(); // slug → oldalról olvasott cím
 const ismeretlenOsztalyNaplo = new Map<string, string[]>();
+const hibasSlugok = new Set<string>(); // validálási hibára futott jogszabályok
+const problemasNaplo: string[] = [];
 let kesz = 0;
 let commitSzamlalo = 0;
 let utolsoPushnal = 0;
@@ -145,20 +147,25 @@ while (i < esemenyek.length) {
 
   const uzenetSorok: string[] = [];
   for (const { js, allapot } of napiak) {
+    if (hibasSlugok.has(js.slug)) continue; // korábban validálási hibára futott
     const s = await getTeljesSnapshot(js.documentId, allapot.version);
     const p = parsolSnapshot(s, js.documentId);
-    // validálás: jó jogszabályt, jó időállapotban kaptunk-e (kis-nagybetű-független,
-    // a régi "törvénycikk"/"törvény-czikk" végződést is elfogadva; a legrégebbi
-    // törvényeknél a h1 hordozza a címet is — azt címként hasznosítjuk
+    // Validálás: jó jogszabályt, jó időállapotban kaptunk-e. Eltérésnél a
+    // TELJES jogszabályt kihagyjuk (rossz adat nem kerülhet a repóba), a futás
+    // megy tovább — a végén összesített hibalistát kapunk kézi vizsgálatra.
     const illesztes = megjelolesIllesztes(js.megjeloles, p.megjeloles);
     if (!illesztes.ok) {
-      throw new Error(`Cím-eltérés: ${js.slug} — várt "${js.megjeloles}", kapott "${p.megjeloles}"`);
+      hibasSlugok.add(js.slug);
+      problemasNaplo.push(`${js.slug}: cím-eltérés — várt "${js.megjeloles}", kapott "${p.megjeloles}"`);
+      continue;
     }
     const cim = p.cim || illesztes.maradekCim;
     if (p.hatalyDatum && p.hatalyDatum !== allapot.hatalyba) {
-      throw new Error(
-        `Hatálydátum-eltérés: ${js.slug} v${allapot.version} — várt ${allapot.hatalyba}, oldal: ${p.hatalyDatum}`,
+      hibasSlugok.add(js.slug);
+      problemasNaplo.push(
+        `${js.slug}: hatálydátum-eltérés v${allapot.version} — várt ${allapot.hatalyba}, oldal: ${p.hatalyDatum}`,
       );
+      continue;
     }
     // Ismeretlen osztály a backfillben nem végzetes: bekezdés-fallbackkel
     // renderelődik, a futás végén összesített figyelmeztetést kapunk.
@@ -178,7 +185,8 @@ while (i < esemenyek.length) {
     kesz++;
   }
 
-  const nevek = napiak.map((n) => n.js.rovidites ?? n.js.megjeloles);
+  if (uzenetSorok.length === 0) continue; // a nap összes tétele kihagyva
+  const nevek = napiak.filter((n) => !hibasSlugok.has(n.js.slug)).map((n) => n.js.rovidites ?? n.js.megjeloles);
   const cim =
     nevek.length === 1
       ? `${nevek[0]} — időállapot ${datum}`
@@ -211,6 +219,11 @@ if (kihagyottak.length > 0) {
 }
 await commit("Index frissítés (jogszabalyok.json, allapotok.json, per-jogszabály állapotfájlok)");
 console.log("Index commitolva.");
+
+if (problemasNaplo.length > 0) {
+  console.log(`\nFIGYELEM — ${hibasSlugok.size} jogszabály validálási hibára futott (kimaradtak, kézi vizsgálat kell):`);
+  for (const sor of problemasNaplo.slice(0, 50)) console.log(`  ${sor}`);
+}
 
 if (ismeretlenOsztalyNaplo.size > 0) {
   console.log("\nFIGYELEM — ismeretlen osztályok (bekezdés-fallbackkel renderelve):");
