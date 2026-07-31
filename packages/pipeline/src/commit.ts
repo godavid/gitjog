@@ -52,9 +52,17 @@ export async function fajlIras(relUt: string, tartalom: string): Promise<void> {
   await writeFile(teljes, tartalom, "utf8");
 }
 
-export async function commit(uzenet: string, datum?: string): Promise<void> {
+/**
+ * Stage + commit. Ha tartalmilag nincs változás (pl. crash utáni újrafutásnál a
+ * determinisztikus kimenet már commitolva van), NEM commitol és false-t ad —
+ * így a megszakadt backfill duplikáció nélkül folytatható.
+ */
+export async function commit(uzenet: string, datum?: string): Promise<boolean> {
   await git(["add", "-A"]);
+  const allapot = await git(["status", "--porcelain"]);
+  if (allapot.trim() === "") return false;
   await git(["commit", "-q", "-m", uzenet], { datum });
+  return true;
 }
 
 export interface AllapotBejegyzes {

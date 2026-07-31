@@ -51,11 +51,18 @@ export function megjelolesIllesztes(
   vart: string,
   kapott: string,
 ): { ok: boolean; maradekCim: string } {
-  const minta = vart
-    .toLowerCase()
-    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    .replace(/törvény$/, "törvény(?:-?cz?ikk)?");
-  const m = kapott.toLowerCase().match(new RegExp(`^${minta}`));
+  const kepletes = vart.toLowerCase().match(/^(\d{4})\. évi ([ivxlcdm]+)\. törvény$/);
+  let re: RegExp;
+  if (kepletes) {
+    // Szerkezeti illesztés: az év és a római szám a lényeg. Az írásjelek az njt
+    // adatában is hibásak lehetnek ("1991 évi ..."), ezért pont/szóköz rugalmas;
+    // az archaikus végződések ("törvénycikk", "törvény-czikk") elfogadva.
+    re = new RegExp(`^${kepletes[1]}\\.?\\s*évi\\s+${kepletes[2]}\\.?\\s*törvény(?:-?cz?ikk)?`, "i");
+  } else {
+    // nem képletes megjelölés (pl. Alaptörvény): egyszerű prefix-egyezés
+    re = new RegExp(`^${vart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i");
+  }
+  const m = kapott.match(re);
   if (!m) return { ok: false, maradekCim: "" };
   return { ok: true, maradekCim: kapott.slice(m[0].length).replace(/^[\s,.—–-]+/, "").trim() };
 }

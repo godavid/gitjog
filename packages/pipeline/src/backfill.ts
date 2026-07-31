@@ -55,6 +55,11 @@ if (folytat) {
     console.error(`HIBA: --folytat módhoz meglévő adat-repo kell (${indexUt} hiányzik).`);
     process.exit(1);
   }
+  // megszakadt futás fél kész, commitolatlan fájljai nem szivâroghatnak be egy
+  // korábbi dátumú commitba — tiszta worktree-ről indulunk (a determinisztikus
+  // kimenet miatt minden a saját napjánál újraíródik)
+  await git(["checkout", "--", "."]);
+  await git(["clean", "-fdq"]);
   const ismertek = new Set(Object.keys(JSON.parse(await readFile(indexUt, "utf8"))));
   KIVALASZTOTT = KIVALASZTOTT.filter((j) => !ismertek.has(j.slug));
   console.log(`Append-mód: ${ismertek.size} jogszabály már a repóban, ${KIVALASZTOTT.length} új jön.`);
@@ -179,9 +184,11 @@ while (i < esemenyek.length) {
       ? `${nevek[0]} — időállapot ${datum}`
       : `Időállapotok ${datum}: ${nevek.join(", ")}`;
   const uzenet = `${cim}\n\nForrás (njt):\n${uzenetSorok.map((s) => `- ${s}`).join("\n")}`;
-  await commit(uzenet.length > 60_000 ? cim : uzenet, datum);
-  commitSzamlalo++;
-  console.log(`[${kesz}/${esemenyek.length}] ${datum}: ${nevek.length > 8 ? `${nevek.length} jogszabály` : nevek.join(", ")}`);
+  const commitolt = await commit(uzenet.length > 60_000 ? cim : uzenet, datum);
+  if (commitolt) commitSzamlalo++;
+  console.log(
+    `[${kesz}/${esemenyek.length}] ${datum}: ${nevek.length > 8 ? `${nevek.length} jogszabály` : nevek.join(", ")}${commitolt ? "" : " (már megvolt)"}`,
+  );
 
   // append-módban kötegenként pusholunk (2 GB push-limit + megszakíthatóság)
   if (folytat && commitSzamlalo - utolsoPushnal >= KOTEG_MERET) {
