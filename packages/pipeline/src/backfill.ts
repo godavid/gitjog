@@ -23,7 +23,7 @@ import {
   type Idoallapot,
 } from "./crawl.js";
 import { markdownGeneralas } from "./normalize.js";
-import { megjelolesEgyezik, parsolSnapshot } from "./parse.js";
+import { megjelolesIllesztes, parsolSnapshot } from "./parse.js";
 import {
   ADAT_REPO_DIR,
   commit,
@@ -143,10 +143,13 @@ while (i < esemenyek.length) {
     const s = await getTeljesSnapshot(js.documentId, allapot.version);
     const p = parsolSnapshot(s, js.documentId);
     // validálás: jó jogszabályt, jó időállapotban kaptunk-e (kis-nagybetű-független,
-    // a régi "törvénycikk" végződést is elfogadva — lásd megjelolesEgyezik)
-    if (!megjelolesEgyezik(js.megjeloles, p.megjeloles)) {
+    // a régi "törvénycikk"/"törvény-czikk" végződést is elfogadva; a legrégebbi
+    // törvényeknél a h1 hordozza a címet is — azt címként hasznosítjuk
+    const illesztes = megjelolesIllesztes(js.megjeloles, p.megjeloles);
+    if (!illesztes.ok) {
       throw new Error(`Cím-eltérés: ${js.slug} — várt "${js.megjeloles}", kapott "${p.megjeloles}"`);
     }
+    const cim = p.cim || illesztes.maradekCim;
     if (p.hatalyDatum && p.hatalyDatum !== allapot.hatalyba) {
       throw new Error(
         `Hatálydátum-eltérés: ${js.slug} v${allapot.version} — várt ${allapot.hatalyba}, oldal: ${p.hatalyDatum}`,
@@ -160,10 +163,10 @@ while (i < esemenyek.length) {
       if (hol.length < 5) hol.push(`${js.slug}@v${allapot.version}`);
       ismeretlenOsztalyNaplo.set(o, hol);
     }
-    cimek.set(js.slug, p.cim);
+    cimek.set(js.slug, cim);
     const eddigiek = osszesMult.get(js.slug)!.filter((a) => a.datum <= datum);
     await fajlIras(`jogszabalyok/${js.slug}/szoveg.md`, markdownGeneralas(p));
-    await fajlIras(`jogszabalyok/${js.slug}/meta.json`, metaJson(js, p.cim, eddigiek));
+    await fajlIras(`jogszabalyok/${js.slug}/meta.json`, metaJson(js, cim, eddigiek));
     uzenetSorok.push(
       `${js.rovidites ?? js.megjeloles}: ${NJT_BASE}/jogszabaly/${js.documentId}.${allapot.version}`,
     );

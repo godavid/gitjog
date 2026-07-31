@@ -41,13 +41,28 @@ export function szovegTisztitas(s: string): string {
 }
 
 /**
- * A várt megjelölés és az oldal h1-e egyezik-e. Kis-nagybetű-független, és a
- * régi jogszabályoknál a "törvénycikk" végződést is elfogadja a "törvény" helyett
- * (pl. "1875. évi XXXVII. törvénycikk").
+ * A várt megjelölés illesztése az oldal h1-ére. Kis-nagybetű-független, és a
+ * régi jogszabályok archaikus végződéseit is elfogadja ("törvénycikk",
+ * "törvény-czikk", "törvényczikk"). A legrégebbi törvényeknél a h1 a teljes
+ * címet is tartalmazza — az illesztett prefix utáni maradékot címként adjuk
+ * vissza (ott jellemzően nincs külön h2).
  */
+export function megjelolesIllesztes(
+  vart: string,
+  kapott: string,
+): { ok: boolean; maradekCim: string } {
+  const minta = vart
+    .toLowerCase()
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/törvény$/, "törvény(?:-?cz?ikk)?");
+  const m = kapott.toLowerCase().match(new RegExp(`^${minta}`));
+  if (!m) return { ok: false, maradekCim: "" };
+  return { ok: true, maradekCim: kapott.slice(m[0].length).replace(/^[\s,.—–-]+/, "").trim() };
+}
+
+/** kényelmi wrapper: csak az egyezés ténye */
 export function megjelolesEgyezik(vart: string, kapott: string): boolean {
-  const norm = (s: string) => s.toLowerCase().replace(/törvénycikk\b/, "törvény");
-  return norm(vart) === norm(kapott);
+  return megjelolesIllesztes(vart, kapott).ok;
 }
 
 function cellaTisztitas(s: string): string {

@@ -17,7 +17,7 @@ import {
   type Idoallapot,
 } from "./crawl.js";
 import { markdownGeneralas } from "./normalize.js";
-import { megjelolesEgyezik, parsolSnapshot } from "./parse.js";
+import { megjelolesIllesztes, parsolSnapshot } from "./parse.js";
 import { riaszt, terjedelemEllenorzes } from "./health.js";
 import {
   ADAT_REPO_DIR,
@@ -102,9 +102,11 @@ async function fut(): Promise<void> {
     for (const { js, allapot } of napiak) {
       const s = await getTeljesSnapshot(js.documentId, allapot.version);
       const p = parsolSnapshot(s, js.documentId);
-      if (!megjelolesEgyezik(js.megjeloles, p.megjeloles)) {
+      const illesztes = megjelolesIllesztes(js.megjeloles, p.megjeloles);
+      if (!illesztes.ok) {
         throw new Error(`Cím-eltérés: ${js.slug} — várt "${js.megjeloles}", kapott "${p.megjeloles}"`);
       }
+      const cim = p.cim || illesztes.maradekCim;
       if (p.hatalyDatum && p.hatalyDatum !== allapot.hatalyba) {
         throw new Error(
           `Hatálydátum-eltérés: ${js.slug} v${allapot.version} — várt ${allapot.hatalyba}, oldal: ${p.hatalyDatum}`,
@@ -127,7 +129,7 @@ async function fut(): Promise<void> {
       ].sort((a, b) => (a.datum < b.datum ? -1 : 1));
       ismertNyers[js.slug] = allapotok;
       await fajlIras(`jogszabalyok/${js.slug}/szoveg.md`, md);
-      await fajlIras(`jogszabalyok/${js.slug}/meta.json`, metaJson(js, p.cim, allapotok));
+      await fajlIras(`jogszabalyok/${js.slug}/meta.json`, metaJson(js, cim, allapotok));
       uzenetSorok.push(
         `${js.rovidites ?? js.megjeloles}: ${NJT_BASE}/jogszabaly/${js.documentId}.${allapot.version}`,
       );
