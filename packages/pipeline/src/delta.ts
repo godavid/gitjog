@@ -8,7 +8,7 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { JOGSZABALYOK, NJT_BASE } from "./config.js";
+import { NJT_BASE, teljesJogszabalyLista, type Jogszabaly } from "./config.js";
 import {
   getIdoallapotok,
   getTeljesSnapshot,
@@ -17,7 +17,7 @@ import {
   type Idoallapot,
 } from "./crawl.js";
 import { markdownGeneralas } from "./normalize.js";
-import { parsolSnapshot } from "./parse.js";
+import { megjelolesEgyezik, parsolSnapshot } from "./parse.js";
 import { riaszt, terjedelemEllenorzes } from "./health.js";
 import {
   ADAT_REPO_DIR,
@@ -32,8 +32,15 @@ import {
 const push = !process.argv.includes("--no-push");
 const ma = maiNapBudapest();
 
+/**
+ * Biztonsági szelep: egy normál napon néhány (max pár tucat) új állapot jön.
+ * Ennél sokkal több azt jelzi, hogy a config és a repo szétcsúszott (pl. a
+ * generált lista bővült backfill nélkül) — ilyenkor riasztunk, nem commitolunk.
+ */
+const MAX_NAPI_UJ = 200;
+
 interface UjEsemeny {
-  js: (typeof JOGSZABALYOK)[number];
+  js: Jogszabaly;
   allapot: Idoallapot;
 }
 
@@ -46,12 +53,18 @@ async function fut(): Promise<void> {
   ) as Record<string, AllapotBejegyzes[]>;
 
   // 1. friss verziólisták + új állapotok kigyűjtése
+  const jogszabalyok = await teljesJogszabalyLista();
   const ujak: UjEsemeny[] = [];
   const ismertTerkep = new Map<string, Set<string>>();
-  for (const js of JOGSZABALYOK) {
+  for (const js of jogszabalyok) {
     const ismertek = new Set((ismertNyers[js.slug] ?? []).map((a) => a.datum));
     ismertTerkep.set(js.slug, ismertek);
-    const mind = await getIdoallapotok(js.documentId, { fresh: true });
+    let mind;
+    try {
+      mind = await getIdoallapotok(js.documentId, { fresh: true });
+    } catch {
+      continue; // nincs konszolidált szöveg (kihagyottak-listás jogszabály)
+    }
     // ugyanaz a napi-győztes logika, mint a backfillben (0 napot élt állapot veszít)
     for (const a of napiGyoztesek(mind.filter((x) => x.hatalyba <= ma))) {
       if (!ismertek.has(a.hatalyba)) ujak.push({ js, allapot: a });
@@ -60,6 +73,11 @@ async function fut(): Promise<void> {
   if (ujak.length === 0) {
     console.log("Nincs új hatályos időállapot — nincs teendő.");
     return;
+  }
+  if (ujak.length > MAX_NAPI_UJ) {
+    throw new Error(
+      `Gyanúsan sok (${ujak.length}) új állapot egy napi futásban — config/repo szétcsúszás? Nem commitolok.`,
+    );
   }
 
   const esemenyek = ujak.sort((a, b) =>
@@ -84,7 +102,7 @@ async function fut(): Promise<void> {
     for (const { js, allapot } of napiak) {
       const s = await getTeljesSnapshot(js.documentId, allapot.version);
       const p = parsolSnapshot(s, js.documentId);
-      if (p.megjeloles.toLowerCase() !== js.megjeloles.toLowerCase()) {
+      if (!megjelolesEgyezik(js.megjeloles, p.megjeloles)) {
         throw new Error(`Cím-eltérés: ${js.slug} — várt "${js.megjeloles}", kapott "${p.megjeloles}"`);
       }
       if (p.hatalyDatum && p.hatalyDatum !== allapot.hatalyba) {
@@ -123,14 +141,41 @@ async function fut(): Promise<void> {
     console.log(`Commit: ${datum} — ${nevek.join(", ")}`);
   }
 
-  // 3. index frissítése (SHA-kkal) külön utócommitban
-  const allapotIndex: Record<string, { datum: string; verzio: number; sha: string }[]> = {};
-  for (const js of JOGSZABALYOK) {
-    const shak = await allapotShaTerkep(js.slug);
-    allapotIndex[js.slug] = (ismertNyers[js.slug] ?? [])
+  // 3. index frissítése külön utócommitban — CSAK a változott jogszabályokra
+  // (5585 jogszabálynál a teljes újraépítés naponta fölösleges git-log-ezrek lenne)
+  const valtozottSlugok = [...new Set(esemenyek.map((e) => e.js.slug))];
+  const allapotIndex = JSON.parse(
+    await readFile(join(ADAT_REPO_DIR, "index", "allapotok.json"), "utf8"),
+  ) as Record<string, { datum: string; verzio: number; sha: string }[]>;
+  for (const slug of valtozottSlugok) {
+    const shak = await allapotShaTerkep(slug);
+    const sajat = (ismertNyers[slug] ?? [])
       .map((a) => ({ datum: a.datum, verzio: a.verzio, sha: shak.get(a.datum) ?? "" }))
       .filter((a) => a.sha !== "");
+    allapotIndex[slug] = sajat;
+    await fajlIras(`jogszabalyok/${slug}/allapotok.json`, JSON.stringify(sajat, null, 2) + "\n");
   }
+  // vadonatúj jogszabály (pl. friss kihirdetés) bekerül a listaindexbe is
+  const listaIndex = JSON.parse(
+    await readFile(join(ADAT_REPO_DIR, "index", "jogszabalyok.json"), "utf8"),
+  ) as { slug: string; documentId: string; megjeloles: string; cim: string; rovidites: string | null }[];
+  const listaSlugok = new Set(listaIndex.map((t) => t.slug));
+  for (const { js } of esemenyek) {
+    if (listaSlugok.has(js.slug)) continue;
+    const meta = JSON.parse(
+      await readFile(join(ADAT_REPO_DIR, "jogszabalyok", js.slug, "meta.json"), "utf8"),
+    ) as { cim: string; rovidites: string | null };
+    listaIndex.push({
+      slug: js.slug,
+      documentId: js.documentId,
+      megjeloles: js.megjeloles,
+      cim: meta.cim,
+      rovidites: meta.rovidites ?? null,
+    });
+    listaSlugok.add(js.slug);
+  }
+  listaIndex.sort((a, b) => a.slug.localeCompare(b.slug));
+  await fajlIras("index/jogszabalyok.json", JSON.stringify(listaIndex, null, 2) + "\n");
   await fajlIras("index/allapotok.json", JSON.stringify(allapotIndex, null, 2) + "\n");
   await commit("Index frissítés (allapotok.json)");
 

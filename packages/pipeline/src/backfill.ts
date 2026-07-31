@@ -1,13 +1,20 @@
-// Egyszeri backfill: a teljes MVP-lista összes múltbeli időállapotának
-// visszajátszása dátumhelyes commit-streamként az adat-repóba.
-// NEM idempotens: üres data/repo könyvtárat vár (szándékosan — a history
-// egyszer épül; a napi növekményt a delta.ts kezeli).
+// Backfill: jogszabályok múltbeli időállapotainak visszajátszása dátumhelyes
+// commit-streamként az adat-repóba.
 //
-// Futtatás:  pnpm backfill            # lokális repo-építés
-//            pnpm backfill --push     # a végén push is
+// Két mód:
+//   pnpm backfill                  # friss építés: ÜRES data/repo-t vár (MVP-mód)
+//   pnpm backfill -- --folytat     # append: meglévő repóban a MÉG HIÁNYZÓ
+//                                  # jogszabályokat dolgozza fel, kötegenként pushol
+//   (+ --push: normál módban a végén pushol; --folytat mindig pushol kötegenként)
+//
+// Az append-mód nem ír át historyt: az új (visszadátumozott) commitok a meglévő
+// history végére fűződnek — a GitHub committer-dátum szerint rendez, a
+// `git log --since/--until` pedig dátumra szűr, így mindkettő jól viselkedik.
 
 import { existsSync } from "node:fs";
-import { JOGSZABALYOK, NJT_BASE, type Jogszabaly } from "./config.js";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { JOGSZABALYOK, NJT_BASE, teljesJogszabalyLista, type Jogszabaly } from "./config.js";
 import {
   getIdoallapotok,
   getTeljesSnapshot,
@@ -16,13 +23,13 @@ import {
   type Idoallapot,
 } from "./crawl.js";
 import { markdownGeneralas } from "./normalize.js";
-import { parsolSnapshot } from "./parse.js";
+import { megjelolesEgyezik, parsolSnapshot } from "./parse.js";
 import {
   ADAT_REPO_DIR,
-  allapotShaTerkep,
   commit,
   fajlIras,
   git,
+  indexEpites,
   metaJson,
   repoInit,
   type AllapotBejegyzes,
@@ -30,25 +37,41 @@ import {
 import { DISCLAIMER_MD, GITATTRIBUTES, LICENSE_TXT, README_MD } from "./sablonok.js";
 
 const push = process.argv.includes("--push");
+const folytat = process.argv.includes("--folytat");
 const ma = maiNapBudapest();
+/** ennyi feldolgozott jogszabályonként közbenső push (append-módban) */
+const KOTEG_MERET = 500;
+
+const teljesLista = await teljesJogszabalyLista();
 
 // füstteszthez: NYILT_CSAK="2012-1-00-00,2013-5-00-00" — csak e documentId-k
 const csak = process.env.NYILT_CSAK?.split(",").map((s) => s.trim());
-const KIVALASZTOTT = csak ? JOGSZABALYOK.filter((j) => csak.includes(j.documentId)) : JOGSZABALYOK;
+let KIVALASZTOTT = csak ? teljesLista.filter((j) => csak.includes(j.documentId)) : teljesLista;
 
-if (existsSync(ADAT_REPO_DIR)) {
-  console.error(`HIBA: ${ADAT_REPO_DIR} már létezik — a backfill üres könyvtárat vár.`);
-  process.exit(1);
+if (folytat) {
+  // append-mód: meglévő repo, csak az indexben MÉG NEM szereplő jogszabályok
+  const indexUt = join(ADAT_REPO_DIR, "index", "allapotok.json");
+  if (!existsSync(indexUt)) {
+    console.error(`HIBA: --folytat módhoz meglévő adat-repo kell (${indexUt} hiányzik).`);
+    process.exit(1);
+  }
+  const ismertek = new Set(Object.keys(JSON.parse(await readFile(indexUt, "utf8"))));
+  KIVALASZTOTT = KIVALASZTOTT.filter((j) => !ismertek.has(j.slug));
+  console.log(`Append-mód: ${ismertek.size} jogszabály már a repóban, ${KIVALASZTOTT.length} új jön.`);
+} else {
+  if (existsSync(ADAT_REPO_DIR)) {
+    console.error(`HIBA: ${ADAT_REPO_DIR} már létezik — friss építéshez üres könyvtár kell (vagy --folytat).`);
+    process.exit(1);
+  }
+  // ── 1. váz ────────────────────────────────────────────────────────────────
+  await repoInit();
+  await fajlIras("README.md", README_MD);
+  await fajlIras("DISCLAIMER.md", DISCLAIMER_MD);
+  await fajlIras("LICENSE", LICENSE_TXT);
+  await fajlIras(".gitattributes", GITATTRIBUTES);
+  await commit("Adat-repo váz: README, DISCLAIMER, LICENSE");
+  console.log("Váz commitolva.");
 }
-
-// ── 1. váz ──────────────────────────────────────────────────────────────────
-await repoInit();
-await fajlIras("README.md", README_MD);
-await fajlIras("DISCLAIMER.md", DISCLAIMER_MD);
-await fajlIras("LICENSE", LICENSE_TXT);
-await fajlIras(".gitattributes", GITATTRIBUTES);
-await commit("Adat-repo váz: README, DISCLAIMER, LICENSE");
-console.log("Váz commitolva.");
 
 // ── 2. enumerálás ───────────────────────────────────────────────────────────
 interface Esemeny {
@@ -58,16 +81,36 @@ interface Esemeny {
 
 const esemenyek: Esemeny[] = [];
 const osszesMult = new Map<string, AllapotBejegyzes[]>(); // slug → múltbeli állapotok
+const kihagyottak: { documentId: string; slug: string; ok: string }[] = [];
 
+let enumSzam = 0;
 for (const js of KIVALASZTOTT) {
-  const mind = await getIdoallapotok(js.documentId);
+  enumSzam++;
+  let mind;
+  try {
+    mind = await getIdoallapotok(js.documentId);
+  } catch (e) {
+    // üres verziólista = nincs konszolidált szöveg az njt-n → listázva kihagyjuk
+    kihagyottak.push({ documentId: js.documentId, slug: js.slug, ok: String(e instanceof Error ? e.message : e) });
+    continue;
+  }
   const mult = napiGyoztesek(mind.filter((a) => a.hatalyba <= ma));
+  if (mult.length === 0) {
+    kihagyottak.push({ documentId: js.documentId, slug: js.slug, ok: "csak jövőbeli állapotok" });
+    continue;
+  }
   osszesMult.set(
     js.slug,
     mult.map((a) => ({ datum: a.hatalyba, verzio: a.version })),
   );
   for (const allapot of mult) esemenyek.push({ js, allapot });
-  console.log(`${js.slug}: ${mult.length} múltbeli állapot (össz: ${mind.length})`);
+  console.log(`[enum ${enumSzam}/${KIVALASZTOTT.length}] ${js.slug}: ${mult.length} múltbeli állapot (össz: ${mind.length})`);
+}
+console.log(`Kihagyva (nincs szöveg): ${kihagyottak.length}`);
+
+if (folytat && esemenyek.length === 0) {
+  console.log("Append-mód: nincs új feldolgozandó jogszabály — nincs teendő.");
+  process.exit(0);
 }
 
 esemenyek.sort((a, b) =>
@@ -83,6 +126,8 @@ console.log(`Összesen ${esemenyek.length} esemény, ${new Set(esemenyek.map((e)
 const cimek = new Map<string, string>(); // slug → oldalról olvasott cím
 const ismeretlenOsztalyNaplo = new Map<string, string[]>();
 let kesz = 0;
+let commitSzamlalo = 0;
+let utolsoPushnal = 0;
 
 let i = 0;
 while (i < esemenyek.length) {
@@ -97,10 +142,9 @@ while (i < esemenyek.length) {
   for (const { js, allapot } of napiak) {
     const s = await getTeljesSnapshot(js.documentId, allapot.version);
     const p = parsolSnapshot(s, js.documentId);
-    // validálás: jó jogszabályt, jó időállapotban kaptunk-e
-    // (régi törvényeknél a h1 nagybetűs — "1988. évi I. TÖRVÉNY" —, ezért
-    // kis-nagybetű-függetlenül hasonlítunk)
-    if (p.megjeloles.toLowerCase() !== js.megjeloles.toLowerCase()) {
+    // validálás: jó jogszabályt, jó időállapotban kaptunk-e (kis-nagybetű-független,
+    // a régi "törvénycikk" végződést is elfogadva — lásd megjelolesEgyezik)
+    if (!megjelolesEgyezik(js.megjeloles, p.megjeloles)) {
       throw new Error(`Cím-eltérés: ${js.slug} — várt "${js.megjeloles}", kapott "${p.megjeloles}"`);
     }
     if (p.hatalyDatum && p.hatalyDatum !== allapot.hatalyba) {
@@ -133,29 +177,29 @@ while (i < esemenyek.length) {
       : `Időállapotok ${datum}: ${nevek.join(", ")}`;
   const uzenet = `${cim}\n\nForrás (njt):\n${uzenetSorok.map((s) => `- ${s}`).join("\n")}`;
   await commit(uzenet.length > 60_000 ? cim : uzenet, datum);
-  console.log(`[${kesz}/${esemenyek.length}] ${datum}: ${nevek.join(", ")}`);
+  commitSzamlalo++;
+  console.log(`[${kesz}/${esemenyek.length}] ${datum}: ${nevek.length > 8 ? `${nevek.length} jogszabály` : nevek.join(", ")}`);
+
+  // append-módban kötegenként pusholunk (2 GB push-limit + megszakíthatóság)
+  if (folytat && commitSzamlalo - utolsoPushnal >= KOTEG_MERET) {
+    await git(["push", "origin", "main"]);
+    utolsoPushnal = commitSzamlalo;
+    console.log(`— közbenső push (${commitSzamlalo} commit) —`);
+  }
 }
 
-// ── 4. index-utócommit ──────────────────────────────────────────────────────
-const lista = KIVALASZTOTT.map((js) => ({
-  slug: js.slug,
-  documentId: js.documentId,
-  megjeloles: js.megjeloles,
-  cim: cimek.get(js.slug) ?? js.cim,
-  rovidites: js.rovidites ?? null,
-}));
-await fajlIras("index/jogszabalyok.json", JSON.stringify(lista, null, 2) + "\n");
-
-const allapotIndex: Record<string, { datum: string; verzio: number; sha: string }[]> = {};
-for (const js of KIVALASZTOTT) {
-  const shak = await allapotShaTerkep(js.slug);
-  allapotIndex[js.slug] = osszesMult
-    .get(js.slug)!
-    .map((a) => ({ ...a, sha: shak.get(a.datum) ?? "" }))
-    .filter((a) => a.sha !== "");
+// ── 4. index-utócommit (a teljes állományra, meta.json-okból — idempotens) ──
+await indexEpites(teljesLista);
+if (kihagyottak.length > 0) {
+  let regiek: typeof kihagyottak = [];
+  try {
+    regiek = JSON.parse(await readFile(join(ADAT_REPO_DIR, "index", "kihagyottak.json"), "utf8"));
+  } catch {}
+  const terkep = new Map([...regiek, ...kihagyottak].map((k) => [k.documentId, k]));
+  const osszes = [...terkep.values()].sort((a, b) => a.documentId.localeCompare(b.documentId));
+  await fajlIras("index/kihagyottak.json", JSON.stringify(osszes, null, 2) + "\n");
 }
-await fajlIras("index/allapotok.json", JSON.stringify(allapotIndex, null, 2) + "\n");
-await commit("Index frissítés (jogszabalyok.json, allapotok.json)");
+await commit("Index frissítés (jogszabalyok.json, allapotok.json, per-jogszabály állapotfájlok)");
 console.log("Index commitolva.");
 
 if (ismeretlenOsztalyNaplo.size > 0) {
@@ -166,9 +210,9 @@ if (ismeretlenOsztalyNaplo.size > 0) {
 }
 
 const commitDb = (await git(["rev-list", "--count", "HEAD"])).trim();
-console.log(`Backfill KÉSZ: ${commitDb} commit, ${kesz} időállapot.`);
+console.log(`Backfill KÉSZ: ${commitDb} commit, ${kesz} időállapot, ${kihagyottak.length} kihagyva.`);
 
-if (push) {
+if (push || folytat) {
   await git(["push", "-u", "origin", "main"]);
   console.log("Push KÉSZ → origin/main");
 }

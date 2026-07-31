@@ -25,6 +25,28 @@ export const RATE_LIMIT_MS = 550;
 export const ADAT_REPO = "godavid/magyar-jogtar";
 export const ADAT_REPO_URL = `https://github.com/${ADAT_REPO}.git`;
 
+/**
+ * A teljes feldolgozandó lista: a kiemelt (kézi) JOGSZABALYOK + a sitemapból
+ * generált data-static/torvenyek.json (ha létezik). Kiemelt győz (rövidítés, cím).
+ * A generált fájl a torvenylista-generalas.ts kimenete.
+ */
+export async function teljesJogszabalyLista(): Promise<Jogszabaly[]> {
+  const { readFile } = await import("node:fs/promises");
+  const terkep = new Map(JOGSZABALYOK.map((j) => [j.documentId, j]));
+  try {
+    const nyers = await readFile(new URL("../data-static/torvenyek.json", import.meta.url), "utf8");
+    const generalt = JSON.parse(nyers) as { documentId: string; slug: string; megjeloles: string }[];
+    for (const g of generalt) {
+      if (!terkep.has(g.documentId)) {
+        terkep.set(g.documentId, { documentId: g.documentId, slug: g.slug, megjeloles: g.megjeloles, cim: "" });
+      }
+    }
+  } catch {
+    // nincs generált lista — csak a kiemeltek (MVP-mód)
+  }
+  return [...terkep.values()];
+}
+
 export const JOGSZABALYOK: Jogszabaly[] = [
   { documentId: "2011-4301-02-00", slug: "magyarorszag-alaptorvenye", megjeloles: "Magyarország Alaptörvénye", cim: "Magyarország Alaptörvénye" },
   { documentId: "2013-5-00-00", slug: "2013-evi-v-torveny-ptk", megjeloles: "2013. évi V. törvény", cim: "a Polgári Törvénykönyvről", rovidites: "Ptk." },

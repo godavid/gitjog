@@ -40,6 +40,16 @@ export function szovegTisztitas(s: string): string {
   return s.replace(/[   ]/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/**
+ * A várt megjelölés és az oldal h1-e egyezik-e. Kis-nagybetű-független, és a
+ * régi jogszabályoknál a "törvénycikk" végződést is elfogadja a "törvény" helyett
+ * (pl. "1875. évi XXXVII. törvénycikk").
+ */
+export function megjelolesEgyezik(vart: string, kapott: string): boolean {
+  const norm = (s: string) => s.toLowerCase().replace(/törvénycikk\b/, "törvény");
+  return norm(vart) === norm(kapott);
+}
+
 function cellaTisztitas(s: string): string {
   return szovegTisztitas(s).replace(/\|/g, "\\|");
 }

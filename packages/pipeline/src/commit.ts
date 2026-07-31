@@ -82,6 +82,44 @@ export function metaJson(
 }
 
 /**
+ * Egységes index-építés a repóban lévő meta.json-okból: index/jogszabalyok.json,
+ * index/allapotok.json ÉS jogszabalyonként allapotok.json (a weboldal a kicsit
+ * olvassa a több MB-os központi helyett). A meta nélküli (ki nem játszott)
+ * jogszabályokat átugorja. Idempotens; a hívó commitol utána.
+ */
+export async function indexEpites(jogszabalyok: Jogszabaly[]): Promise<void> {
+  const { readFile } = await import("node:fs/promises");
+  const lista: { slug: string; documentId: string; megjeloles: string; cim: string; rovidites: string | null }[] = [];
+  const allapotIndex: Record<string, { datum: string; verzio: number; sha: string }[]> = {};
+  for (const js of jogszabalyok) {
+    let meta: { cim: string; rovidites: string | null; allapotok: AllapotBejegyzes[] };
+    try {
+      meta = JSON.parse(
+        await readFile(join(ADAT_REPO_DIR, "jogszabalyok", js.slug, "meta.json"), "utf8"),
+      );
+    } catch {
+      continue; // ehhez a jogszabályhoz (még) nincs adat
+    }
+    lista.push({
+      slug: js.slug,
+      documentId: js.documentId,
+      megjeloles: js.megjeloles,
+      cim: meta.cim || js.cim,
+      rovidites: meta.rovidites ?? js.rovidites ?? null,
+    });
+    const shak = await allapotShaTerkep(js.slug);
+    const sajat = meta.allapotok
+      .map((a) => ({ datum: a.datum, verzio: a.verzio, sha: shak.get(a.datum) ?? "" }))
+      .filter((a) => a.sha !== "");
+    allapotIndex[js.slug] = sajat;
+    await fajlIras(`jogszabalyok/${js.slug}/allapotok.json`, JSON.stringify(sajat, null, 2) + "\n");
+  }
+  lista.sort((a, b) => a.slug.localeCompare(b.slug));
+  await fajlIras("index/jogszabalyok.json", JSON.stringify(lista, null, 2) + "\n");
+  await fajlIras("index/allapotok.json", JSON.stringify(allapotIndex, null, 2) + "\n");
+}
+
+/**
  * slug → (datum → commit SHA) térkép a jogszabály KÖNYVTÁRÁNAK history-jából.
  * Szándékosan a könyvtár és nem a szoveg.md: van olyan njt-verzió, ahol a
  * szöveg nem változik (csak lábjegyzet, amit kiszűrünk) — ilyenkor csak a
