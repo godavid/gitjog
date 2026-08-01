@@ -64,7 +64,10 @@ let cache: IndexCsomag | null = null;
 let epitesFolyamatban: Promise<IndexCsomag> | null = null;
 
 async function epit(): Promise<IndexCsomag> {
-  const jogszabalyok = await getJogszabalyok();
+  // ÁTMENETI szűkítés: 5586 törvény teljes szövege nem fér memóriabeli indexbe —
+  // amíg a Postgres FTS (Supabase) nem él, a teljes szövegű keresés a kiemelt
+  // (rövidítéses) törvényekre korlátozódik. A kereses-oldal jelzi ezt.
+  const jogszabalyok = (await getJogszabalyok()).filter((j) => j.rovidites !== null);
   const dokumentumok = new Map<number, KeresoDok>();
   let kovId = 1;
   const mini = new MiniSearch<KeresoDok>({

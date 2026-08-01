@@ -23,7 +23,8 @@ export default async function KeresesOldal({
         <p className="alcim-sor">Írj be egy kifejezést a fenti keresőmezőbe.</p>
       ) : (
         <p className="alcim-sor">
-          „{kifejezes}” — {talalatok.length} találat a jogszabályok teljes szövegében
+          „{kifejezes}” — {talalatok.length} találat (egyelőre a kiemelt törvények teljes
+          szövegében; a teljes állományra kiterjedő keresés hamarosan)
         </p>
       )}
       {kifejezes && talalatok.length === 0 ? (
