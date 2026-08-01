@@ -73,7 +73,9 @@ export function megjelolesIllesztes(
     // Szerkezeti illesztés: az év és a római szám ÉRTÉKE a mérvadó — az njt
     // írásjel-hibái ("1991 évi …"), az archaikus végződések ("törvény-czikk")
     // és a nem szabványos, de hivatalos számalakok ("IL" = XLIX) is átmennek.
-    const m = kapott.match(/^(\d{4})\.?\s*évi\s+([IVXLCDMivxlcdm]+)\.?\s*törvény(?:-?cz?ikk)?/i);
+    // az "évi" szó az njt-adatban hiányozhat ("1959. IV. TÖRVÉNY") vagy
+    // pontozott lehet ("2015. évi. LIII.") — az év + a római szám ÉRTÉKE a mérvadó
+    const m = kapott.match(/^(\d{4})\.?\s*(?:évi\.?\s+)?([IVXLCDMivxlcdm]+)\.?\s*törvény(?:-?cz?ikk)?/i);
     if (!m) return { ok: false, maradekCim: "" };
     if (m[1] !== kepletes[1]) return { ok: false, maradekCim: "" };
     if (romaiErtekLazan(m[2]!) !== romaiErtekLazan(kepletes[2]!)) return { ok: false, maradekCim: "" };
@@ -263,4 +265,6 @@ export const ISMERT_OSZTALYOK = new Set([
   "idezetElo",
   "idezetZaro",
   "idezetUto",
+  "idezetTitle",
+  "preambulumbekezdes",
 ]);
