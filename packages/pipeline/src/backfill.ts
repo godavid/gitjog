@@ -132,6 +132,7 @@ const cimek = new Map<string, string>(); // slug → oldalról olvasott cím
 const ismeretlenOsztalyNaplo = new Map<string, string[]>();
 const hibasSlugok = new Set<string>(); // validálási hibára futott jogszabályok
 const problemasNaplo: string[] = [];
+const keszTerkep = new Map<string, Set<string>>(); // gyors resume: slug → kész dátumok
 let kesz = 0;
 let commitSzamlalo = 0;
 let utolsoPushnal = 0;
@@ -148,6 +149,27 @@ while (i < esemenyek.length) {
   const uzenetSorok: string[] = [];
   for (const { js, allapot } of napiak) {
     if (hibasSlugok.has(js.slug)) continue; // korábban validálási hibára futott
+    // gyors resume: ha a repó meta.json-ja már tartalmazza ezt a dátumot, a
+    // (letöltés + parse + írás) teljes egésze kihagyható — a determinisztikus
+    // kimenet úgyis változatlan lenne
+    if (folytat) {
+      let keszek = keszTerkep.get(js.slug);
+      if (keszek === undefined) {
+        try {
+          const meta = JSON.parse(
+            await readFile(join(ADAT_REPO_DIR, "jogszabalyok", js.slug, "meta.json"), "utf8"),
+          ) as { allapotok: { datum: string }[] };
+          keszek = new Set(meta.allapotok.map((a) => a.datum));
+        } catch {
+          keszek = new Set();
+        }
+        keszTerkep.set(js.slug, keszek);
+      }
+      if (keszek.has(allapot.hatalyba)) {
+        kesz++;
+        continue;
+      }
+    }
     const s = await getTeljesSnapshot(js.documentId, allapot.version);
     const p = parsolSnapshot(s, js.documentId);
     // Validálás: jó jogszabályt, jó időállapotban kaptunk-e. Eltérésnél a
