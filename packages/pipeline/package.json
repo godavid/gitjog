@@ -8,6 +8,7 @@
   "scripts": {
     "backfill": "tsx src/backfill.ts",
     "delta": "tsx src/delta.ts",
+    "enumeralas-init": "tsx src/enumeralas-init.ts",
     "test": "vitest run"
   },
   "dependencies": {

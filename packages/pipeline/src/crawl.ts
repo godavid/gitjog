@@ -23,6 +23,13 @@ export interface Idoallapot {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Az njt üres verziólistát adott: a jogszabálynak nincs konszolidált szövege.
+ * Külön típus, mert a hívónak ezt meg kell különböztetnie a hálózati hibától —
+ * az előbbi tartós tény (réteg-besorolás), az utóbbi átmeneti zaj.
+ */
+export class UresVerziolistaHiba extends Error {}
+
 let utolsoKeres = 0;
 const BACKOFF_MS = [2_000, 8_000, 30_000];
 
@@ -127,7 +134,9 @@ export async function getIdoallapotok(
     data?: { version: number; comingIntoForce: string; expiresOn: string | null; current?: boolean }[];
   };
   if (!valasz.data || valasz.data.length === 0) {
-    throw new Error(`Üres verziólista: ${documentId} — rossz documentId vagy njt-változás?`);
+    throw new UresVerziolistaHiba(
+      `Üres verziólista: ${documentId} — rossz documentId vagy njt-változás?`,
+    );
   }
   return valasz.data
     .map((v) => ({

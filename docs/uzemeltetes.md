@@ -29,6 +29,19 @@
   Megszakadt LOKÁLIS futás után mindig friss klónból futtasd újra (a részben
   commitolt napok + az elmaradt index-frissítés miatt); az Actions-futásnál ez
   nem gond, mert minden futás friss checkoutot kap.
+- `enumeralas.ts` — réteges enumerálás: melyik jogszabályt kell MA lekérdezni.
+  Az 5586-os listát végigkérdezni naponta ~51 perc lenne (550 ms rate limit),
+  ezért három réteg van (az adat-repo `index/enumeralas.json`-jában):
+  `aktiv` (van hatályos vagy jövőbeli állapota) minden nap, `lezart` és
+  `nincs-szoveg` heti körforgásban. A körforgás állapotmentes: a documentId
+  hash-e dönti el, melyik napon esedékes — nincs "utoljára ellenőrizve" mező,
+  és a napi terhelés egyenletes. A delta minden lekérdezésnél frissíti a réteget.
+  Jelenlegi arány: 2043 aktív / 2296 lezárt / 1247 szöveg nélküli → ~2550 kérés
+  és ~23 perc naponta az 5586 helyett.
+  A térkép első feltöltése a lemez-cache-ből: `pnpm --filter @nyilt-jogtar/pipeline
+  enumeralas-init [-- --push]` (a backfill után; utána a delta tartja karban).
+  Ha a fájl hiányzik vagy sérült, a delta a teljes végigjárásra esik vissza —
+  lassabb, de nem hagy ki adatot.
 - `health.ts` — riasztás (Issue) + terjedelem-anomália-őr.
 
 ## Ha törik a parser (njt-átdizájn)
@@ -52,16 +65,21 @@ commitol — rossz adat nem kerülhet a repóba.
    a következő delta-commitnál — kerüld, ha csak lehet.
 5. Kézi delta-futtatás ellenőrzésre, majd az issue lezárása.
 
-## Skálázás a teljes joganyagra (4326 jogszabály)
+## Skálázás a törvényekre — KÉSZ (2026-08-01)
 
-1. A `config.ts` listát generálni kell kézi felsorolás helyett: az njt keresője
-   (`/search_kozismert/*` engedélyezett; a teljes lista módszerét fel kell deríteni).
-2. A backfill futásideje a snapshotszámmal skálázik (~1,3 s/kérés). A teljes korpusz
-   becsült 100–200 ezer snapshot → hetekig futó lokális/VPS folyamat, szakaszolva
-   (a cache miatt megszakítható-folytatható; a backfillt jogszabály-kötegekre bontva
-   érdemes futtatni és szakaszonként pusholni).
-3. A weboldal keresője (MiniSearch, memóriában) ~200 törvényig bírja; utána Postgres
-   FTS (Supabase) a terv (FABLE-PROMPT 7. fázis).
+A teljes törvényállomány betöltve: **4332 jogszabály, 5404 commit** az adat-repóban,
+1254 tétel kihagyva (nincs konszolidált szöveg az njt-n). A lista a sitemapból
+generálódik (`torvenylista-generalas.ts` → `data-static/torvenyek.json`, 5585 tétel).
+
+- A backfill folytatható: `pnpm backfill -- --folytat` (tiszta worktree-ről indul,
+  a már commitolt (jogszabály, dátum) párokat parse nélkül átugorja, kötegenként pushol).
+- A napi delta ehhez a mérethez a réteges enumerálással igazodik (lásd fentebb).
+
+Ami még hátravan:
+1. A weboldal keresője (MiniSearch, memóriában) ~200 törvényig bírja, ezért a teljes
+   szövegű keresés ÁTMENETILEG a kiemelt (rövidítéses) törvényekre szűkítve fut
+   (`apps/web/lib/kereso.ts`); a kereső-oldal ezt jelzi. Terv: Postgres FTS (Supabase).
+2. Rendeletek, határozatok (a lista jelenleg csak törvény).
 
 ## Titkok
 
@@ -75,3 +93,6 @@ a weboldal publikus adatot olvas. A Vercel-deploy a `remenyfarm` fiókhoz kötö
 - Az njt időállapot-listája a MÚLTAT is átírhatja (ritkán): a delta az ismert
   dátumokhoz nem nyúl, új múltbeli dátumot viszont felvesz a következő futáskor —
   ilyenkor a commit-dátum (a hatálybalépés napja) helyes marad, csak később került be.
+- A réteges enumerálás ára: ha egy már lezárt (hatályát vesztett) jogszabály mégis
+  új időállapotot kap az njt-n, az legfeljebb egy körforgásnyi (7 nap) késéssel
+  kerül be. A hatályos jogszabályok napi pontossága ettől nem sérül.

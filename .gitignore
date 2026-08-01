@@ -6,5 +6,6 @@ dist/
 .env.*
 data/cache/
 data/repo/
+data/sitemap.xml
 *.log
 .DS_Store

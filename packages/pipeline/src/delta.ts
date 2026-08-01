@@ -14,8 +14,18 @@ import {
   getTeljesSnapshot,
   maiNapBudapest,
   napiGyoztesek,
+  UresVerziolistaHiba,
   type Idoallapot,
 } from "./crawl.js";
+import {
+  maiHalmaz,
+  retegBesorolas,
+  retegOsszefoglalo,
+  retegTerkepJson,
+  retegTerkepOlvas,
+  RETEG_FAJL,
+  type RetegTerkep,
+} from "./enumeralas.js";
 import { markdownGeneralas } from "./normalize.js";
 import { megjelolesIllesztes, parsolSnapshot } from "./parse.js";
 import { riaszt, terjedelemEllenorzes } from "./health.js";
@@ -39,9 +49,20 @@ const ma = maiNapBudapest();
  */
 const MAX_NAPI_UJ = 200;
 
+/**
+ * Ennyi sikertelen verziólista-kérésig (a retry+backoff kimerülése UTÁN) nem
+ * riasztunk: egy-két kiesés az njt normál üzemi zaja. Fölötte viszont
+ * kimaradásra vagy blokkolásra gyanakszunk, és inkább leállunk.
+ */
+const MAX_HALOZATI_HIBA = 20;
+
 interface UjEsemeny {
   js: Jogszabaly;
   allapot: Idoallapot;
+}
+
+async function retegTerkepMentes(terkep: RetegTerkep): Promise<void> {
+  await fajlIras(RETEG_FAJL, retegTerkepJson(terkep));
 }
 
 async function fut(): Promise<void> {
@@ -52,25 +73,59 @@ async function fut(): Promise<void> {
     await readFile(join(ADAT_REPO_DIR, "index", "allapotok.json"), "utf8"),
   ) as Record<string, AllapotBejegyzes[]>;
 
-  // 1. friss verziólisták + új állapotok kigyűjtése
+  // 1. friss verziólisták + új állapotok kigyűjtése — csak a ma esedékes
+  // jogszabályokra (réteges enumerálás, lásd enumeralas.ts)
   const jogszabalyok = await teljesJogszabalyLista();
+  const retegTerkep = await retegTerkepOlvas(ADAT_REPO_DIR);
+  const vanTerkep = Object.keys(retegTerkep).length > 0;
+  const maiak = maiHalmaz(jogszabalyok, retegTerkep, ma);
+  console.log(
+    `Enumerálás: ${maiak.length}/${jogszabalyok.length} jogszabály esedékes ma` +
+      (vanTerkep
+        ? ` (${retegOsszefoglalo(retegTerkep)})`
+        : " — nincs réteg-térkép, teljes végigjárás"),
+  );
+
   const ujak: UjEsemeny[] = [];
-  const ismertTerkep = new Map<string, Set<string>>();
-  for (const js of jogszabalyok) {
+  let halozatiHiba = 0;
+  for (const js of maiak) {
     const ismertek = new Set((ismertNyers[js.slug] ?? []).map((a) => a.datum));
-    ismertTerkep.set(js.slug, ismertek);
     let mind;
     try {
       mind = await getIdoallapotok(js.documentId, { fresh: true });
-    } catch {
-      continue; // nincs konszolidált szöveg (kihagyottak-listás jogszabály)
+    } catch (e) {
+      if (e instanceof UresVerziolistaHiba) {
+        // nincs konszolidált szöveg (kihagyottak-listás jogszabály) — tartós tény
+        retegTerkep[js.documentId] = "nincs-szoveg";
+        continue;
+      }
+      // átmeneti njt-hiba a retry+backoff kimerülése után: a réteget NEM
+      // írjuk át, mert egy téves besorolás napokra kiejtené a napi körből
+      halozatiHiba++;
+      continue;
     }
+    retegTerkep[js.documentId] = retegBesorolas(mind, ma);
     // ugyanaz a napi-győztes logika, mint a backfillben (0 napot élt állapot veszít)
     for (const a of napiGyoztesek(mind.filter((x) => x.hatalyba <= ma))) {
       if (!ismertek.has(a.hatalyba)) ujak.push({ js, allapot: a });
     }
   }
+  if (halozatiHiba > MAX_HALOZATI_HIBA) {
+    throw new Error(
+      `${halozatiHiba} verziólista-kérés hiúsult meg ${maiak.length}-ből — njt-kimaradás vagy blokkolás? Nem commitolok.`,
+    );
+  }
+  if (halozatiHiba > 0) {
+    console.log(`(${halozatiHiba} verziólista nem jött le — a következő futás újrapróbálja)`);
+  }
+
   if (ujak.length === 0) {
+    // a réteg-térkép akkor is változhatott, ha nincs új időállapot
+    await retegTerkepMentes(retegTerkep);
+    if (await commit("Enumerálás-térkép frissítés")) {
+      console.log(`Enumerálás-térkép frissítve (${retegOsszefoglalo(retegTerkep)}).`);
+      if (push) await git(["push", "origin", "main"]);
+    }
     console.log("Nincs új hatályos időállapot — nincs teendő.");
     return;
   }
@@ -179,7 +234,8 @@ async function fut(): Promise<void> {
   listaIndex.sort((a, b) => a.slug.localeCompare(b.slug));
   await fajlIras("index/jogszabalyok.json", JSON.stringify(listaIndex, null, 2) + "\n");
   await fajlIras("index/allapotok.json", JSON.stringify(allapotIndex, null, 2) + "\n");
-  await commit("Index frissítés (allapotok.json)");
+  await retegTerkepMentes(retegTerkep);
+  await commit("Index frissítés (allapotok.json, enumeralas.json)");
 
   if (push) {
     await git(["push", "origin", "main"]);
