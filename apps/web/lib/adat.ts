@@ -40,6 +40,13 @@ export async function getAllapotok(): Promise<Record<string, Allapot[]>> {
   return JSON.parse(nyers) as Record<string, Allapot[]>;
 }
 
+/** egy jogszabály állapotlistája a kis per-törvény fájlból */
+export async function getAllapotokSlug(slug: string): Promise<Allapot[]> {
+  const nyers = await rawFetch(`main/jogszabalyok/${slug}/allapotok.json`);
+  if (!nyers) return [];
+  return JSON.parse(nyers) as Allapot[];
+}
+
 export async function getSzoveg(slug: string): Promise<string | null> {
   return rawFetch(`main/jogszabalyok/${slug}/szoveg.md`);
 }

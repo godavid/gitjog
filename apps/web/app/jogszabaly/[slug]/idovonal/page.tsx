@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAllapotok, getJogszabalyok } from "@/lib/adat";
+import { getAllapotokSlug, getJogszabalyok } from "@/lib/adat";
 
 export const revalidate = 3600;
 
@@ -21,10 +21,9 @@ export default async function IdovonalOldal({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [jogszabalyok, allapotok] = await Promise.all([getJogszabalyok(), getAllapotok()]);
+  const [jogszabalyok, sajat] = await Promise.all([getJogszabalyok(), getAllapotokSlug(slug)]);
   const tetel = jogszabalyok.find((j) => j.slug === slug);
-  const sajat = allapotok[slug];
-  if (!tetel || !sajat?.length) notFound();
+  if (!tetel || !sajat.length) notFound();
 
   const forditott = [...sajat].reverse(); // legfrissebb felül
   return (

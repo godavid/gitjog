@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import DiffNezet from "@/components/DiffNezet";
-import { getAllapotok, getJogszabalyok, nyersUrl } from "@/lib/adat";
+import { getAllapotokSlug, getJogszabalyok, nyersUrl } from "@/lib/adat";
 
 export const revalidate = 3600;
 
@@ -24,9 +24,8 @@ export default async function DiffOldal({
   params: Promise<{ slug: string; tol: string; ig: string }>;
 }) {
   const { slug, tol, ig } = await params;
-  const [jogszabalyok, allapotok] = await Promise.all([getJogszabalyok(), getAllapotok()]);
+  const [jogszabalyok, sajat] = await Promise.all([getJogszabalyok(), getAllapotokSlug(slug)]);
   const tetel = jogszabalyok.find((j) => j.slug === slug);
-  const sajat = allapotok[slug] ?? [];
   const regi = sajat.find((a) => a.datum === tol);
   const uj = sajat.find((a) => a.datum === ig);
   if (!tetel || !regi || !uj) notFound();

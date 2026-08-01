@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAllapotok, getJogszabalyok, getSzoveg } from "@/lib/adat";
+import { getAllapotokSlug, getJogszabalyok, getSzoveg } from "@/lib/adat";
 import { mdRender } from "@/lib/md";
 
 export const revalidate = 3600;
 
 export async function generateStaticParams() {
   const jogszabalyok = await getJogszabalyok();
-  return jogszabalyok.map((j) => ({ slug: j.slug }));
+  return jogszabalyok.filter((j) => j.rovidites !== null).map((j) => ({ slug: j.slug }));
 }
 
 export async function generateMetadata({
@@ -31,15 +31,14 @@ export default async function JogszabalyOldal({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [jogszabalyok, allapotok, szoveg] = await Promise.all([
+  const [jogszabalyok, sajat, szoveg] = await Promise.all([
     getJogszabalyok(),
-    getAllapotok(),
+    getAllapotokSlug(slug),
     getSzoveg(slug),
   ]);
   const tetel = jogszabalyok.find((j) => j.slug === slug);
   if (!tetel || !szoveg) notFound();
 
-  const sajat = allapotok[slug] ?? [];
   const utolso = sajat.at(-1);
   const elozo = sajat.at(-2);
   const { html } = mdRender(szoveg);

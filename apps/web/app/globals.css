@@ -380,3 +380,69 @@ h4:hover .horgony,
 .lablec a {
   color: inherit;
 }
+
+/* ── főoldal: nagy kereső ── */
+.fo-kereso {
+  display: flex;
+  gap: 10px;
+  max-width: 40rem;
+  margin: 8px auto 0;
+}
+.fo-kereso input {
+  font: inherit;
+  font-size: 17px;
+  color: inherit;
+  background: var(--papir);
+  border: 1px solid var(--vonal);
+  border-radius: 6px;
+  padding: 12px 16px;
+  flex: 1;
+  min-width: 0;
+}
+.fo-kereso input::placeholder {
+  color: var(--tinta-halvany);
+}
+.fo-kereso .gomb {
+  font-size: 17px;
+  padding: 12px 22px;
+}
+
+/* ── főoldal: szekciók ── */
+.fo-szekcio {
+  margin-top: 52px;
+}
+.fo-szekcio h2 {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* ── főoldal: évrács ── */
+.ev-racs {
+  margin-top: 16px;
+  border-top: 1px solid var(--vonal);
+}
+.ev-racs-sor {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  gap: 4px 20px;
+  align-items: baseline;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--vonal);
+}
+.ev-racs-cimke {
+  font-family: var(--serif);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ev-racs-evek {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+@media (max-width: 640px) {
+  .ev-racs-sor {
+    grid-template-columns: 1fr;
+  }
+}
