@@ -174,23 +174,36 @@ export function borderekKiolvasasa(alapHtml: string): { start: number; last?: nu
 }
 
 async function njtFetchJson(path: string, body: unknown): Promise<string> {
-  // A blokk-végpont application/json törzset vár (nem form-encodedet)
+  // A blokk-végpont application/json törzset vár (nem form-encodedet).
+  // Ugyanaz a retry+backoff jár neki, mint a fő fetchnek — egy éjszakai
+  // futást egyetlen átmeneti timeout nem üthet ki.
   const url = `${NJT_BASE}${path}`;
-  const varakozas = utolsoKeres + RATE_LIMIT_MS - Date.now();
-  if (varakozas > 0) await sleep(varakozas);
-  utolsoKeres = Date.now();
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "User-Agent": USER_AGENT,
-      "Accept-Language": "hu-HU,hu;q=0.9",
-      "Content-Type": "application/json; charset=utf-8",
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(180_000),
-  });
-  if (res.status !== 200) throw new Error(`HTTP ${res.status} — ${url}`);
-  return await res.text();
+  let utolsoHiba: unknown;
+  for (let proba = 0; proba <= BACKOFF_MS.length; proba++) {
+    const varakozas = utolsoKeres + RATE_LIMIT_MS - Date.now();
+    if (varakozas > 0) await sleep(varakozas);
+    utolsoKeres = Date.now();
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "User-Agent": USER_AGENT,
+          "Accept-Language": "hu-HU,hu;q=0.9",
+          "Content-Type": "application/json; charset=utf-8",
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(180_000),
+      });
+      if (res.status === 200) return await res.text();
+      utolsoHiba = new Error(`HTTP ${res.status} — ${url}`);
+      if (res.status >= 400 && res.status < 500 && res.status !== 429) throw utolsoHiba;
+    } catch (e) {
+      if (e === utolsoHiba) throw e;
+      utolsoHiba = e;
+    }
+    if (proba < BACKOFF_MS.length) await sleep(BACKOFF_MS[proba]!);
+  }
+  throw new Error(`njt-blokk-kérés végleg meghiúsult: ${url} — ${String(utolsoHiba)}`);
 }
 
 export interface TeljesSnapshot {
