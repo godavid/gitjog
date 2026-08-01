@@ -38,8 +38,8 @@ export default async function Fooldal() {
         <input
           type="search"
           name="q"
-          placeholder="Keresés megjelölésre, címre vagy rövidítésre"
-          aria-label="Keresés a törvények között"
+          placeholder="Keresés a törvények teljes szövegében…"
+          aria-label="Keresés a törvények teljes szövegében"
         />
         <button className="gomb" type="submit">
           Keresés

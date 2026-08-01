@@ -42,7 +42,7 @@ export default async function EvOldal({
 
   return (
     <main className="lap">
-      <h1>„{ev}. évi törvények”</h1>
+      <h1>{ev}. évi törvények</h1>
       <p className="alcim-sor">
         {tetelek.length} törvény
         {elozo !== undefined ? (
