@@ -139,12 +139,26 @@ export async function indexEpites(jogszabalyok: Jogszabaly[]): Promise<void> {
  * különben a napi delta örökké "újként" látná (fantom-állapot hurok).
  */
 export async function allapotShaTerkep(slug: string): Promise<Map<string, string>> {
-  const ki = await git(["log", "--reverse", "--format=%H|%cs", "--", `jogszabalyok/${slug}/`]);
+  const ki = await git(["log", "--reverse", "--format=%H|%cs|%s", "--", `jogszabalyok/${slug}/`]);
+  return shaTerkepParse(ki);
+}
+
+/**
+ * A `%H|%cs|%s` sorok feldolgozása. A kulcs NEM a commit dátuma lehet, mert az
+ * 1970 előtti hatálybalépéseket a git() az epoch-határra csúsztatja (lásd ott) —
+ * egy 1902-es időállapot commit-dátuma 1970-01-01, így a dátum szerinti
+ * párosítás elvesztené. Az üzenet első sorában viszont MINDIG a valódi nap áll
+ * ("… — időállapot 1902-09-21" / "Időállapotok 1902-09-21: …"), ezért az a
+ * mérvadó; dátum nélküli üzenetnél (index-commitok) marad a commit dátuma.
+ */
+export function shaTerkepParse(gitLogKimenet: string): Map<string, string> {
   const terkep = new Map<string, string>();
-  for (const sor of ki.trim().split("\n")) {
+  for (const sor of gitLogKimenet.trim().split("\n")) {
     if (!sor) continue;
-    const [sha, datum] = sor.split("|");
-    if (sha && datum) terkep.set(datum, sha); // azonos napon az utolsó commit győz
+    const [sha, commitDatum, ...uzenetReszek] = sor.split("|");
+    if (!sha || !commitDatum) continue;
+    const uzenetDatum = uzenetReszek.join("|").match(/\d{4}-\d{2}-\d{2}/)?.[0];
+    terkep.set(uzenetDatum ?? commitDatum, sha); // azonos napra az utolsó commit győz
   }
   return terkep;
 }
