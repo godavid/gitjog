@@ -9,6 +9,7 @@
     "backfill": "tsx src/backfill.ts",
     "delta": "tsx src/delta.ts",
     "enumeralas-init": "tsx src/enumeralas-init.ts",
+    "index-ellenorzes": "tsx src/index-ellenorzes.ts",
     "test": "vitest run"
   },
   "dependencies": {
