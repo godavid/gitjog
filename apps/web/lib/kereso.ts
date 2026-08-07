@@ -1,138 +1,61 @@
-// Szerver oldali teljes szövegű kereső: MiniSearch-index §-szintű
-// dokumentumokból, modul-szintű cache-sel (a Fluid Compute példány-újra-
-// használata miatt a meleg kérések azonnaliak). Óránként újraépül.
+// Teljes szövegű keresés a Supabase Postgres FTS-én keresztül. Az index
+// építése a pipeline dolga (packages/pipeline/src/kereso-index.ts); itt
+// csak lekérdezünk. A magyar szótövezést és a találat-kiemelést a
+// kereses() adatbázisfüggvény adja.
+//
+// A kulcsok szándékosan NEM NEXT_PUBLIC_ előtagúak: a keresés szerver
+// oldalon fut, így a kliens bundle-be semmi nem kerül belőlük.
 
-import MiniSearch from "minisearch";
-import { getJogszabalyok, getSzoveg, type JogszabalyTetel } from "./adat";
-import { horgonyId } from "./md";
-
-export interface KeresoDok {
-  id: number;
-  slug: string;
-  jogszabaly: string; // pl. "Ptk. — 2013. évi V. törvény"
-  szakasz: string; // a legközelebbi #### heading (pl. "6:272. § [Megbízási szerződés]")
-  horgony: string;
-  szoveg: string;
-}
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export interface Talalat {
   slug: string;
-  jogszabaly: string;
+  jogszabaly: string; // "Ptk. (2013. évi V. törvény)"
   szakasz: string;
   horgony: string;
+  reszlet: string; // <mark> jelöléssel kiemelve
+  hatalyos: boolean;
+}
+
+interface KeresesSor {
+  slug: string;
+  megjeloles: string;
+  rovidites: string | null;
+  jogszabaly_cim: string;
+  szakasz_cim: string;
+  horgony: string;
   reszlet: string;
+  hatalyos: boolean;
 }
 
-interface IndexCsomag {
-  mini: MiniSearch<KeresoDok>;
-  dokumentumok: Map<number, KeresoDok>;
-  epult: number;
+let kliens: SupabaseClient | null = null;
+
+function getKliens(): SupabaseClient {
+  if (kliens) return kliens;
+  const url = process.env.SUPABASE_URL;
+  const kulcs = process.env.SUPABASE_ANON_KEY;
+  if (!url || !kulcs) throw new Error("Hiányzó Supabase-konfiguráció (URL vagy anon kulcs).");
+  kliens = createClient(url, kulcs, { auth: { persistSession: false } });
+  return kliens;
 }
 
-function szakaszokraBont(tetel: JogszabalyTetel, md: string, kezdoId: number): KeresoDok[] {
-  const nev = tetel.rovidites ? `${tetel.rovidites} (${tetel.megjeloles})` : tetel.megjeloles;
-  const dokok: KeresoDok[] = [];
-  let cim = "";
-  let sorok: string[] = [];
-  let id = kezdoId;
-  const lezar = () => {
-    const szoveg = sorok.join(" ").trim();
-    if (szoveg) {
-      dokok.push({ id: id++, slug: tetel.slug, jogszabaly: nev, szakasz: cim, horgony: cim ? horgonyId(cim) : "", szoveg });
-    }
-    sorok = [];
-  };
-  for (const sor of md.split("\n")) {
-    const h = sor.match(/^#{2,4} (.+)$/);
-    if (h) {
-      lezar();
-      cim = h[1]!;
-    } else if (sor && !sor.startsWith("# ")) {
-      if (/^\|(?: *:?-{3,}:? *\|)+ *$/.test(sor)) continue; // táblázat-elválasztó
-      // táblázat-sorból a cső-szintaxist szedjük ki, a cellatartalom marad
-      const tiszta = sor.startsWith("| ")
-        ? sor.replace(/^\| | \|$/g, "").split(" | ").join(" · ")
-        : sor.replace(/^ *- /, "");
-      sorok.push(tiszta);
-    }
-  }
-  lezar();
-  return dokok;
+export function jogszabalyNev(sor: Pick<KeresesSor, "megjeloles" | "rovidites">): string {
+  return sor.rovidites ? `${sor.rovidites} (${sor.megjeloles})` : sor.megjeloles;
 }
 
-let cache: IndexCsomag | null = null;
-let epitesFolyamatban: Promise<IndexCsomag> | null = null;
-
-async function epit(): Promise<IndexCsomag> {
-  // ÁTMENETI szűkítés: 5586 törvény teljes szövege nem fér memóriabeli indexbe —
-  // amíg a Postgres FTS (Supabase) nem él, a teljes szövegű keresés a kiemelt
-  // (rövidítéses) törvényekre korlátozódik. A kereses-oldal jelzi ezt.
-  const jogszabalyok = (await getJogszabalyok()).filter((j) => j.rovidites !== null);
-  const dokumentumok = new Map<number, KeresoDok>();
-  let kovId = 1;
-  const mini = new MiniSearch<KeresoDok>({
-    fields: ["szakasz", "szoveg"],
-    storeFields: [],
-    searchOptions: { boost: { szakasz: 3 }, prefix: true, fuzzy: 0.1, combineWith: "AND" },
+export async function keres(q: string, mind = false, limit = 40): Promise<Talalat[]> {
+  const { data, error } = await getKliens().rpc("kereses", {
+    q,
+    mind,
+    talalat_limit: limit,
   });
-  // a 37 szöveg párhuzamosan töltődik — szekvenciálisan ~5-6 mp lenne az index-építés
-  const szovegek = await Promise.all(
-    jogszabalyok.map(async (tetel) => ({ tetel, md: await getSzoveg(tetel.slug) })),
-  );
-  for (const { tetel, md } of szovegek) {
-    if (!md) continue;
-    const dokok = szakaszokraBont(tetel, md, kovId);
-    kovId += dokok.length + 1;
-    for (const d of dokok) dokumentumok.set(d.id, d);
-    mini.addAll(dokok);
-  }
-  return { mini, dokumentumok, epult: Date.now() };
-}
-
-async function getIndex(): Promise<IndexCsomag> {
-  if (cache && Date.now() - cache.epult < 3_600_000) return cache;
-  // hibás építés után az ígéretet el KELL dobni, különben minden későbbi
-  // keresés ugyanazt az elutasított Promise-t kapná a példány élete végéig
-  epitesFolyamatban ??= epit().then(
-    (cs) => {
-      cache = cs;
-      epitesFolyamatban = null;
-      return cs;
-    },
-    (hiba) => {
-      epitesFolyamatban = null;
-      throw hiba;
-    },
-  );
-  return epitesFolyamatban;
-}
-
-function reszlet(szoveg: string, kifejezesek: string[]): string {
-  const kis = szoveg.toLowerCase();
-  let poz = -1;
-  for (const k of kifejezesek) {
-    poz = kis.indexOf(k.toLowerCase());
-    if (poz >= 0) break;
-  }
-  if (poz < 0) poz = 0;
-  const eleje = Math.max(0, poz - 90);
-  const vege = Math.min(szoveg.length, poz + 210);
-  return `${eleje > 0 ? "… " : ""}${szoveg.slice(eleje, vege).trim()}${vege < szoveg.length ? " …" : ""}`;
-}
-
-export async function keres(q: string, limit = 40): Promise<Talalat[]> {
-  const { mini, dokumentumok } = await getIndex();
-  return mini
-    .search(q)
-    .slice(0, limit)
-    .map((t) => {
-      const d = dokumentumok.get(t.id as number)!;
-      return {
-        slug: d.slug,
-        jogszabaly: d.jogszabaly,
-        szakasz: d.szakasz,
-        horgony: d.horgony,
-        reszlet: reszlet(d.szoveg, t.terms),
-      };
-    });
+  if (error) throw new Error(`Keresési hiba: ${error.message}`);
+  return (data as KeresesSor[]).map((sor) => ({
+    slug: sor.slug,
+    jogszabaly: jogszabalyNev(sor),
+    szakasz: sor.szakasz_cim,
+    horgony: sor.horgony,
+    reszlet: sor.reszlet,
+    hatalyos: sor.hatalyos,
+  }));
 }
