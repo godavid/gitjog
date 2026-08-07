@@ -241,6 +241,64 @@ async function fut(): Promise<void> {
     await git(["push", "origin", "main"]);
     console.log("Push KÉSZ.");
   }
+
+  await keresoIndexSzinkron(valtozottSlugok, jogszabalyok, retegTerkep);
+}
+
+/**
+ * Keresőindex-szinkron a változott jogszabályokra. KÜLÖN hibaágon fut: az
+ * index származtatott adat, a hibája nem ronthatja el a delta kilépési
+ * kódját — az adat-repo integritása előbbre való. Riasztunk, és a
+ * következő futás úgyis újraírja a változott jogszabályokat.
+ */
+async function keresoIndexSzinkron(
+  valtozottSlugok: string[],
+  jogszabalyok: Jogszabaly[],
+  retegTerkep: RetegTerkep,
+): Promise<void> {
+  const dbUrl = process.env.NYILT_DB_URL;
+  if (!dbUrl) {
+    console.log("NYILT_DB_URL nincs beállítva — keresőindex-szinkron kihagyva.");
+    return;
+  }
+  try {
+    const { default: postgres } = await import("postgres");
+    const { szinkronizal } = await import("./kereso-index.js");
+    const terkep = new Map(jogszabalyok.map((j) => [j.slug, j]));
+    const tetelek = valtozottSlugok.flatMap((slug) => {
+      const js = terkep.get(slug);
+      if (!js) return [];
+      return [
+        {
+          tetel: {
+            slug: js.slug,
+            documentId: js.documentId,
+            megjeloles: js.megjeloles,
+            cim: js.cim,
+            rovidites: js.rovidites ?? null,
+          },
+          hatalyos: retegTerkep[js.documentId] !== "lezart",
+        },
+      ];
+    });
+    const sql = postgres(dbUrl, { max: 2 });
+    try {
+      const db = await szinkronizal(sql, tetelek);
+      console.log(`Keresőindex frissítve: ${tetelek.length} jogszabály, ${db} szakasz.`);
+    } finally {
+      await sql.end();
+    }
+  } catch (e) {
+    const uzenet = e instanceof Error ? (e.stack ?? e.message) : String(e);
+    console.error(`Keresőindex-szinkron HIBA (a delta adata rendben van):\n${uzenet}`);
+    await riaszt(
+      "Keresőindex-szinkron hiba",
+      `A napi delta adata rendben bekerült a repóba, de a keresőindex frissítése elhasalt.\n\n` +
+        `\`\`\`\n${uzenet}\n\`\`\`\n\n` +
+        `Teendő: a következő futás újrapróbálja. Ha ismétlődik, teljes újraépítés:\n` +
+        `\`NYILT_DB_URL=... pnpm --filter @nyilt-jogtar/pipeline kereso-feltoltes\``,
+    );
+  }
 }
 
 try {
