@@ -117,6 +117,14 @@ pooler connection stringje a keresőindex-szinkronhoz. Pooler kell (nem a
 közvetlen kapcsolat viszont IPv6. A napi delta ezen kívül a beépített
 `GITHUB_TOKEN`-nel fut (contents+issues write).
 
+A secret NEM a `postgres` superuser stringje, hanem a **`jogtar_szinkron`**
+szerepé (`03-szinkron-szerep.sql`), amely kizárólag a `jogszabaly` és `szakasz`
+táblára írhat — sémát módosítani, más adathoz nyúlni nem tud. Ez azért fontos,
+mert a titok jelen van a környezetben, amikor a CI-ben harmadik féltől származó
+npm-csomagok kódja fut: egy kiszivárgás így a keresőindexre korlátozódik, ami
+amúgy is bármikor újraépíthető. Jelszócserénél futtasd újra a 03-as SQL-t új
+jelszóval, és frissítsd a secretet.
+
 A Vercel oldalon `SUPABASE_URL` és `SUPABASE_ANON_KEY` él (Production). A web
 csak OLVAS: a két táblán RLS engedi a `select`-et, az írás joga a connection
 stringé. A kulcsok szándékosan nem `NEXT_PUBLIC_` előtagúak — a keresés szerver
