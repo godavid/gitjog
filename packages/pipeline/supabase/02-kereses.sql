@@ -41,7 +41,10 @@ as $$
   cross join lekerdezes l
   where sz.tsv @@ l.tsq
     and (mind or sz.hatalyos)
-  order by ts_rank_cd(sz.tsv, l.tsq) desc, sz.slug, sz.sorszam
+  -- A 2-es normalizáció (osztás a dokumentum hosszával) nélkülözhetetlen: enélkül
+  -- a hosszú, szóismétléses mellékletek nyomják el a valódi §-okat. Füsttesztelve:
+  -- "szerződést" normalizáció nélkül mellékleteket hoz, ezzel a Ptk. 6:96. §-át.
+  order by ts_rank_cd(sz.tsv, l.tsq, 2) desc, sz.slug, sz.sorszam
   limit least(talalat_limit, 100);
 $$;
 
