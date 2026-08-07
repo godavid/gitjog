@@ -7,5 +7,6 @@ dist/
 data/cache/
 data/repo/
 data/sitemap.xml
+supabase/.temp/
 *.log
 .DS_Store
