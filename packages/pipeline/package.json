@@ -10,10 +10,12 @@
     "delta": "tsx src/delta.ts",
     "enumeralas-init": "tsx src/enumeralas-init.ts",
     "index-ellenorzes": "tsx src/index-ellenorzes.ts",
+    "kereso-feltoltes": "tsx src/kereso-feltoltes.ts",
     "test": "vitest run"
   },
   "dependencies": {
-    "cheerio": "^1.0.0"
+    "cheerio": "^1.0.0",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
