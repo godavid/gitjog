@@ -42,6 +42,11 @@
   enumeralas-init [-- --push]` (a backfill után; utána a delta tartja karban).
   Ha a fájl hiányzik vagy sérült, a delta a teljes végigjárásra esik vissza —
   lassabb, de nem hagy ki adatot.
+- `szakaszok.ts` — markdown → §-szintű szakaszok a keresőindexhez. A horgony-
+  generálás az `apps/web/lib/md.ts` `mdRender()`-ével bit szerint egyezik (lásd
+  a Keresés szakasz horgony-invariánsát).
+- `kereso-index.ts` + `kereso-feltoltes.ts` — a keresőindex szinkronja és teljes
+  újraépítése (lásd a Keresés szakaszt).
 - `health.ts` — riasztás (Issue) + terjedelem-anomália-őr.
 
 ## Ha törik a parser (njt-átdizájn)
@@ -75,16 +80,50 @@ generálódik (`torvenylista-generalas.ts` → `data-static/torvenyek.json`, 558
   a már commitolt (jogszabály, dátum) párokat parse nélkül átugorja, kötegenként pushol).
 - A napi delta ehhez a mérethez a réteges enumerálással igazodik (lásd fentebb).
 
-Ami még hátravan:
-1. A weboldal keresője (MiniSearch, memóriában) ~200 törvényig bírja, ezért a teljes
-   szövegű keresés ÁTMENETILEG a kiemelt (rövidítéses) törvényekre szűkítve fut
-   (`apps/web/lib/kereso.ts`); a kereső-oldal ezt jelzi. Terv: Postgres FTS (Supabase).
-2. Rendeletek, határozatok (a lista jelenleg csak törvény).
+Ami még hátravan: rendeletek, határozatok (a lista jelenleg csak törvény).
+
+## Keresés (Supabase Postgres FTS)
+
+A weboldal keresője a `nyilt-jogtar` Supabase-projekt Postgres FTS-ét használja
+(régió: eu-central-1, a magyar látogatókhoz és a Vercelhez közel). A korábbi
+memóriabeli MiniSearch-index ~200 törvényig bírta, ezért volt a keresés a
+kiemeltekre szűkítve; ez megszűnt.
+
+- **Séma és lekérdezés:** `packages/pipeline/supabase/01-sema.sql` (táblák, GIN
+  index, RLS) és `02-kereses.sql` (a `kereses()` függvény). Mindkettő
+  újrafuttatható: `psql "$NYILT_DB_URL" -f <fájl>`.
+- **Magyar szótövezés:** `to_tsvector('hungarian', …)` — ettől talál a
+  „szerződést" a „szerződés" szóra. A generált oszlop csak a KÉTARGUMENTUMOS
+  alakot fogadja el (az egyargumentumos nem immutable).
+- **Az index származtatott adat.** Bármikor eldobható és újraépíthető:
+  `NYILT_DB_URL=... pnpm --filter @nyilt-jogtar/pipeline kereso-feltoltes`
+  (~4332 jogszabály, teljes újraépítés kb. háromnegyed óra Frankfurtba).
+- **Napi szinkron:** a delta a push után frissíti a változott jogszabályokat.
+  KÜLÖN hibaágon: ha a szinkron elhasal, riasztó issue-t nyit, de a delta
+  kilépési kódját nem rontja el — az adat-repo integritása előbbre való.
+- **Kiemelés-invariáns:** a `kereses()` a találatot vezérlőkarakterekkel jelöli
+  (STX/ETX), nem HTML-lel, mert a `ts_headline` nem escape-eli a bemenetét. A
+  `<mark>` elemet a React építi. Ezt ne írd vissza nyers HTML-re.
+- **Horgony-invariáns:** a `szakaszok.ts` bontója ugyanazt a horgony-id-t adja,
+  mint az `apps/web/lib/md.ts` `mdRender()`-e (az ismétlődő címek `-2`, `-3`
+  utótagjával együtt). A `test/szakaszok.test.ts` mindkét implementációt
+  futtatja és összeveti — ha ez elromlik, a találatok mélylinkje rossz §-ra visz.
 
 ## Titkok
 
-Nincsenek. A napi delta a beépített `GITHUB_TOKEN`-nel fut (contents+issues write),
-a weboldal publikus adatot olvas. A Vercel-deploy a `remenyfarm` fiókhoz kötött.
+Az adat-repóban egy GitHub secret van: **`NYILT_DB_URL`** — a Supabase session
+pooler connection stringje a keresőindex-szinkronhoz. Pooler kell (nem a
+`db.*.supabase.co` közvetlen host), mert a GitHub-runnerek IPv4-esek, a
+közvetlen kapcsolat viszont IPv6. A napi delta ezen kívül a beépített
+`GITHUB_TOKEN`-nel fut (contents+issues write).
+
+A Vercel oldalon `SUPABASE_URL` és `SUPABASE_ANON_KEY` él (Production). A web
+csak OLVAS: a két táblán RLS engedi a `select`-et, az írás joga a connection
+stringé. A kulcsok szándékosan nem `NEXT_PUBLIC_` előtagúak — a keresés szerver
+oldalon fut, így semmi nem kerül belőlük a kliens bundle-be.
+
+A Vercel-deploy a `remenyfarm` fiókhoz kötött, és **nem automatikus a git
+push-ra**: `cd apps/web && vercel --prod --yes`.
 
 ## Ismert korlátok
 
