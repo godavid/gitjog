@@ -28,8 +28,13 @@ as $$
     j.cim as jogszabaly_cim,
     sz.cim as szakasz_cim,
     sz.horgony,
+    -- A kiemelést NEM HTML-ként adjuk vissza: a ts_headline nem escape-eli a
+    -- bemenetét, így egy <script> a forrásszövegben átmenne rajta. Vezérlő-
+    -- karakterekkel jelöljük a találatot (STX/ETX), a web ezekből épít <mark>
+    -- elemet — így a React escape-el mindent, és az md.ts XSS-invariánsa áll.
     ts_headline('hungarian', sz.szoveg, l.tsq,
-      'StartSel=<mark>, StopSel=</mark>, MaxWords=45, MinWords=20, MaxFragments=1'),
+      'StartSel=' || chr(2) || ', StopSel=' || chr(3) ||
+      ', MaxWords=45, MinWords=20, MaxFragments=1'),
     sz.hatalyos
   from szakasz sz
   join jogszabaly j on j.slug = sz.slug

@@ -446,3 +446,33 @@ h4:hover .horgony,
     grid-template-columns: 1fr;
   }
 }
+
+/* ── keresőoldal: űrlap és találat-kiemelés ── */
+.kereso-urlap {
+  flex-wrap: wrap;
+  max-width: 46rem;
+  margin-left: 0;
+}
+.kereso-kapcsolo {
+  flex-basis: 100%;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--tinta-halvany);
+}
+.talalat mark {
+  background: transparent;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.hatalytalan-jel {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-size: 11px;
+  text-transform: lowercase;
+}
