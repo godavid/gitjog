@@ -28,6 +28,27 @@ export function horgonyId(cim: string): string {
     .slice(0, 80);
 }
 
+/** ennél hosszabb heading nélküli törzset bekezdéshatáron darabolunk */
+export const MAX_TORZS_HOSSZ = 2500;
+
+/** Bekezdéshatáron darabol: szó közepén sosem vág. */
+function darabol(sorok: string[]): string[] {
+  const darabok: string[] = [];
+  let akt: string[] = [];
+  let hossz = 0;
+  for (const sor of sorok) {
+    if (hossz > 0 && hossz + sor.length > MAX_TORZS_HOSSZ) {
+      darabok.push(akt.join(" ").trim());
+      akt = [];
+      hossz = 0;
+    }
+    akt.push(sor);
+    hossz += sor.length + 1;
+  }
+  if (akt.length > 0) darabok.push(akt.join(" ").trim());
+  return darabok;
+}
+
 export function szakaszokraBont(md: string): Szakasz[] {
   const szakaszok: Szakasz[] = [];
   const hasznaltIdk = new Map<string, number>(); // ütközésfeloldás, mint az mdRenderben
@@ -37,8 +58,16 @@ export function szakaszokraBont(md: string): Szakasz[] {
   let sorszam = 0;
 
   const lezar = () => {
-    const szoveg = sorok.join(" ").trim();
-    if (cim && szoveg) szakaszok.push({ sorszam: ++sorszam, cim, horgony, szoveg });
+    if (sorok.length === 0) return;
+    // A heading NÉLKÜLI törzs (bevezető rész, vagy egy tagolatlan törvény teljes
+    // szövege) nem veszhet el: 1924 törvénynek — köztük 1025 hatályosnak — nincs
+    // egyetlen ##-#### headingje sem, ezek különben kimaradnának a keresésből.
+    // Ilyenkor darabolunk, mert egy több száz kilobájtos szakasz a relevanciát
+    // (ts_rank_cd hossznormalizálás) és a kiemelést is elrontaná.
+    // A headinges szakaszokat NEM daraboljuk: a mélylink egy §-ra mutasson.
+    for (const szoveg of cim ? [sorok.join(" ").trim()] : darabol(sorok)) {
+      if (szoveg) szakaszok.push({ sorszam: ++sorszam, cim, horgony, szoveg });
+    }
     sorok = [];
   };
 

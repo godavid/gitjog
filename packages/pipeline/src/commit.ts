@@ -65,6 +65,31 @@ export async function commit(uzenet: string, datum?: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * Push a main-re, elutasításnál rebase és újrapróbálás.
+ *
+ * A remote előrébb járhat: átfedő Actions-futás (az ütemezett és egy kézi
+ * indítás beleérhet egymás ablakába) vagy kézi push. Ilyenkor a napi delta nem
+ * hasalhat el — 2026-08-08-án pontosan ez történt, non-fast-forward hibával és
+ * riasztó issue-val, pedig az adat rendben volt.
+ *
+ * A rebase biztonságos: az AUTHOR-dátum (a hatálybalépés napja) megmarad, és az
+ * index SHA-térképe a commit ÜZENETÉBŐL olvassa a dátumot, nem a committer-
+ * dátumból (lásd shaTerkepParse), így az átírt committer-dátum nem zavar.
+ */
+export async function pushRebase(probak = 3): Promise<void> {
+  for (let proba = 1; ; proba++) {
+    try {
+      await git(["push", "origin", "main"]);
+      return;
+    } catch (e) {
+      if (proba >= probak) throw e;
+      console.log(`Push elutasítva (${proba}. próba) — rebase és újrapróbálás.`);
+      await git(["pull", "--rebase", "origin", "main"]);
+    }
+  }
+}
+
 export interface AllapotBejegyzes {
   datum: string;
   verzio: number;

@@ -36,6 +36,7 @@ import {
   fajlIras,
   git,
   metaJson,
+  pushRebase,
   type AllapotBejegyzes,
 } from "./commit.js";
 
@@ -124,7 +125,7 @@ async function fut(): Promise<void> {
     await retegTerkepMentes(retegTerkep);
     if (await commit("Enumerálás-térkép frissítés")) {
       console.log(`Enumerálás-térkép frissítve (${retegOsszefoglalo(retegTerkep)}).`);
-      if (push) await git(["push", "origin", "main"]);
+      if (push) await pushRebase();
     }
     console.log("Nincs új hatályos időállapot — nincs teendő.");
     return;
@@ -238,7 +239,7 @@ async function fut(): Promise<void> {
   await commit("Index frissítés (allapotok.json, enumeralas.json)");
 
   if (push) {
-    await git(["push", "origin", "main"]);
+    await pushRebase();
     console.log("Push KÉSZ.");
   }
 
