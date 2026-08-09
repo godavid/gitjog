@@ -104,6 +104,14 @@ kiemeltekre szűkítve; ez megszűnt.
 - **Kiemelés-invariáns:** a `kereses()` a találatot vezérlőkarakterekkel jelöli
   (STX/ETX), nem HTML-lel, mert a `ts_headline` nem escape-eli a bemenetét. A
   `<mark>` elemet a React építi. Ezt ne írd vissza nyers HTML-re.
+- **Heading nélküli törzs:** 1924 törvény szövegében (ebből 1025 hatályos) nincs
+  egyetlen `##`–`####` heading sem — a teljes tartalom heading nélküli törzs
+  (jellemzően kihirdető és nemzetközi szerződést becikkelyező törvények). Ezeket
+  a bontó 2500 karakteres darabokra vágja bekezdéshatáron, üres `cim` és
+  `horgony` mezővel (a találat a jogszabály nevét mutatja, és az oldal tetejére
+  linkel). Darabolni KELL: egy 443 KB-os szakasz a hossznormalizált relevanciát
+  és a `ts_headline` kiemelést is elrontaná. A headinges szakaszokat viszont nem
+  daraboljuk, hogy a mélylink egy §-ra mutasson.
 - **Horgony-invariáns:** a `szakaszok.ts` bontója ugyanazt a horgony-id-t adja,
   mint az `apps/web/lib/md.ts` `mdRender()`-e (az ismétlődő címek `-2`, `-3`
   utótagjával együtt). A `test/szakaszok.test.ts` mindkét implementációt
@@ -143,3 +151,9 @@ push-ra**: `cd apps/web && vercel --prod --yes`.
 - A réteges enumerálás ára: ha egy már lezárt (hatályát vesztett) jogszabály mégis
   új időállapotot kap az njt-n, az legfeljebb egy körforgásnyi (7 nap) késéssel
   kerül be. A hatályos jogszabályok napi pontossága ettől nem sérül.
+- A keresés a jogszabályok SZÖVEGÉBEN és §-címeiben keres, a jogszabály CÍMÉBEN
+  nem: az „ÉLVONAL Csúcskutatási… Alapítványról" típusú cím csak akkor talál, ha
+  a kifejezés a szövegben is szerepel. Cím szerinti böngészésre a főoldal és az
+  évoldalak valók. Ha ez zavaró lesz: a `jogszabaly.cim` felvehető a `szakasz.tsv`-be
+  C súllyal (minden szakaszra ismételve, ezért nagyobb index), vagy külön uniós
+  lekérdezéssel a `kereses()`-ben.
