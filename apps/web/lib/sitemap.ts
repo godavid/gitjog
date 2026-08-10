@@ -3,7 +3,7 @@
 
 import { unstable_cache } from "next/cache";
 import type { MetadataRoute } from "next";
-import { evOf, getAllapotok, getJogszabalyok } from "@/lib/adat";
+import { CACHE_VERZIO, evOf, getAllapotok, getJogszabalyok } from "@/lib/adat";
 
 export const OLDAL_URL = "https://jogtar.remenyfarm.hu";
 
@@ -23,21 +23,53 @@ export const sitemapShard = unstable_cache(
     const meret = Math.ceil(osszes.length / SITEMAP_SHARDOK);
     return osszes.slice(id * meret, (id + 1) * meret);
   },
-  ["sitemap-shard"],
+  ["sitemap-shard", CACHE_VERZIO],
   { revalidate: 21600 },
 );
 
 async function sitemapUrlok(): Promise<MetadataRoute.Sitemap> {
   const [jogszabalyok, allapotok] = await Promise.all([getJogszabalyok(), getAllapotok()]);
 
+  // évenként a legfrissebb hatálybalépés: az évoldal tartalma ekkor változott
+  // utoljára. A globális maximum a főoldal és a változás-lista lastmodja.
+  const evLegutobbi = new Map<number, string>();
+  let legfrissebb = "";
+  for (const j of jogszabalyok) {
+    const utolso = allapotok[j.slug]?.at(-1);
+    if (!utolso) continue;
+    const ev = evOf(j);
+    const eddig = evLegutobbi.get(ev);
+    if (!eddig || utolso.datum > eddig) evLegutobbi.set(ev, utolso.datum);
+    if (utolso.datum > legfrissebb) legfrissebb = utolso.datum;
+  }
+  const globalis = legfrissebb ? new Date(legfrissebb) : undefined;
+
   const sorok: MetadataRoute.Sitemap = [
-    { url: OLDAL_URL, changeFrequency: "daily", priority: 1 },
-    { url: `${OLDAL_URL}/valtozasok`, changeFrequency: "daily", priority: 0.9 },
-    { url: `${OLDAL_URL}/adatok`, changeFrequency: "monthly", priority: 0.3 },
+    // záró perjellel: a property-prefix is így néz ki, a per nélküli alak
+    // a sitemap-feldolgozónál hibát ad
+    { url: `${OLDAL_URL}/`, lastModified: globalis, changeFrequency: "daily", priority: 1 },
+    {
+      url: `${OLDAL_URL}/valtozasok`,
+      lastModified: globalis,
+      changeFrequency: "daily",
+      priority: 0.9,
+    },
+    {
+      url: `${OLDAL_URL}/adatok`,
+      lastModified: globalis,
+      changeFrequency: "monthly",
+      priority: 0.3,
+    },
   ];
 
   for (const ev of [...new Set(jogszabalyok.map(evOf))].sort((a, b) => a - b)) {
-    sorok.push({ url: `${OLDAL_URL}/evek/${ev}`, changeFrequency: "yearly", priority: 0.3 });
+    const evDatum = evLegutobbi.get(ev);
+    sorok.push({
+      url: `${OLDAL_URL}/evek/${ev}`,
+      lastModified: evDatum ? new Date(evDatum) : globalis,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    });
   }
 
   for (const j of jogszabalyok) {

@@ -13,6 +13,13 @@ const RAW = `https://raw.githubusercontent.com/${ADAT_REPO}`;
 // éri el az adatot.
 const REVALIDATE = 21_600; // 6 óra
 
+/**
+ * Az `unstable_cache` bejegyzései átélik a deployokat: ha a belőlük épített adat
+ * SZERKEZETE változik (más mezők, más URL-halmaz), a régi eredmény a revalidate
+ * ablak végéig kiszolgálódik — a friss kód ellenére. Ilyenkor ezt kell léptetni.
+ */
+export const CACHE_VERZIO = "2";
+
 export interface JogszabalyTetel {
   slug: string;
   documentId: string;
@@ -123,9 +130,11 @@ export async function legutobbiValtozasokFrissen(limit: number): Promise<Valtoza
   return sorok.slice(0, limit);
 }
 
-export const getLegutobbiValtozasok = unstable_cache(legutobbiValtozasokFrissen, [
-  "legutobbi-valtozasok",
-], { revalidate: REVALIDATE });
+export const getLegutobbiValtozasok = unstable_cache(
+  legutobbiValtozasokFrissen,
+  ["legutobbi-valtozasok", CACHE_VERZIO],
+  { revalidate: REVALIDATE },
+);
 
 /** Darabszámok az /adatok oldalhoz — a nagy állapot-térképből, kis eredménnyel. */
 export const getAllomanyStatisztika = unstable_cache(
@@ -136,7 +145,7 @@ export const getAllomanyStatisztika = unstable_cache(
       allapotSzam: Object.values(allapotok).reduce((n, a) => n + a.length, 0),
     };
   },
-  ["allomany-statisztika"],
+  ["allomany-statisztika", CACHE_VERZIO],
   { revalidate: REVALIDATE },
 );
 
