@@ -1,10 +1,25 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { getJogszabalyok, type JogszabalyTetel } from "@/lib/adat";
+import { evOf, getJogszabalyok, getLegutobbiValtozasok } from "@/lib/adat";
 
-export const revalidate = 3600;
+export const revalidate = 21600;
 
-function evOf(j: JogszabalyTetel): number {
-  return Number(j.documentId.slice(0, 4));
+const FRISS_DARAB = 12;
+
+export async function generateMetadata(): Promise<Metadata> {
+  const jogszabalyok = await getJogszabalyok();
+  const elsoEv = Math.min(...jogszabalyok.map(evOf));
+  return {
+    title: { absolute: "Nyílt Jogtár — a magyar törvények szövege és változástörténete" },
+    description:
+      `A magyar törvények teljes szövege és változástörténete. ${jogszabalyok.length} törvény ` +
+      `${elsoEv} óta, minden módosításnál látható, mi került bele és mi került ki. Nem hiteles jogforrás.`,
+    alternates: {
+      canonical: "/",
+      // a page alternates-e teljesen kicseréli a layoutét, ezért az RSS-t itt is meg kell adni
+      types: { "application/rss+xml": "/valtozasok.xml" },
+    },
+  };
 }
 
 /** „1820-as évek” alakú címke; a negyvenes és hetvenes évek -es ragosak */
@@ -15,7 +30,10 @@ function evtizedCimke(evtized: number): string {
 }
 
 export default async function Fooldal() {
-  const jogszabalyok = await getJogszabalyok();
+  const [jogszabalyok, frissek] = await Promise.all([
+    getJogszabalyok(),
+    getLegutobbiValtozasok(FRISS_DARAB),
+  ]);
   const kiemeltek = jogszabalyok.filter((j) => j.rovidites !== null);
 
   const evek = [...new Set(jogszabalyok.map(evOf))].sort((a, b) => a - b);
@@ -29,9 +47,10 @@ export default async function Fooldal() {
 
   return (
     <main className="lap">
-      <h1>A magyar jogrendszer, verziókövetve</h1>
+      <h1>A magyar törvények szövege és változástörténete</h1>
       <p className="alcim-sor">
-        {jogszabalyok.length} törvény, {evek[0]}-től napjainkig, naponta frissítve.
+        {jogszabalyok.length} törvény, {evek[0]}-től napjainkig. Minden módosításnál látszik, mi
+        került bele a szövegbe és mi került ki belőle. Naponta frissül.
       </p>
 
       <form className="fo-kereso" action="/kereses" method="get">
@@ -45,6 +64,36 @@ export default async function Fooldal() {
           Keresés
         </button>
       </form>
+
+      <section className="fo-szekcio">
+        <h2>Legutóbbi változások</h2>
+        <ul className="friss-lista">
+          {frissek.map((v) => (
+            <li key={`${v.tetel.slug}-${v.datum}`}>
+              <span className="friss-datum">{v.datum}</span>
+              <Link className="friss-nev" href={`/jogszabaly/${v.tetel.slug}`}>
+                {v.tetel.rovidites ?? v.tetel.megjeloles}
+              </Link>
+              <span className="friss-cim">{v.tetel.cim}</span>
+              {v.elozoDatum ? (
+                <Link
+                  className="friss-diff"
+                  href={`/jogszabaly/${v.tetel.slug}/diff/${v.elozoDatum}/${v.datum}`}
+                >
+                  mi változott?
+                </Link>
+              ) : (
+                <span className="friss-diff">hatálybalépés</span>
+              )}
+            </li>
+          ))}
+        </ul>
+        <p className="szekcio-lab">
+          <Link href="/valtozasok">Összes változás</Link>
+          {" · "}
+          <a href="/valtozasok.xml">RSS</a>
+        </p>
+      </section>
 
       <section className="fo-szekcio">
         <h2>Kiemelt jogszabályok</h2>

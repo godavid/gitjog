@@ -34,4 +34,6 @@ jogszabályszöveg olvasására van hangolva (nyomtatott jogtár-érzés, képer
 2. A változás az érték: az idővonal és a diff elsőrangú felület, nem elrejtett extra.
 3. Hivatkozhatóság: minden § mélylinkelhető; az URL-ek beszédesek és stabilak.
 4. „Nem hiteles jogforrás” figyelmeztetés minden szövegoldalon, diszkréten, de láthatóan.
-5. Nulla sallang: nincs süti-banner (nincs tracking), nincs modál, nincs fölösleges JS.
+5. Nulla sallang: nincs süti-banner, nincs modál, nincs fölösleges JS. Mérés csak
+   süti nélküli, a látogatót nem azonosító, oldalszintű forgalmi statisztika lehet
+   (Vercel Web Analytics) — személyre visszavezethető tracking nincs.

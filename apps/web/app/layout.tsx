@@ -1,15 +1,30 @@
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { OLDAL_URL } from "@/lib/sitemap";
 import "./globals.css";
+
+const LEIRAS =
+  "A magyar törvények teljes szövege és változástörténete. Minden módosításnál látható, mi került bele a szövegbe és mi került ki belőle. Nem hiteles jogforrás.";
 
 export const metadata: Metadata = {
   title: {
     default: "Nyílt Jogtár",
     template: "%s · Nyílt Jogtár",
   },
-  description:
-    "A magyar jogrendszer git-natív verziókövetése: jogszabályok hatályos szövege, időállapotok és módosítás-diffek. Nem hiteles jogforrás.",
-  metadataBase: new URL("https://jogtar.remenyfarm.hu"),
+  description: LEIRAS,
+  metadataBase: new URL(OLDAL_URL),
+  alternates: {
+    types: { "application/rss+xml": "/valtozasok.xml" },
+  },
+  // description szándékosan nincs itt: különben minden aloldal megosztásán ez
+  // az általános szöveg jelenne meg az oldalspecifikus leírás helyett
+  openGraph: {
+    type: "website",
+    locale: "hu_HU",
+    siteName: "Nyílt Jogtár",
+  },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function GyokerElrendezes({ children }: { children: React.ReactNode }) {
@@ -44,6 +59,10 @@ export default function GyokerElrendezes({ children }: { children: React.ReactNo
               </a>
             </span>
             <span>
+              <Link href="/adatok">Az adatokról</Link>
+              {" · "}
+              <Link href="/valtozasok">Változások</Link>
+              {" · "}
               <a href="https://github.com/godavid/magyar-jogtar" rel="noopener">
                 Adat-repo (git)
               </a>
@@ -54,6 +73,9 @@ export default function GyokerElrendezes({ children }: { children: React.ReactNo
             </span>
           </div>
         </footer>
+        {/* Vercel Web Analytics: süti nélküli, oldalszintű mérés — a látogató
+            nem azonosítható, ezért nem kell hozzá süti-banner. */}
+        <Analytics />
       </body>
     </html>
   );

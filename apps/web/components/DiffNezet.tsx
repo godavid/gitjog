@@ -1,69 +1,27 @@
-"use client";
+// Két időállapot sorszintű diffjének megjelenítése. Szerver-komponens: a
+// blokkokat készen kapja (lib/valtozas.ts), így a diff-szöveg benne van a
+// kiszolgált HTML-ben — enélkül a kereső és az AI-crawlerek nem látják.
 
-// Két időállapot sorszintű diffje, kliens oldalon számolva.
-// A szövegek a raw.githubusercontent.com-ról jönnek commit-SHA-val
-// (immutábilis, CDN-ről cache-elt, CORS-engedélyezett).
-
-import { diffLines } from "diff";
-import { useEffect, useState } from "react";
+import type { Blokk } from "@/lib/valtozas";
 
 interface Props {
-  regiUrl: string;
-  ujUrl: string;
+  blokkok: Blokk[];
 }
-
-type Allapot =
-  | { fazis: "tolt" }
-  | { fazis: "hiba"; uzenet: string }
-  | { fazis: "kesz"; blokkok: { tipus: "uj" | "torolt" | "kontextus"; sorok: string[] }[] };
 
 const KONTEXTUS = 3;
 
-export default function DiffNezet({ regiUrl, ujUrl }: Props) {
-  const [allapot, setAllapot] = useState<Allapot>({ fazis: "tolt" });
-
-  useEffect(() => {
-    let aktiv = true;
-    (async () => {
-      try {
-        const [regiV, ujV] = await Promise.all([fetch(regiUrl), fetch(ujUrl)]);
-        if (!regiV.ok || !ujV.ok) {
-          throw new Error(`Nem sikerült letölteni a szövegeket (HTTP ${regiV.status}/${ujV.status})`);
-        }
-        const [regi, uj] = await Promise.all([regiV.text(), ujV.text()]);
-        const reszek = diffLines(regi, uj);
-        const blokkok = reszek.map((r) => ({
-          tipus: r.added ? ("uj" as const) : r.removed ? ("torolt" as const) : ("kontextus" as const),
-          sorok: r.value.replace(/\n$/, "").split("\n"),
-        }));
-        if (aktiv) setAllapot({ fazis: "kesz", blokkok });
-      } catch (e) {
-        if (aktiv) setAllapot({ fazis: "hiba", uzenet: e instanceof Error ? e.message : String(e) });
-      }
-    })();
-    return () => {
-      aktiv = false;
-    };
-  }, [regiUrl, ujUrl]);
-
-  if (allapot.fazis === "tolt") {
-    return <p role="status">Diff számítása…</p>;
-  }
-  if (allapot.fazis === "hiba") {
-    return <p role="alert">Hiba: {allapot.uzenet}</p>;
-  }
-
-  const valtozott = allapot.blokkok.some((b) => b.tipus !== "kontextus");
+export default function DiffNezet({ blokkok }: Props) {
+  const valtozott = blokkok.some((b) => b.tipus !== "kontextus");
   if (!valtozott) {
     return <p>A két időállapot szövege azonos.</p>;
   }
 
   return (
     <div className="diff">
-      {allapot.blokkok.map((b, i) => {
+      {blokkok.map((b, i) => {
         if (b.tipus === "kontextus") {
           const elso = i === 0;
-          const utolso = i === allapot.blokkok.length - 1;
+          const utolso = i === blokkok.length - 1;
           // rövid blokknál nincs mit kihagyni — átfedő szeletek duplikálnának
           const rovid = b.sorok.length <= 2 * KONTEXTUS;
           const eleje = elso ? [] : rovid ? b.sorok : b.sorok.slice(0, KONTEXTUS);
@@ -74,14 +32,14 @@ export default function DiffNezet({ regiUrl, ujUrl }: Props) {
               {!elso &&
                 eleje.map((s, j) => (
                   <div key={`e${j}`} className="sor">
-                    {s || " "}
+                    {s || " "}
                   </div>
                 ))}
               {kihagyva > 0 && <div className="kihagyas">⋯ {kihagyva} változatlan sor ⋯</div>}
               {!utolso &&
                 vege.map((s, j) => (
                   <div key={`v${j}`} className="sor">
-                    {s || " "}
+                    {s || " "}
                   </div>
                 ))}
             </div>
@@ -91,7 +49,7 @@ export default function DiffNezet({ regiUrl, ujUrl }: Props) {
           <div key={i}>
             {b.sorok.map((s, j) => (
               <div key={j} className={`sor ${b.tipus}`}>
-                {s || " "}
+                {s || " "}
               </div>
             ))}
           </div>
