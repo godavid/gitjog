@@ -9,6 +9,27 @@
 | Weboldal | `jogtar.remenyfarm.hu` (Vercel, projekt: `jogtar`, scope: `remenyfarm`) |
 | Napi frissítés | GitHub Actions az adat-repóban (`.github/workflows/napi-delta.yml`), 03:30 UTC |
 | Riasztás | GitHub Issue az adat-repóban, `parser-riasztas` címkével (a GitHub emailt küld) |
+| IndexNow-bejelentés | Vercel cron, `/api/indexnow`, 06:00 UTC (a napi delta után) |
+| Forgalommérés | Vercel Web Analytics (süti nélküli, oldalszintű) |
+
+## Felfedezhetőség (2026-08-10)
+
+- **Sitemap**: `/sitemap/0.xml` … `/sitemap/5.xml`, összesen ~31 300 URL (jogszabály-
+  oldalak, idővonalak, minden szomszédos időállapot-pár diffje, évoldalak). A Next nem
+  generál sitemap-indexet, ezért a `robots.txt` sorolja fel a hat shardot. A shardok
+  számát a `lib/sitemap.ts` `SITEMAP_SHARDOK` konstansa adja — ha nő az állomány, ezt
+  kell emelni (shardonként 50 000 URL a limit).
+- **A diff szerver oldalon renderelődik.** Ha valaha visszakerülne kliensre, a
+  22 592 diff-oldal azonnal kiesik az indexből: a Bing és az AI-crawlerek nem
+  futtatnak JS-t.
+- **IndexNow**: a `public/f2b522b792d5d8381a74992ca28abe51.txt` kulcsfájl igazolja a
+  domaint (nem titok). A napi cron az elmúlt 3 nap változásait jelenti be; a
+  `CRON_SECRET` env védi. Kézi teljes újraküldés a sitemapokból bármikor lehetséges.
+- **Cache-csapda**: az `index/allapotok.json` 4,4 MB, nem fér a Next adat-cache 2 MB-os
+  limitjébe. Ezért `cache: "no-store"`-ral jön, és a belőle számolt rövid eredményt
+  `unstable_cache` tartja el. Ha ezt valaki visszaállítja `revalidate`-re, egy régi,
+  kisebb válasz beragadhat és némán hetekig elavult adatot szolgál ki (2026-08-10-én
+  pontosan ez történt: a sitemap 37 törvényből épült 4332 helyett).
 
 ## A pipeline (packages/pipeline)
 
