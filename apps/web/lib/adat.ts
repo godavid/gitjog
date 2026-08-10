@@ -18,7 +18,7 @@ const REVALIDATE = 21_600; // 6 óra
  * SZERKEZETE változik (más mezők, más URL-halmaz), a régi eredmény a revalidate
  * ablak végéig kiszolgálódik — a friss kód ellenére. Ilyenkor ezt kell léptetni.
  */
-export const CACHE_VERZIO = "2";
+export const CACHE_VERZIO = "3";
 
 export interface JogszabalyTetel {
   slug: string;
@@ -133,6 +133,42 @@ export async function legutobbiValtozasokFrissen(limit: number): Promise<Valtoza
 export const getLegutobbiValtozasok = unstable_cache(
   legutobbiValtozasokFrissen,
   ["legutobbi-valtozasok", CACHE_VERZIO],
+  { revalidate: REVALIDATE },
+);
+
+/**
+ * Az egész korpusz havi bontása, kompakt alakban (~0,9 MB): a slugra indexszel
+ * hivatkozunk, nem a ~40 karakteres szöveggel. A nyers állapot-térkép 4,4 MB, ami
+ * NEM fér a Next adat-cache 2 MB-os korlátjába — ez a származtatott alak viszont
+ * igen, így mind a ~400 havi oldal EGYETLEN cache-bejegyzésből dolgozik, és a nagy
+ * fájl a revalidate-ablakonként csak egyszer jön le.
+ *
+ * Ha ez az alak valaha a 2 MB fölé nőne, a régi hónapokat kell kihagyni belőle
+ * (a kereslet úgyis a friss hónapokra esik) — nem a `revalidate`-et emelni.
+ */
+export interface HaviBontas {
+  slugok: string[];
+  /** hónapkulcs („2026-07") → [slug indexe, dátum, előző időállapot dátuma] */
+  honapok: Record<string, [number, string, string | null][]>;
+}
+
+export const getHaviBontas = unstable_cache(
+  async (): Promise<HaviBontas> => {
+    const allapotok = await getAllapotok();
+    const slugok = Object.keys(allapotok).sort();
+    const helye = new Map(slugok.map((s, i) => [s, i]));
+    const honapok: HaviBontas["honapok"] = {};
+    for (const [slug, sajat] of Object.entries(allapotok)) {
+      const i = helye.get(slug)!;
+      for (let n = 0; n < sajat.length; n++) {
+        const datum = sajat[n]!.datum;
+        const kulcs = datum.slice(0, 7);
+        (honapok[kulcs] ??= []).push([i, datum, n > 0 ? sajat[n - 1]!.datum : null]);
+      }
+    }
+    return { slugok, honapok };
+  },
+  ["havi-bontas", CACHE_VERZIO],
   { revalidate: REVALIDATE },
 );
 

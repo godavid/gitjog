@@ -14,8 +14,9 @@
 
 ## Felfedezhetőség (2026-08-10)
 
-- **Sitemap**: `/sitemap/0.xml` … `/sitemap/5.xml`, összesen ~31 300 URL (jogszabály-
-  oldalak, idővonalak, minden szomszédos időállapot-pár diffje, évoldalak). A Next nem
+- **Sitemap**: `/sitemap/0.xml` … `/sitemap/5.xml`, összesen ~31 700 URL (jogszabály-
+  oldalak, idővonalak, minden szomszédos időállapot-pár diffje, évoldalak, havi
+  változás-oldalak). A Next nem
   generál sitemap-indexet, ezért a `robots.txt` sorolja fel a hat shardot. A shardok
   számát a `lib/sitemap.ts` `SITEMAP_SHARDOK` konstansa adja — ha nő az állomány, ezt
   kell emelni (shardonként 50 000 URL a limit).
@@ -25,11 +26,40 @@
 - **IndexNow**: a `public/f2b522b792d5d8381a74992ca28abe51.txt` kulcsfájl igazolja a
   domaint (nem titok). A napi cron az elmúlt 3 nap változásait jelenti be; a
   `CRON_SECRET` env védi. Kézi teljes újraküldés a sitemapokból bármikor lehetséges.
+- **Oldaltípusok, amelyek a keresésre válaszolnak.** A címek és fejlécek a keresők
+  nyelvét beszélik, nem a fejlesztőét: a törvényoldal címében ott a hivatalos
+  megjelölés is (`Btk. – 2012. évi C. törvény hatályos szövege`), a diff-oldal címe
+  `Btk. — mi változott? 2026. augusztus 7.` (a „Diff" szót senki nem keresi). A látható
+  `<h1>` a lap tetején áll és tartalmazza a rövidítést + a teljes címet; a Markdown saját
+  nyitó sora ezért `<h2 class="szoveg-fejcim">` (a `lib/md.ts` szint-1 ága). Ez a heading
+  NEM kap horgonyt, így a `szakaszok.ts`-szel közös horgony-invariáns sértetlen marad.
+- **Havi változás-oldalak**: `/valtozasok/{ev}-{ho}` (pl. `/valtozasok/2026-01`), jelenleg
+  404 hónap 1902-től. Erre a keresletre („mi változott januárban?") ma csak kézzel írt
+  újságcikkek válaszolnak. Az adat a `lib/adat.ts` `getHaviBontas()`-ából jön: ez a nagy
+  állapot-térkép KOMPAKT származéka (~0,9 MB, a slugra indexszel hivatkozik), hogy mind a
+  404 oldal EGYETLEN cache-bejegyzésből dolgozzon. Ha valaha 2 MB fölé nőne, a régi
+  hónapokat kell kihagyni belőle — nem a revalidate-et emelni. Buildkor csak az utolsó
+  12 hónap generálódik, a többi első kérésre (ISR).
+- **Gépi felületek**: `/jogszabaly/{slug}/szoveg.md` (nyers Markdown azonos eredetről) és
+  `/jogszabaly/{slug}/valtozasok.xml` (egy törvény változásainak RSS-e — a fizetős
+  Jogtár „figyeltetés" funkciójának ingyenes megfelelője).
+- **Strukturált adat**: `Legislation` a törvényoldalon (`legislationDate` és
+  `temporalCoverage` is), `Dataset` az `/adatok`-on, `BreadcrumbList` az idővonal- és
+  diff-oldalakon, `WebSite` a layoutban. A sitelinks-keresődoboz (`SearchAction`)
+  SZÁNDÉKOSAN kimarad: a `/kereses` a robots.txt-ben tiltott.
+- **A Search Console / Bing tokenje környezeti változóból jön**:
+  `GOOGLE_SITE_VERIFICATION`, illetve `BING_SITE_VERIFICATION` (Vercel env, Production).
+  Ha nincs beállítva, a meta kimarad — a bekötés tehát nem igényel kódmódosítást.
 - **Cache-csapda**: az `index/allapotok.json` 4,4 MB, nem fér a Next adat-cache 2 MB-os
   limitjébe. Ezért `cache: "no-store"`-ral jön, és a belőle számolt rövid eredményt
   `unstable_cache` tartja el. Ha ezt valaki visszaállítja `revalidate`-re, egy régi,
   kisebb válasz beragadhat és némán hetekig elavult adatot szolgál ki (2026-08-10-én
   pontosan ez történt: a sitemap 37 törvényből épült 4332 helyett).
+- **A `CACHE_VERZIO` léptetése nem opcionális.** Az `unstable_cache` bejegyzései átélik a
+  deployt: amikor a sitemap URL-halmaza a havi oldalakkal bővült, a régi bejegyzés a friss
+  kód ellenére a régi listát szolgálta ki — ez lokális buildben is reprodukálódott, mielőtt
+  élesre ment volna. Ha változik, hogy MI kerül egy cache-elt eredménybe, léptesd a
+  `lib/adat.ts` `CACHE_VERZIO`-ját; különben a változás némán késik egy revalidate-ablakot.
 
 ## A pipeline (packages/pipeline)
 

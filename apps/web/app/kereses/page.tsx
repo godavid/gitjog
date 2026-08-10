@@ -2,7 +2,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { keres, type Talalat } from "@/lib/kereso";
 
-export const metadata: Metadata = { title: "Keresés" };
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}): Promise<Metadata> {
+  const { q } = await searchParams;
+  const kifejezes = (q ?? "").trim();
+  return {
+    title: kifejezes
+      ? `„${kifejezes}” — keresés a törvények szövegében`
+      : "Keresés a törvények teljes szövegében",
+  };
+}
 
 /**
  * A kereses() a találatot vezérlőkarakterekkel jelöli (STX/ETX), nem HTML-lel:
@@ -39,7 +51,7 @@ export default async function KeresesOldal({
 
   return (
     <main className="lap lap-szukebb">
-      <h1>Keresés</h1>
+      <h1>Keresés a törvények teljes szövegében</h1>
 
       <form className="fo-kereso kereso-urlap" action="/kereses" method="get">
         <input
@@ -68,7 +80,10 @@ export default async function KeresesOldal({
           áll rendelkezésre.
         </p>
       ) : !kifejezes ? (
-        <p className="alcim-sor">Írj be egy kifejezést a fenti keresőmezőbe.</p>
+        <p className="alcim-sor">
+          Írj be egy kifejezést a fenti keresőmezőbe. Például: elévülés, felmondási idő,
+          öröklési sorrend.
+        </p>
       ) : (
         <p className="alcim-sor">
           „{kifejezes}” — {talalatok.length} találat

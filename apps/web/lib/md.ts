@@ -64,7 +64,10 @@ export function mdRender(md: string): { html: string; jegyzek: Szakaszjegyzek[] 
       const szint = heading[1]!.length;
       const cim = heading[2]!;
       if (szint === 1) {
-        ki.push(`<h1>${esc(cim)}</h1>`);
+        // A szöveg saját nyitó sora (a megjelölés) NEM h1: az oldal h1-je a
+        // lap tetején áll, és tartalmazza a rövidítést is. Horgonyt itt sem
+        // adunk — a jegyzék tartalma így változatlan (lásd horgony-invariáns).
+        ki.push(`<h2 class="szoveg-fejcim">${esc(cim)}</h2>`);
       } else {
         // ismétlődő cím (pl. több "Értelmező rendelkezések" alcím) sorszámot kap
         const alap = horgonyId(cim);

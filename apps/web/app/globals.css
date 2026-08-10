@@ -191,9 +191,11 @@ h1 {
   line-height: 1.65;
   max-width: 70ch;
 }
-.jogszoveg h1 {
-  font-size: 30px;
+/* a jogszabályszöveg saját nyitó sora (a megjelölés) — az oldal h1-je fölötte áll */
+.jogszoveg .szoveg-fejcim {
+  font-size: 22px;
   margin: 0 0 10px;
+  font-weight: 600;
 }
 .jogszoveg h2 {
   font-size: 24px;
@@ -406,6 +408,12 @@ h4:hover .horgony,
   font-size: 17px;
   padding: 12px 22px;
 }
+.kereso-pelda {
+  max-width: 40rem;
+  margin: 8px auto 0;
+  font-size: 14px;
+  color: var(--tinta-halvany);
+}
 
 /* ── főoldal: szekciók ── */
 .fo-szekcio {
@@ -486,7 +494,8 @@ h4:hover .horgony,
 }
 .friss-lista li {
   display: grid;
-  grid-template-columns: 7rem 8rem 1fr auto;
+  /* az első oszlop a kiírt magyar dátumhoz méretezve („2026. szeptember 30.") */
+  grid-template-columns: 10rem 8rem 1fr auto;
   gap: 4px 18px;
   align-items: baseline;
   padding: 11px 8px;

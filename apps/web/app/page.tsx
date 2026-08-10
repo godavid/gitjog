@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { evOf, getJogszabalyok, getLegutobbiValtozasok } from "@/lib/adat";
+import { datumSzoveg } from "@/lib/datum";
 
 export const revalidate = 21600;
 
@@ -22,6 +23,12 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+/**
+ * A leggyakrabban keresett kódexek elöl. A többi rövidítéses törvény utánuk
+ * marad, az index sorrendjében (a rendezés stabil).
+ */
+const ELOL = ["Ptk.", "Btk.", "Mt.", "Szja tv.", "Áfa tv.", "Be.", "Pp.", "Ákr.", "Nkt.", "Eütv."];
+
 /** „1820-as évek” alakú címke; a negyvenes és hetvenes évek -es ragosak */
 function evtizedCimke(evtized: number): string {
   const ketjegy = evtized % 100;
@@ -34,7 +41,13 @@ export default async function Fooldal() {
     getJogszabalyok(),
     getLegutobbiValtozasok(FRISS_DARAB),
   ]);
-  const kiemeltek = jogszabalyok.filter((j) => j.rovidites !== null);
+  const rang = (rov: string | null) => {
+    const i = ELOL.indexOf(rov ?? "");
+    return i === -1 ? ELOL.length : i;
+  };
+  const kiemeltek = jogszabalyok
+    .filter((j) => j.rovidites !== null)
+    .sort((a, b) => rang(a.rovidites) - rang(b.rovidites));
 
   const evek = [...new Set(jogszabalyok.map(evOf))].sort((a, b) => a - b);
   const evtizedek = new Map<number, number[]>();
@@ -64,13 +77,16 @@ export default async function Fooldal() {
           Keresés
         </button>
       </form>
+      <p className="kereso-pelda">
+        Például: elévülés, felmondási idő, öröklési sorrend.
+      </p>
 
       <section className="fo-szekcio">
         <h2>Legutóbbi változások</h2>
         <ul className="friss-lista">
           {frissek.map((v) => (
             <li key={`${v.tetel.slug}-${v.datum}`}>
-              <span className="friss-datum">{v.datum}</span>
+              <span className="friss-datum">{datumSzoveg(v.datum)}</span>
               <Link className="friss-nev" href={`/jogszabaly/${v.tetel.slug}`}>
                 {v.tetel.rovidites ?? v.tetel.megjeloles}
               </Link>

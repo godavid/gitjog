@@ -1,6 +1,7 @@
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { jsonLdSzoveg } from "@/lib/jsonld";
 import { OLDAL_URL } from "@/lib/sitemap";
 import "./globals.css";
 
@@ -25,12 +26,40 @@ export const metadata: Metadata = {
     siteName: "Nyílt Jogtár",
   },
   twitter: { card: "summary_large_image" },
+  // A tulajdonjog-igazolás tokenjei környezeti változóból jönnek: így a
+  // Search Console / Bing bekötése nem igényel kódmódosítást, és a token nem
+  // kerül a repóba. Ha nincs beállítva, a meta egyszerűen kimarad.
+  verification: {
+    ...(process.env.GOOGLE_SITE_VERIFICATION
+      ? { google: process.env.GOOGLE_SITE_VERIFICATION }
+      : {}),
+    ...(process.env.BING_SITE_VERIFICATION
+      ? { other: { "msvalidate.01": process.env.BING_SITE_VERIFICATION } }
+      : {}),
+  },
+};
+
+// Az oldal azonossága a keresőknek és az AI-válaszmotoroknak. SearchAction
+// (sitelinks-keresődoboz) SZÁNDÉKOSAN nincs benne: a /kereses a robots.txt-ben
+// tiltott, egy oda mutató kereső-akciót deklarálni ellentmondásos jelzés lenne.
+const OLDAL_JSONLD = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "Nyílt Jogtár",
+  alternateName: "A magyar törvények szövege és változástörténete",
+  url: OLDAL_URL,
+  inLanguage: "hu",
+  isAccessibleForFree: true,
 };
 
 export default function GyokerElrendezes({ children }: { children: React.ReactNode }) {
   return (
     <html lang="hu">
       <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: jsonLdSzoveg(OLDAL_JSONLD) }}
+        />
         <header className="fejlec">
           <div className="fejlec-belso">
             <Link href="/" className="wordmark">

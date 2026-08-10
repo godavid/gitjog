@@ -31,7 +31,13 @@ időállapot (a commit dátuma a hatálybalépés napja), a diff maga a törvén
 - [Időállapotok](${OLDAL_URL}/jogszabaly/{slug}/idovonal)
 - [Két állapot különbsége](${OLDAL_URL}/jogszabaly/{slug}/diff/{tol}/{ig}) — a dátumok YYYY-MM-DD alakban
 - [Legutóbbi változások](${OLDAL_URL}/valtozasok) — RSS: ${OLDAL_URL}/valtozasok.xml
+- [Egy hónap összes módosítása](${OLDAL_URL}/valtozasok/{ev}-{ho}) — pl. /valtozasok/2026-01
 - [Az adatokról](${OLDAL_URL}/adatok)
+
+## Gépi felületek
+
+- Egy jogszabály nyers Markdown-szövege: ${OLDAL_URL}/jogszabaly/{slug}/szoveg.md
+- Egy jogszabály változásainak RSS-feedje: ${OLDAL_URL}/jogszabaly/{slug}/valtozasok.xml
 
 ## Adat
 

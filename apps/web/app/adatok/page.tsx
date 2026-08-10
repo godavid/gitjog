@@ -1,20 +1,58 @@
 import type { Metadata } from "next";
-import { ADAT_REPO, getAllomanyStatisztika } from "@/lib/adat";
+import { ADAT_REPO, evOf, getAllomanyStatisztika, getJogszabalyok } from "@/lib/adat";
+import { jsonLdSzoveg } from "@/lib/jsonld";
+import { OLDAL_URL } from "@/lib/sitemap";
 
 export const revalidate = 86400;
 
 export const metadata: Metadata = {
-  title: "Az adatokról",
+  title: "Adatok és git-repó — hogyan épül a Nyílt Jogtár",
   description:
     "Honnan jönnek a szövegek, milyen szerkezetben, milyen gyakran frissülnek, és hogyan használhatók fel újra. A teljes állomány egyetlen git repóból klónozható.",
   alternates: { canonical: "/adatok" },
 };
 
 export default async function AdatokOldal() {
-  const { jogszabalySzam, allapotSzam } = await getAllomanyStatisztika();
+  const [{ jogszabalySzam, allapotSzam }, jogszabalyok] = await Promise.all([
+    getAllomanyStatisztika(),
+    getJogszabalyok(),
+  ]);
+  const elsoEv = Math.min(...jogszabalyok.map(evOf));
+
+  // Ez az oldal szó szerint egy adatkészletet ír le (repó, szerkezet, licenc),
+  // ezért a Dataset a valóságnak megfelelő séma — nem díszítés.
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Dataset",
+    name: "Nyílt Jogtár — a magyar törvények szövege és változástörténete",
+    description:
+      `${jogszabalySzam} magyar törvény konszolidált szövege ${allapotSzam} időállapottal, ` +
+      "git-verziókövetésben: minden commit egy időállapot, a commit dátuma a hatálybalépés napja.",
+    url: `${OLDAL_URL}/adatok`,
+    inLanguage: "hu",
+    isAccessibleForFree: true,
+    temporalCoverage: `${elsoEv}/..`,
+    license: "https://creativecommons.org/publicdomain/zero/1.0/",
+    creator: { "@type": "Organization", name: "Nyílt Jogtár", url: OLDAL_URL },
+    distribution: [
+      {
+        "@type": "DataDownload",
+        name: "Adat-repó (git)",
+        encodingFormat: "text/markdown",
+        contentUrl: `https://github.com/${ADAT_REPO}`,
+      },
+      {
+        "@type": "DataDownload",
+        name: "Jogszabály-index (JSON)",
+        encodingFormat: "application/json",
+        contentUrl: `https://raw.githubusercontent.com/${ADAT_REPO}/main/index/jogszabalyok.json`,
+      },
+    ],
+  };
 
   return (
     <main className="lap lap-szukebb">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSzoveg(jsonLd) }} />
       <h1>Az adatokról</h1>
       <p className="alcim-sor">
         Ez az oldal egy git repót jelenít meg. Minden törvény egy Markdown-fájl, minden commit egy

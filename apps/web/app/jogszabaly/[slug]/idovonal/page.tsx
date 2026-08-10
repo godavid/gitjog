@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAllapotokSlug, getJogszabalyok } from "@/lib/adat";
+import { evOf, getAllapotokSlug, getJogszabalyok } from "@/lib/adat";
+import { datumSzoveg } from "@/lib/datum";
+import { morzsaJsonLd } from "@/lib/jsonld";
+import { OLDAL_URL } from "@/lib/sitemap";
 
 export const revalidate = 21600;
 
@@ -17,7 +20,7 @@ export async function generateMetadata({
   const nev = tetel.rovidites ?? tetel.megjeloles;
   const elsoEv = sajat[0]?.datum.slice(0, 4);
   return {
-    title: `Idővonal — ${nev}`,
+    title: `${nev} módosításai — ${sajat.length} időállapot${elsoEv ? ` ${elsoEv} óta` : ""}`,
     description:
       `${nev} — összes időállapot: ${sajat.length} módosítás` +
       `${elsoEv ? ` ${elsoEv} óta` : ""}, dátummal; mindegyiknél megtekinthető a pontos szövegváltozás.`,
@@ -36,11 +39,23 @@ export default async function IdovonalOldal({
   if (!tetel || !sajat.length) notFound();
 
   const forditott = [...sajat].reverse(); // legfrissebb felül
+  const morzsa = morzsaJsonLd([
+    { name: "Nyílt Jogtár", item: OLDAL_URL },
+    { name: `${evOf(tetel)}. évi törvények`, item: `${OLDAL_URL}/evek/${evOf(tetel)}` },
+    { name: tetel.rovidites ?? tetel.megjeloles, item: `${OLDAL_URL}/jogszabaly/${slug}` },
+    { name: "Összes időállapot", item: `${OLDAL_URL}/jogszabaly/${slug}/idovonal` },
+  ]);
+
   return (
     <main className="lap lap-szukebb">
-      <h1>{tetel.rovidites ?? tetel.megjeloles} — idővonal</h1>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: morzsa }}
+      />
+      <h1>{tetel.rovidites ?? tetel.megjeloles} — összes időállapot</h1>
       <p className="alcim-sor">
-        {tetel.megjeloles} {tetel.cim} · {sajat.length} időállapot ·{" "}
+        {tetel.megjeloles} {tetel.cim} · {sajat.length} időállapot
+        {sajat[0] ? ` ${sajat[0].datum.slice(0, 4)} óta` : ""} ·{" "}
         <Link href={`/jogszabaly/${slug}`}>hatályos szöveg</Link>
       </p>
       <ol className="idovonal">
@@ -48,7 +63,7 @@ export default async function IdovonalOldal({
           const elozo = forditott[i + 1];
           return (
             <li key={a.datum}>
-              <span className="datum">{a.datum}</span>
+              <span className="datum">{datumSzoveg(a.datum)}</span>
               <span className="muvelet">
                 {elozo ? (
                   <Link href={`/jogszabaly/${slug}/diff/${elozo.datum}/${a.datum}`}>

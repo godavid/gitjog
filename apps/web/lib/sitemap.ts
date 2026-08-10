@@ -62,6 +62,26 @@ async function sitemapUrlok(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
+  // havi változás-oldalak: hónaponként a legkésőbbi hatálybalépés a lastmod.
+  // A lezárt hónapok tartalma soha nem változik, a legfrissebbé még igen.
+  const honapLegutobbi = new Map<string, string>();
+  for (const sajat of Object.values(allapotok)) {
+    for (const a of sajat) {
+      const kulcs = a.datum.slice(0, 7);
+      const eddig = honapLegutobbi.get(kulcs);
+      if (!eddig || a.datum > eddig) honapLegutobbi.set(kulcs, a.datum);
+    }
+  }
+  const legfrissebbHonap = [...honapLegutobbi.keys()].sort().at(-1);
+  for (const [honap, datum] of [...honapLegutobbi].sort()) {
+    sorok.push({
+      url: `${OLDAL_URL}/valtozasok/${honap}`,
+      lastModified: new Date(datum),
+      changeFrequency: honap === legfrissebbHonap ? "daily" : "never",
+      priority: honap === legfrissebbHonap ? 0.7 : 0.5,
+    });
+  }
+
   for (const ev of [...new Set(jogszabalyok.map(evOf))].sort((a, b) => a - b)) {
     const evDatum = evLegutobbi.get(ev);
     sorok.push({

@@ -33,6 +33,10 @@ export async function GET(request: Request) {
   ]);
   // a változás-lista és a feed is frissül minden ilyen napon
   urlok.push(`${OLDAL_URL}/valtozasok`, OLDAL_URL);
+  // az érintett havi oldalak is (hónapfordulón két hónap is szóba jön)
+  for (const honap of new Set(frissek.map((v) => v.datum.slice(0, 7)))) {
+    urlok.push(`${OLDAL_URL}/valtozasok/${honap}`);
+  }
 
   const eredmeny = await indexNowBekuldes(urlok);
   return Response.json({ hatar, valtozas: frissek.length, ...eredmeny });

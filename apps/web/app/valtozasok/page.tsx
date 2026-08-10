@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getLegutobbiValtozasok, type ValtozasTetel } from "@/lib/adat";
+import { getHaviBontas, getLegutobbiValtozasok, type ValtozasTetel } from "@/lib/adat";
+import { datumSzoveg, honapSzoveg } from "@/lib/datum";
 
 export const revalidate = 21600;
 
 const DARAB = 100;
 
 export const metadata: Metadata = {
-  title: "Mi változott mostanában?",
+  title: "Mi változott a magyar jogban? — friss módosítások",
   description:
     "Mi változott mostanában a magyar jogban? A legutóbb hatályba lépett törvénymódosítások, mindegyiknél a pontos szövegváltozással.",
   alternates: {
@@ -16,8 +17,15 @@ export const metadata: Metadata = {
   },
 };
 
+/** hány hónap linkje látszik az archívumban a lap alján */
+const ARCHIVUM_HONAP = 24;
+
 export default async function ValtozasokOldal() {
-  const valtozasok = await getLegutobbiValtozasok(DARAB);
+  const [valtozasok, bontas] = await Promise.all([
+    getLegutobbiValtozasok(DARAB),
+    getHaviBontas(),
+  ]);
+  const honapok = Object.keys(bontas.honapok).sort().reverse().slice(0, ARCHIVUM_HONAP);
 
   // dátumonként csoportosítva: egy naphoz jellemzően több módosítás tartozik
   const napok: { datum: string; tetelek: ValtozasTetel[] }[] = [];
@@ -42,7 +50,7 @@ export default async function ValtozasokOldal() {
         <ol className="idovonal">
           {napok.map((nap) => (
             <li key={nap.datum}>
-              <span className="datum">{nap.datum}</span>
+              <span className="datum">{datumSzoveg(nap.datum)}</span>
               <ul className="valtozas-nap">
                 {nap.tetelek.map((v) => (
                   <li key={`${v.tetel.slug}-${v.datum}`}>
@@ -67,6 +75,18 @@ export default async function ValtozasokOldal() {
           ))}
         </ol>
       )}
+
+      <section className="fo-szekcio">
+        <h2>Havi bontás</h2>
+        <p className="szekcio-lab">
+          {honapok.map((ho, i) => (
+            <span key={ho}>
+              {i > 0 ? " · " : null}
+              <Link href={`/valtozasok/${ho}`}>{honapSzoveg(ho)}</Link>
+            </span>
+          ))}
+        </p>
+      </section>
     </main>
   );
 }

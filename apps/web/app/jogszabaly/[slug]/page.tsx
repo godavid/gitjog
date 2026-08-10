@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAllapotokSlug, getJogszabalyok, getSzoveg, nyersUrl } from "@/lib/adat";
+import { evOf, getAllapotokSlug, getJogszabalyok, getSzoveg } from "@/lib/adat";
+import { datumSzoveg } from "@/lib/datum";
+import { jsonLdSzoveg } from "@/lib/jsonld";
 import { mdRender } from "@/lib/md";
 
 export const revalidate = 21600;
@@ -22,12 +24,17 @@ export async function generateMetadata({
   if (!tetel) return {};
   const utolso = sajat.at(-1);
   return {
-    title: `${tetel.rovidites ?? tetel.megjeloles} — ${tetel.cim}`,
+    title: tetel.rovidites
+      ? `${tetel.rovidites} – ${tetel.megjeloles} hatályos szövege`
+      : `${tetel.megjeloles} hatályos szövege – ${tetel.cim}`,
     description:
-      `${tetel.megjeloles} ${tetel.cim} teljes szövege` +
-      `${utolso ? ` — a ${utolso.datum} napján hatályos állapot` : ""}. ` +
+      `${tetel.megjeloles} ${tetel.cim} hatályos szövege` +
+      `${utolso ? ` — ${datumSzoveg(utolso.datum)} napjától` : ""}. ` +
       `${sajat.length} időállapot; módosításonként megnézhető, pontosan mi változott.`,
-    alternates: { canonical: `/jogszabaly/${slug}` },
+    alternates: {
+      canonical: `/jogszabaly/${slug}`,
+      types: { "application/rss+xml": `/jogszabaly/${slug}/valtozasok.xml` },
+    },
   };
 }
 
@@ -53,6 +60,7 @@ export default async function JogszabalyOldal({
   // schema.org-mezőket töltjük ki, amikre tényleges adatunk van: a kihirdetés
   // dátuma és a hatályossági jelző nincs az indexben, ezért kimarad.
   const tipus = tetel.megjeloles.split(" ").at(-1) ?? "jogszabály";
+  const elso = sajat[0];
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Legislation",
@@ -60,6 +68,8 @@ export default async function JogszabalyOldal({
     ...(tetel.rovidites ? { alternateName: tetel.rovidites } : {}),
     legislationIdentifier: tetel.megjeloles,
     legislationType: tipus,
+    ...(elso ? { legislationDate: elso.datum } : {}),
+    ...(elso && utolso ? { temporalCoverage: `${elso.datum}/${utolso.datum}` } : {}),
     ...(utolso ? { legislationDateVersion: utolso.datum, dateModified: utolso.datum } : {}),
     ...(tipus === "törvény"
       ? { legislationPassedBy: { "@type": "Organization", name: "Országgyűlés" } }
@@ -73,27 +83,36 @@ export default async function JogszabalyOldal({
 
   return (
     <main className="lap lap-szukebb">
-      {/* a `<` escape-elése zárja ki, hogy egy jogszabálycím kitörjön a script-blokkból */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSzoveg(jsonLd) }} />
+      <h1>
+        {tetel.rovidites ? `${tetel.rovidites} — ` : ""}
+        {tetel.megjeloles} {tetel.cim}
+      </h1>
+      <p className="alcim-sor">
+        Hatályos szöveg{utolso ? ` — ${datumSzoveg(utolso.datum)} napjától` : ""}.{" "}
+        {sajat.length > 1 ? (
+          <>
+            {sajat.length} időállapot{elso ? ` ${elso.datum.slice(0, 4)} óta` : ""}; minden
+            módosításnál szó szerint megnézhető, mi került bele a szövegbe és mi került ki
+            belőle.
+          </>
+        ) : (
+          "Hatálybalépése óta nem módosult."
+        )}
+      </p>
       <div className="eszkozsor">
-        <span>
-          Hatályos állapot: <strong>{utolso?.datum ?? "?"}</strong> · {sajat.length} időállapot
-        </span>
-        <Link href={`/jogszabaly/${slug}/idovonal`}>Idővonal</Link>
+        <Link href={`/jogszabaly/${slug}/idovonal`}>Időállapotok</Link>
         {elozo && utolso ? (
           <Link href={`/jogszabaly/${slug}/diff/${elozo.datum}/${utolso.datum}`}>
             Legutóbbi módosítás
           </Link>
         ) : null}
+        <Link href={`/evek/${evOf(tetel)}`}>{evOf(tetel)}. évi törvények</Link>
         <a href={`https://njt.jog.gov.hu/jogszabaly/${tetel.documentId}`} rel="noopener">
           Hiteles szöveg (njt)
         </a>
-        <a href={nyersUrl("main", slug)} rel="noopener">
-          Nyers szöveg (.md)
-        </a>
+        <a href={`/jogszabaly/${slug}/szoveg.md`}>Nyers szöveg (.md)</a>
+        <a href={`/jogszabaly/${slug}/valtozasok.xml`}>RSS</a>
       </div>
       <article className="jogszoveg" dangerouslySetInnerHTML={{ __html: html }} />
     </main>

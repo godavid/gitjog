@@ -19,7 +19,7 @@ export async function generateMetadata({
   const { ev } = await params;
   const tetelek = (await getJogszabalyok()).filter((j) => evOf(j) === Number(ev));
   return {
-    title: `${ev}. évi törvények`,
+    title: `${ev}. évi törvények — mind a ${tetelek.length}, teljes szöveggel`,
     description: `A ${ev}. évben kihirdetett ${tetelek.length} törvény listája, teljes szöveggel és változástörténettel.`,
     alternates: { canonical: `/evek/${ev}` },
   };
@@ -45,7 +45,8 @@ export default async function EvOldal({
     <main className="lap">
       <h1>{ev}. évi törvények</h1>
       <p className="alcim-sor">
-        {tetelek.length} törvény
+        {tetelek.length} törvény, amit ebben az évben hirdettek ki. Mindegyiknél elérhető a
+        teljes hatályos szöveg és a módosítások története.
         {elozo !== undefined ? (
           <>
             {" · "}
