@@ -1,9 +1,17 @@
 // Adatréteg: a magyar-jogtar adat-repo tartalma raw.githubusercontent.com-ról.
-// A HEAD-re mutató kérések óránként revalidálódnak (ISR), a commit-SHA-s
+// A HEAD-re mutató kérések naponta revalidálódnak (ISR), a commit-SHA-s
 // kérések változhatatlanok, ezért örökre cache-elhetők.
+
+import { unstable_cache } from "next/cache";
 
 export const ADAT_REPO = "godavid/magyar-jogtar";
 const RAW = `https://raw.githubusercontent.com/${ADAT_REPO}`;
+
+// A tartalom naponta egyszer frissül (napi delta workflow), ezért ennél
+// sűrűbb revalidálás csak fölösleges kimenő kérés a GitHub felé. Ez a szám
+// minden route cache-ablakát meghatározza, mert mindegyik ezen a fetch-en át
+// éri el az adatot.
+const REVALIDATE = 21_600; // 6 óra
 
 export interface JogszabalyTetel {
   slug: string;
@@ -19,13 +27,50 @@ export interface Allapot {
   sha: string; // az adott állapotot rögzítő commit
 }
 
-async function rawFetch(utvonal: string, orokre = false): Promise<string | null> {
-  const valasz = await fetch(`${RAW}/${utvonal}`, {
-    next: orokre ? { revalidate: false } : { revalidate: 3600 },
-  });
-  if (valasz.status === 404) return null;
-  if (!valasz.ok) throw new Error(`Adat-repo fetch hiba: HTTP ${valasz.status} — ${utvonal}`);
-  return valasz.text();
+const varj = (ms: number) => new Promise((kesz) => setTimeout(kesz, ms));
+
+/**
+ * - `napi`: a HEAD-re mutató, revalidálódó kérések.
+ * - `orokre`: commit-SHA-ra pinnelt, megváltoztathatatlan tartalom.
+ * - `friss`: a Next adat-cache teljes kikerülése. A 2 MB fölötti válaszokat a
+ *   cache nem tudja eltárolni, viszont egy korábbi, még beférő válasz ott
+ *   ragadhat és stale-ként visszajönne — ez élesben hetekig régi adatot
+ *   szolgálna ki. Az ilyen fájlokat ezért mindig frissen kérjük le, és az
+ *   eredményt a hívó oldalán `unstable_cache` tartja el (kis méretben).
+ */
+type Mod = "napi" | "orokre" | "friss";
+
+/**
+ * A `null` kizárólag azt jelenti, hogy a fájl nem létezik (HTTP 404) — a hívók
+ * ebből `notFound()`-ot csinálnak. Átmeneti hibánál (429 rate limit, 5xx) ezért
+ * NEM adhatunk `null`-t: a kereső a 404-et véglegesnek veszi és kiindexeli az
+ * oldalt, míg a dobott hiba (500) csak annyit üzen neki, hogy jöjjön vissza.
+ * Egy crawl-hullám alatt ez a különbség dönti el, megmarad-e az indexeltség.
+ */
+async function rawFetch(utvonal: string, mod: Mod = "napi"): Promise<string | null> {
+  const url = `${RAW}/${utvonal}`;
+  for (let probalkozas = 0; ; probalkozas++) {
+    const valasz = await fetch(
+      url,
+      mod === "friss"
+        ? { cache: "no-store" }
+        : { next: { revalidate: mod === "orokre" ? false : REVALIDATE } },
+    );
+    if (valasz.status === 404) return null;
+    if (valasz.ok) return valasz.text();
+
+    const atmeneti = valasz.status === 429 || valasz.status >= 500;
+    if (atmeneti && probalkozas < 2) {
+      await varj(500 * 2 ** probalkozas);
+      continue;
+    }
+    throw new Error(`Adat-repo fetch hiba: HTTP ${valasz.status} — ${utvonal}`);
+  }
+}
+
+/** a kihirdetés éve a documentId-ből („2013-5-00-00" → 2013) */
+export function evOf(j: JogszabalyTetel): number {
+  return Number(j.documentId.slice(0, 4));
 }
 
 export async function getJogszabalyok(): Promise<JogszabalyTetel[]> {
@@ -34,11 +79,66 @@ export async function getJogszabalyok(): Promise<JogszabalyTetel[]> {
   return JSON.parse(nyers) as JogszabalyTetel[];
 }
 
+/**
+ * A teljes időállapot-térkép (~4,4 MB). Nem fér a Next adat-cache-ébe, ezért
+ * mindig frissen jön — csak `unstable_cache`-elt függvényből hívd, hogy az
+ * eredmény kis méretben mégis eltárolható legyen.
+ */
 export async function getAllapotok(): Promise<Record<string, Allapot[]>> {
-  const nyers = await rawFetch("main/index/allapotok.json");
+  const nyers = await rawFetch("main/index/allapotok.json", "friss");
   if (!nyers) throw new Error("Hiányzó index/allapotok.json az adat-repóban");
   return JSON.parse(nyers) as Record<string, Allapot[]>;
 }
+
+export interface ValtozasTetel {
+  tetel: JogszabalyTetel;
+  datum: string;
+  /** az előző időállapot dátuma; `null`, ha ez a jogszabály hatálybalépése */
+  elozoDatum: string | null;
+}
+
+/**
+ * A legutóbb hatályba lépett módosítások, dátum szerint csökkenően.
+ * Az állapot-térkép ~27 000 bejegyzését futtatja végig, majd a rövid eredményt
+ * `unstable_cache` tartja el: a nagy forrásfájl így nem terheli a cache-t, a
+ * hívó oldal viszont statikusan prerenderelhető marad.
+ */
+export const getLegutobbiValtozasok = unstable_cache(
+  async (limit: number): Promise<ValtozasTetel[]> => {
+    const [jogszabalyok, allapotok] = await Promise.all([getJogszabalyok(), getAllapotok()]);
+    const nevek = new Map(jogszabalyok.map((j) => [j.slug, j]));
+
+    const sorok: ValtozasTetel[] = [];
+    for (const [slug, sajat] of Object.entries(allapotok)) {
+      const tetel = nevek.get(slug);
+      if (!tetel) continue;
+      for (let i = 0; i < sajat.length; i++) {
+        sorok.push({
+          tetel,
+          datum: sajat[i]!.datum,
+          elozoDatum: i > 0 ? sajat[i - 1]!.datum : null,
+        });
+      }
+    }
+    sorok.sort((a, b) => b.datum.localeCompare(a.datum));
+    return sorok.slice(0, limit);
+  },
+  ["legutobbi-valtozasok"],
+  { revalidate: REVALIDATE },
+);
+
+/** Darabszámok az /adatok oldalhoz — a nagy állapot-térképből, kis eredménnyel. */
+export const getAllomanyStatisztika = unstable_cache(
+  async (): Promise<{ jogszabalySzam: number; allapotSzam: number }> => {
+    const [jogszabalyok, allapotok] = await Promise.all([getJogszabalyok(), getAllapotok()]);
+    return {
+      jogszabalySzam: jogszabalyok.length,
+      allapotSzam: Object.values(allapotok).reduce((n, a) => n + a.length, 0),
+    };
+  },
+  ["allomany-statisztika"],
+  { revalidate: REVALIDATE },
+);
 
 /** egy jogszabály állapotlistája a kis per-törvény fájlból */
 export async function getAllapotokSlug(slug: string): Promise<Allapot[]> {
@@ -53,7 +153,7 @@ export async function getSzoveg(slug: string): Promise<string | null> {
 
 /** egy múltbeli időállapot szövege az azt rögzítő commit SHA-jánál (immutábilis) */
 export async function getSzovegAt(sha: string, slug: string): Promise<string | null> {
-  return rawFetch(`${sha}/jogszabalyok/${slug}/szoveg.md`, true);
+  return rawFetch(`${sha}/jogszabalyok/${slug}/szoveg.md`, "orokre");
 }
 
 export function nyersUrl(sha: string, slug: string): string {

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Nyílt Jogtár">
+  <rect width="32" height="32" rx="6" fill="#0e6549" />
+  <text
+    x="16"
+    y="24"
+    text-anchor="middle"
+    font-family="Palatino, Georgia, serif"
+    font-size="24"
+    font-weight="600"
+    fill="#f7f5f1"
+  >§</text>
+</svg>

@@ -1,13 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getJogszabalyok, type JogszabalyTetel } from "@/lib/adat";
+import { evOf, getJogszabalyok } from "@/lib/adat";
 
-export const revalidate = 3600;
-
-function evOf(j: JogszabalyTetel): number {
-  return Number(j.documentId.slice(0, 4));
-}
+export const revalidate = 86400;
 
 export async function generateStaticParams() {
   const jogszabalyok = await getJogszabalyok();
@@ -21,7 +17,12 @@ export async function generateMetadata({
   params: Promise<{ ev: string }>;
 }): Promise<Metadata> {
   const { ev } = await params;
-  return { title: `${ev}. évi törvények` };
+  const tetelek = (await getJogszabalyok()).filter((j) => evOf(j) === Number(ev));
+  return {
+    title: `${ev}. évi törvények`,
+    description: `A ${ev}. évben kihirdetett ${tetelek.length} törvény listája, teljes szöveggel és változástörténettel.`,
+    alternates: { canonical: `/evek/${ev}` },
+  };
 }
 
 export default async function EvOldal({

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAllapotokSlug, getJogszabalyok } from "@/lib/adat";
 
-export const revalidate = 3600;
+export const revalidate = 21600;
 
 export async function generateMetadata({
   params,
@@ -11,8 +11,18 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const tetel = (await getJogszabalyok()).find((j) => j.slug === slug);
-  return tetel ? { title: `Idővonal — ${tetel.rovidites ?? tetel.megjeloles}` } : {};
+  const [jogszabalyok, sajat] = await Promise.all([getJogszabalyok(), getAllapotokSlug(slug)]);
+  const tetel = jogszabalyok.find((j) => j.slug === slug);
+  if (!tetel) return {};
+  const nev = tetel.rovidites ?? tetel.megjeloles;
+  const elsoEv = sajat[0]?.datum.slice(0, 4);
+  return {
+    title: `Idővonal — ${nev}`,
+    description:
+      `${nev} — összes időállapot: ${sajat.length} módosítás` +
+      `${elsoEv ? ` ${elsoEv} óta` : ""}, dátummal; mindegyiknél megtekinthető a pontos szövegváltozás.`,
+    alternates: { canonical: `/jogszabaly/${slug}/idovonal` },
+  };
 }
 
 export default async function IdovonalOldal({

@@ -476,3 +476,99 @@ h4:hover .horgony,
   font-size: 11px;
   text-transform: lowercase;
 }
+
+/* ── főoldal: legutóbbi változások ── */
+.friss-lista {
+  list-style: none;
+  margin: 24px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--vonal);
+}
+.friss-lista li {
+  display: grid;
+  grid-template-columns: 7rem 8rem 1fr auto;
+  gap: 4px 18px;
+  align-items: baseline;
+  padding: 11px 8px;
+  border-bottom: 1px solid var(--vonal);
+}
+.friss-datum {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--tinta-halvany);
+  white-space: nowrap;
+}
+.friss-nev {
+  font-family: var(--serif);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.friss-cim {
+  color: var(--tinta-halvany);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.friss-diff {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.szekcio-lab {
+  margin: 14px 0 0;
+  font-size: 13px;
+}
+@media (max-width: 640px) {
+  .friss-lista li {
+    grid-template-columns: 1fr auto;
+  }
+  .friss-datum {
+    grid-column: 1 / -1;
+  }
+  .friss-cim {
+    grid-column: 1 / -1;
+    white-space: normal;
+  }
+}
+
+/* ── szöveges oldalak (adatok) ── */
+.szoveg-szekcio {
+  margin-top: 36px;
+  max-width: 40rem;
+}
+.szoveg-szekcio h2 {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 10px;
+}
+.szoveg-szekcio p {
+  margin: 0 0 12px;
+}
+.kodblokk {
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--papir-melyebb);
+  border: 1px solid var(--vonal);
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 0 0 12px;
+}
+
+/* ── változások oldal: napokba csoportosítva ── */
+.valtozas-nap {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+.valtozas-nap li {
+  padding: 3px 0;
+}
+.valtozas-cim {
+  color: var(--tinta-halvany);
+}
+.valtozas-diff {
+  font-size: 13px;
+  white-space: nowrap;
+}
