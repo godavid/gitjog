@@ -10,3 +10,6 @@ data/sitemap.xml
 supabase/.temp/
 *.log
 .DS_Store
+
+# a tsc inkrementális build-állapota
+*.tsbuildinfo
