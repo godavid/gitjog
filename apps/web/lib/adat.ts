@@ -103,29 +103,29 @@ export interface ValtozasTetel {
  * `unstable_cache` tartja el: a nagy forrásfájl így nem terheli a cache-t, a
  * hívó oldal viszont statikusan prerenderelhető marad.
  */
-export const getLegutobbiValtozasok = unstable_cache(
-  async (limit: number): Promise<ValtozasTetel[]> => {
-    const [jogszabalyok, allapotok] = await Promise.all([getJogszabalyok(), getAllapotok()]);
-    const nevek = new Map(jogszabalyok.map((j) => [j.slug, j]));
+export async function legutobbiValtozasokFrissen(limit: number): Promise<ValtozasTetel[]> {
+  const [jogszabalyok, allapotok] = await Promise.all([getJogszabalyok(), getAllapotok()]);
+  const nevek = new Map(jogszabalyok.map((j) => [j.slug, j]));
 
-    const sorok: ValtozasTetel[] = [];
-    for (const [slug, sajat] of Object.entries(allapotok)) {
-      const tetel = nevek.get(slug);
-      if (!tetel) continue;
-      for (let i = 0; i < sajat.length; i++) {
-        sorok.push({
-          tetel,
-          datum: sajat[i]!.datum,
-          elozoDatum: i > 0 ? sajat[i - 1]!.datum : null,
-        });
-      }
+  const sorok: ValtozasTetel[] = [];
+  for (const [slug, sajat] of Object.entries(allapotok)) {
+    const tetel = nevek.get(slug);
+    if (!tetel) continue;
+    for (let i = 0; i < sajat.length; i++) {
+      sorok.push({
+        tetel,
+        datum: sajat[i]!.datum,
+        elozoDatum: i > 0 ? sajat[i - 1]!.datum : null,
+      });
     }
-    sorok.sort((a, b) => b.datum.localeCompare(a.datum));
-    return sorok.slice(0, limit);
-  },
-  ["legutobbi-valtozasok"],
-  { revalidate: REVALIDATE },
-);
+  }
+  sorok.sort((a, b) => b.datum.localeCompare(a.datum));
+  return sorok.slice(0, limit);
+}
+
+export const getLegutobbiValtozasok = unstable_cache(legutobbiValtozasokFrissen, [
+  "legutobbi-valtozasok",
+], { revalidate: REVALIDATE });
 
 /** Darabszámok az /adatok oldalhoz — a nagy állapot-térképből, kis eredménnyel. */
 export const getAllomanyStatisztika = unstable_cache(
