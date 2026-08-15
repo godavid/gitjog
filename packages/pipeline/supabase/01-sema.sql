@@ -7,8 +7,20 @@ create table if not exists jogszabaly (
   megjeloles  text not null,
   cim         text not null,
   rovidites   text,
-  hatalyos    boolean not null
+  hatalyos    boolean not null,
+  tsv tsvector generated always as (
+    setweight(to_tsvector('hungarian', coalesce(rovidites, '')), 'A') ||
+    setweight(to_tsvector('hungarian', megjeloles), 'A') ||
+    setweight(to_tsvector('hungarian', cim), 'B')
+  ) stored
 );
+
+-- Létező tábla esetén a tsv oszlop idempotens hozzáadása
+alter table jogszabaly add column if not exists tsv tsvector generated always as (
+  setweight(to_tsvector('hungarian', coalesce(rovidites, '')), 'A') ||
+  setweight(to_tsvector('hungarian', megjeloles), 'A') ||
+  setweight(to_tsvector('hungarian', cim), 'B')
+) stored;
 
 create table if not exists szakasz (
   id       bigserial primary key,
@@ -27,8 +39,9 @@ create table if not exists szakasz (
   ) stored
 );
 
-create index if not exists szakasz_tsv_idx  on szakasz using gin (tsv);
-create index if not exists szakasz_slug_idx on szakasz (slug);
+create index if not exists jogszabaly_tsv_idx on jogszabaly using gin (tsv);
+create index if not exists szakasz_tsv_idx    on szakasz using gin (tsv);
+create index if not exists szakasz_slug_idx   on szakasz (slug);
 
 -- A web anon kulccsal OLVAS; írni csak a connection stringgel lehet.
 alter table jogszabaly enable row level security;

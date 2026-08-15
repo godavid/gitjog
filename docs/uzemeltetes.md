@@ -115,6 +115,16 @@ commitol — rossz adat nem kerülhet a repóba.
      a lazy-load rendjét — a `parse.ts` összefésülő logikáját kell igazítani.
    - **Üres verziólista / 4xx**: URL-séma változott — a `crawl.ts` végpontjait
      kell újra felderíteni (böngésző devtools a njt.jog.gov.hu-n).
+   - **Terjedelem-anomália** (`10212 → 3311 kar (32%) — nem commitolom`): NEM
+     feltétlenül parser-törés. Előbb döntsd el, valós-e a rövidülés: kérd le az
+     njt-ről az érintett verziót (`GET /jogszabaly/{id}.{verzió}`), és nézd meg,
+     hogy (a) van-e benne `borderStart` (ha igen, lazy-blokk hiányzik → valódi
+     parser-hiba), és (b) csökkent-e a `§` jelek száma. Ha a rövidülés valós — a
+     módosító törvényeknél ez a normális életciklus —, a futás egyszer
+     átengedhető: `pnpm delta -- --anomalia-ok=<slug>` (vesszővel több is).
+     A „…módosításáról" végű című törvényeket az őr 2026-08-15 óta magától
+     engedékenyebben kezeli (`modositoTorveny()` a `health.ts`-ben): náluk csak
+     5% alatti maradék, illetve a duzzadás számít anomáliának.
 4. Tesztek: `pnpm test`. Ha a normalizálás SZÁNDÉKOSAN változott, regeneráld a
    golden hasheket (`parse-proba` + `shasum -a 256`) a `test/normalize.test.ts`-ben.
    Vigyázz: a golden-változás azt jelenti, hogy a teljes history diffje "ugrik" egyet
@@ -202,9 +212,7 @@ push-ra**: `cd apps/web && vercel --prod --yes`.
 - A réteges enumerálás ára: ha egy már lezárt (hatályát vesztett) jogszabály mégis
   új időállapotot kap az njt-n, az legfeljebb egy körforgásnyi (7 nap) késéssel
   kerül be. A hatályos jogszabályok napi pontossága ettől nem sérül.
-- A keresés a jogszabályok SZÖVEGÉBEN és §-címeiben keres, a jogszabály CÍMÉBEN
-  nem: az „ÉLVONAL Csúcskutatási… Alapítványról" típusú cím csak akkor talál, ha
-  a kifejezés a szövegben is szerepel. Cím szerinti böngészésre a főoldal és az
-  évoldalak valók. Ha ez zavaró lesz: a `jogszabaly.cim` felvehető a `szakasz.tsv`-be
-  C súllyal (minden szakaszra ismételve, ezért nagyobb index), vagy külön uniós
-  lekérdezéssel a `kereses()`-ben.
+- A keresés a jogszabályok SZÖVEGÉBEN, §-címeiben, valamint a jogszabály
+  CÍMÉBEN, MEG JELÖLÉSÉBEN és RÖVIDÍTÉSÉBEN is keres (`01-sema.sql` és
+  `02-kereses.sql` unió). A jogszabály-cím találatok kiemelt rangsorolással
+  közvetlenül a törvény hatályos oldalára mutatnak.

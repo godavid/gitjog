@@ -44,13 +44,35 @@ export async function riaszt(cim: string, torzs: string): Promise<void> {
 }
 
 /**
+ * Módosító törvény-e a cím alapján („…egyes törvények módosításáról”).
+ *
+ * Ezek szakaszai a hatálybalépés után sorra hatályukat vesztik — a módosítás
+ * beépül a módosított törvénybe —, így a konszolidált szövegük menet közben
+ * kiürül. Az állomány 46%-a (közel 2000 törvény) ilyen, tehát a zsugorodásuk
+ * nem anomália, hanem a normális életciklusuk.
+ */
+export function modositoTorveny(cim: string): boolean {
+  return /módosításáról\s*$/iu.test(cim.trim());
+}
+
+/**
  * Terjedelem-őr: az új szöveg gyanús mértékű zsugorodása/duzzadása njt-törésre
  * utal (pl. üres vagy csonka oldal) — ilyenkor inkább hibázunk, mint commitolunk.
+ *
+ * A `zsugorodhat` jelzés (módosító törvény) csak az ALSÓ küszöböt engedi le: a
+ * duzzadás ott is gyanús marad, és a szöveg teljes eltűnését is elfogjuk — a
+ * cím és a preambulum ugyanis a kiürült módosító törvényekben is megmarad.
  */
-export function terjedelemEllenorzes(regiHossz: number, ujHossz: number, mi: string): void {
+export function terjedelemEllenorzes(
+  regiHossz: number,
+  ujHossz: number,
+  mi: string,
+  opciok: { zsugorodhat?: boolean } = {},
+): void {
   if (regiHossz < 10_000) return; // kis fájlnál a nagy relatív ugrás normális
   const arany = ujHossz / regiHossz;
-  if (arany < 0.5 || arany > 2.0) {
+  const also = opciok.zsugorodhat ? 0.05 : 0.5;
+  if (arany < also || arany > 2.0) {
     throw new Error(
       `Terjedelem-anomália (${mi}): ${regiHossz} → ${ujHossz} kar (${(arany * 100).toFixed(0)}%) — nem commitolom`,
     );

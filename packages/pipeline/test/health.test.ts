@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { terjedelemEllenorzes } from "../src/health.js";
+import { modositoTorveny, terjedelemEllenorzes } from "../src/health.js";
 import { parsolSnapshot } from "../src/parse.js";
 
 describe("terjedelemEllenorzes (agent-őr)", () => {
@@ -14,6 +14,39 @@ describe("terjedelemEllenorzes (agent-őr)", () => {
   });
   it("kis fájlnál nem szól (ott a nagy relatív ugrás normális)", () => {
     expect(() => terjedelemEllenorzes(2_000, 9_000, "teszt")).not.toThrow();
+  });
+});
+
+describe("módosító törvények kiürülése", () => {
+  it("felismeri a módosító törvény címét", () => {
+    expect(modositoTorveny("a környezetvédelemmel összefüggő törvények módosításáról")).toBe(true);
+    expect(modositoTorveny("egyes törvények módosításáról ")).toBe(true);
+  });
+  it("nem téveszti össze az érdemi törvénnyel", () => {
+    expect(modositoTorveny("a Büntető Törvénykönyvről")).toBe(false);
+    expect(modositoTorveny("a Polgári Törvénykönyvről")).toBe(false);
+    // a „módosításáról” csak a cím VÉGÉN számít
+    expect(modositoTorveny("a szabálysértésekről szóló törvény módosításáról és egyebekről")).toBe(
+      false,
+    );
+  });
+  it("módosító törvénynél átengedi a zsugorodást (valós eset: 2025. évi CXXIV.)", () => {
+    expect(() =>
+      terjedelemEllenorzes(10_212, 3_311, "teszt", { zsugorodhat: true }),
+    ).not.toThrow();
+  });
+  it("ugyanez jelzés nélkül továbbra is dob", () => {
+    expect(() => terjedelemEllenorzes(10_212, 3_311, "teszt")).toThrow(/anomália/);
+  });
+  it("a szöveg teljes eltűnését módosító törvénynél is elfogja", () => {
+    expect(() => terjedelemEllenorzes(100_000, 200, "teszt", { zsugorodhat: true })).toThrow(
+      /anomália/,
+    );
+  });
+  it("a duzzadás módosító törvénynél is gyanús marad", () => {
+    expect(() => terjedelemEllenorzes(100_000, 250_000, "teszt", { zsugorodhat: true })).toThrow(
+      /anomália/,
+    );
   });
 });
 

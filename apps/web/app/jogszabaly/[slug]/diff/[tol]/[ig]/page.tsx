@@ -48,10 +48,15 @@ export default async function DiffOldal({
 
   const { blokkok, hozzaadott, torolt } = valtozasSzamitas(regiSzoveg, ujSzoveg);
 
-  // A szomszédos módosítások: a ~22 600 diff-oldal eddig csak az idővonalról
-  // és a sitemapból volt elérhető, egymásra nem mutattak.
+  // A módosítások közötti léptetés: közvetlen szomszédos állapotoknál a közvetlen
+  // előző és következő lépésre visz, több állapotot átfogó diffnél a környező
+  // állapotokhoz navigál.
+  const tolIdx = sajat.findIndex((a) => a.datum === regi.datum);
   const igIdx = sajat.findIndex((a) => a.datum === uj.datum);
-  const elozoPar = igIdx >= 2 ? [sajat[igIdx - 2]!, sajat[igIdx - 1]!] : null;
+  const kozvetlenSzomszed = tolIdx >= 0 && igIdx === tolIdx + 1;
+  const lepesSzam = tolIdx >= 0 && igIdx > tolIdx ? igIdx - tolIdx : 1;
+
+  const elozoPar = tolIdx >= 1 ? [sajat[tolIdx - 1]!, sajat[tolIdx]!] : null;
   const kovetkezoPar = igIdx >= 0 && igIdx + 1 < sajat.length ? [sajat[igIdx]!, sajat[igIdx + 1]!] : null;
 
   const morzsa = morzsaJsonLd([
@@ -72,7 +77,7 @@ export default async function DiffOldal({
       </h1>
       <p className="alcim-sor">
         A {datumSzoveg(regi.datum)} és {datumSzoveg(uj.datum)} között hatályba lépett
-        módosítások.{" "}
+        módosítások{kozvetlenSzomszed ? "" : ` (${lepesSzam} módosítási lépés összesítve)`}.{" "}
         {hozzaadott > 0 || torolt > 0 ? (
           <>
             {hozzaadott} sor került be, {torolt} sor került ki.
@@ -82,12 +87,12 @@ export default async function DiffOldal({
       <div className="eszkozsor">
         {elozoPar ? (
           <Link href={`/jogszabaly/${slug}/diff/${elozoPar[0].datum}/${elozoPar[1].datum}`}>
-            ← Előző módosítás ({datumSzoveg(elozoPar[1].datum)})
+            ← {kozvetlenSzomszed ? "Előző" : "Korábbi"} módosítás ({datumSzoveg(elozoPar[1].datum)})
           </Link>
         ) : null}
         {kovetkezoPar ? (
           <Link href={`/jogszabaly/${slug}/diff/${kovetkezoPar[0].datum}/${kovetkezoPar[1].datum}`}>
-            Következő módosítás ({datumSzoveg(kovetkezoPar[1].datum)}) →
+            {kozvetlenSzomszed ? "Következő" : "Későbbi"} módosítás ({datumSzoveg(kovetkezoPar[1].datum)}) →
           </Link>
         ) : null}
         <Link href={`/jogszabaly/${slug}/idovonal`}>Időállapotok</Link>

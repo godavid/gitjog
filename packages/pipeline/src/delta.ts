@@ -28,7 +28,7 @@ import {
 } from "./enumeralas.js";
 import { markdownGeneralas } from "./normalize.js";
 import { megjelolesIllesztes, parsolSnapshot } from "./parse.js";
-import { riaszt, terjedelemEllenorzes } from "./health.js";
+import { modositoTorveny, riaszt, terjedelemEllenorzes } from "./health.js";
 import {
   ADAT_REPO_DIR,
   allapotShaTerkep,
@@ -42,6 +42,20 @@ import {
 
 const push = !process.argv.includes("--no-push");
 const ma = maiNapBudapest();
+
+/**
+ * Egyszeri átengedés a terjedelem-őrnek: `--anomalia-ok=<slug>[,<slug>]`.
+ * Csak akkor használd, ha KÉZZEL ellenőrizted az njt-n, hogy a zsugorodás valós
+ * (a verzió szövege tényleg rövidebb, nem lazy-blokk hiányzik). Kézi futtatásra
+ * való eszköz — a napi Actions-futás soha nem adja meg.
+ */
+const anomaliaOk = new Set(
+  process.argv
+    .filter((a) => a.startsWith("--anomalia-ok="))
+    .flatMap((a) => a.slice("--anomalia-ok=".length).split(","))
+    .map((s) => s.trim())
+    .filter(Boolean),
+);
 
 /**
  * Biztonsági szelep: egy normál napon néhány (max pár tucat) új állapot jön.
@@ -177,7 +191,17 @@ async function fut(): Promise<void> {
       const szovegUt = join(ADAT_REPO_DIR, "jogszabalyok", js.slug, "szoveg.md");
       if (existsSync(szovegUt)) {
         const regi = await readFile(szovegUt, "utf8");
-        terjedelemEllenorzes(regi.length, md.length, js.slug);
+        if (anomaliaOk.has(js.slug)) {
+          console.warn(
+            `[terjedelem-őr átengedve: --anomalia-ok] ${js.slug}: ${regi.length} → ${md.length} kar`,
+          );
+        } else {
+          // a generált listából jövő tételeknél a config-beli cím üres,
+          // ezért a ténylegesen parse-olt cím az elsődleges
+          terjedelemEllenorzes(regi.length, md.length, js.slug, {
+            zsugorodhat: modositoTorveny(cim || js.cim),
+          });
+        }
       }
       const allapotok = [
         ...(ismertNyers[js.slug] ?? []).filter((a) => a.datum !== allapot.hatalyba),
