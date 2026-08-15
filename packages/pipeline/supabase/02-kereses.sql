@@ -64,6 +64,19 @@ as $$
     cross join lekerdezes l
     where sz.tsv @@ l.tsq
       and (mind or sz.hatalyos)
+      -- A normalizált markdown címsora a heading előtti, üres horgonyú
+      -- bevezető sorba is bekerül. Ha ugyanaz a lekérdezés már kiemelt
+      -- jogszabálycím-találatot adott, ezt az azonos oldalra mutató másolatot
+      -- elhagyjuk. Ha nincs cím-találat, a bevezető találata megmarad; a valódi,
+      -- horgonyzott szakasztalálatokat pedig egyik esetben sem szűrjük.
+      and (
+        sz.horgony <> ''
+        or not exists (
+          select 1
+          from jogszabaly_talalatok jt
+          where jt.slug = sz.slug
+        )
+      )
   ),
   egyesitett as (
     select * from jogszabaly_talalatok

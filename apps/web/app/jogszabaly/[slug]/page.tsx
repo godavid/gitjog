@@ -23,13 +23,14 @@ export async function generateMetadata({
   const tetel = jogszabalyok.find((j) => j.slug === slug);
   if (!tetel) return {};
   const utolso = sajat.at(-1);
+  const lezart = tetel.reteg === "lezart";
   return {
     title: tetel.rovidites
-      ? `${tetel.rovidites} – ${tetel.megjeloles} hatályos szövege`
-      : `${tetel.megjeloles} hatályos szövege – ${tetel.cim}`,
+      ? `${tetel.rovidites} – ${tetel.megjeloles} ${lezart ? "már nem hatályos" : "hatályos"} szövege`
+      : `${tetel.megjeloles} ${lezart ? "már nem hatályos" : "hatályos"} szövege – ${tetel.cim}`,
     description:
-      `${tetel.megjeloles} ${tetel.cim} hatályos szövege` +
-      `${utolso ? ` — ${datumSzoveg(utolso.datum)} napjától` : ""}. ` +
+      `${tetel.megjeloles} ${tetel.cim} ${lezart ? "már nem hatályos, utolsó ismert" : "hatályos"} szövege` +
+      `${utolso ? ` — ${lezart ? "az utolsó időállapot " : ""}${datumSzoveg(utolso.datum)} napjától` : ""}. ` +
       `${sajat.length} időállapot; módosításonként megnézhető, pontosan mi változott.`,
     alternates: {
       canonical: `/jogszabaly/${slug}`,
@@ -54,11 +55,13 @@ export default async function JogszabalyOldal({
 
   const utolso = sajat.at(-1);
   const elozo = sajat.at(-2);
+  const lezart = tetel.reteg === "lezart";
   const { html } = mdRender(szoveg);
 
   // A megjelölés utolsó szava a jogszabály fajtája („törvény"). Csak azokat a
-  // schema.org-mezőket töltjük ki, amikre tényleges adatunk van: a kihirdetés
-  // dátuma és a hatályossági jelző nincs az indexben, ezért kimarad.
+  // schema.org-mezőket töltjük ki, amikre tényleges adatunk van. Az első
+  // időállapot dátuma a hatálybalépés, nem a kihirdetés, ezért abból
+  // nem képezünk `legislationDate` mezőt.
   const tipus = tetel.megjeloles.split(" ").at(-1) ?? "jogszabály";
   const elso = sajat[0];
   const jsonLd = {
@@ -68,7 +71,6 @@ export default async function JogszabalyOldal({
     ...(tetel.rovidites ? { alternateName: tetel.rovidites } : {}),
     legislationIdentifier: tetel.megjeloles,
     legislationType: tipus,
-    ...(elso ? { legislationDate: elso.datum } : {}),
     ...(elso && utolso ? { temporalCoverage: `${elso.datum}/${utolso.datum}` } : {}),
     ...(utolso ? { legislationDateVersion: utolso.datum, dateModified: utolso.datum } : {}),
     ...(tipus === "törvény"
@@ -89,7 +91,9 @@ export default async function JogszabalyOldal({
         {tetel.megjeloles} {tetel.cim}
       </h1>
       <p className="alcim-sor">
-        Hatályos szöveg{utolso ? ` — ${datumSzoveg(utolso.datum)} napjától` : ""}.{" "}
+        {lezart ? "Utolsó ismert szöveg" : "Hatályos szöveg"}
+        {utolso ? ` — ${datumSzoveg(utolso.datum)} napjától` : ""}.{" "}
+        {lezart ? "A jogszabály már nem hatályos. " : null}
         {sajat.length > 1 ? (
           <>
             {sajat.length} időállapot{elso ? ` ${elso.datum.slice(0, 4)} óta` : ""}; minden

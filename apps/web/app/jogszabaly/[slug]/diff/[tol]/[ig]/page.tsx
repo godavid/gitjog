@@ -36,9 +36,11 @@ export default async function DiffOldal({
   const { slug, tol, ig } = await params;
   const [jogszabalyok, sajat] = await Promise.all([getJogszabalyok(), getAllapotokSlug(slug)]);
   const tetel = jogszabalyok.find((j) => j.slug === slug);
-  const regi = sajat.find((a) => a.datum === tol);
-  const uj = sajat.find((a) => a.datum === ig);
-  if (!tetel || !regi || !uj) notFound();
+  const tolIdx = sajat.findIndex((a) => a.datum === tol);
+  const igIdx = sajat.findIndex((a) => a.datum === ig);
+  const regi = sajat[tolIdx];
+  const uj = sajat[igIdx];
+  if (!tetel || !regi || !uj || tolIdx >= igIdx) notFound();
 
   const [regiSzoveg, ujSzoveg] = await Promise.all([
     getSzovegAt(regi.sha, slug),
@@ -51,13 +53,11 @@ export default async function DiffOldal({
   // A módosítások közötti léptetés: közvetlen szomszédos állapotoknál a közvetlen
   // előző és következő lépésre visz, több állapotot átfogó diffnél a környező
   // állapotokhoz navigál.
-  const tolIdx = sajat.findIndex((a) => a.datum === regi.datum);
-  const igIdx = sajat.findIndex((a) => a.datum === uj.datum);
-  const kozvetlenSzomszed = tolIdx >= 0 && igIdx === tolIdx + 1;
-  const lepesSzam = tolIdx >= 0 && igIdx > tolIdx ? igIdx - tolIdx : 1;
+  const kozvetlenSzomszed = igIdx === tolIdx + 1;
+  const lepesSzam = igIdx - tolIdx;
 
   const elozoPar = tolIdx >= 1 ? [sajat[tolIdx - 1]!, sajat[tolIdx]!] : null;
-  const kovetkezoPar = igIdx >= 0 && igIdx + 1 < sajat.length ? [sajat[igIdx]!, sajat[igIdx + 1]!] : null;
+  const kovetkezoPar = igIdx + 1 < sajat.length ? [sajat[igIdx]!, sajat[igIdx + 1]!] : null;
 
   const morzsa = morzsaJsonLd([
     { name: "Nyílt Jogtár", item: OLDAL_URL },
