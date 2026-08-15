@@ -213,6 +213,6 @@ push-ra**: `cd apps/web && vercel --prod --yes`.
   új időállapotot kap az njt-n, az legfeljebb egy körforgásnyi (7 nap) késéssel
   kerül be. A hatályos jogszabályok napi pontossága ettől nem sérül.
 - A keresés a jogszabályok SZÖVEGÉBEN, §-címeiben, valamint a jogszabály
-  CÍMÉBEN, MEG JELÖLÉSÉBEN és RÖVIDÍTÉSÉBEN is keres (`01-sema.sql` és
+  CÍMÉBEN, MEGJELÖLÉSÉBEN és RÖVIDÍTÉSÉBEN is keres (`01-sema.sql` és
   `02-kereses.sql` unió). A jogszabály-cím találatok kiemelt rangsorolással
   közvetlenül a törvény hatályos oldalára mutatnak.
