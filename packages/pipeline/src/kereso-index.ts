@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Sql } from "postgres";
 import { ADAT_REPO_DIR } from "./commit.js";
+import type { RetegTerkep } from "./enumeralas.js";
 import { szakaszokraBont } from "./szakaszok.js";
 
 export interface IndexTetel {
@@ -33,6 +34,25 @@ export function szakaszSorok(tetel: IndexTetel, md: string, hatalyos: boolean): 
     szoveg: sz.szoveg,
     hatalyos,
   }));
+}
+
+/**
+ * A delta keresőindex-tételei az adat-repó friss listaindexéből készülnek.
+ * A generált config-lista címe szándékosan üres, míg a listaindex már a
+ * snapshotból parse-olt címet őrzi.
+ */
+export function deltaSzinkronTetelek(
+  valtozottSlugok: string[],
+  listaIndex: IndexTetel[],
+  retegTerkep: RetegTerkep,
+): { tetel: IndexTetel; hatalyos: boolean }[] {
+  const terkep = new Map(listaIndex.map((tetel) => [tetel.slug, tetel]));
+  return valtozottSlugok.flatMap((slug) => {
+    const tetel = terkep.get(slug);
+    return tetel
+      ? [{ tetel, hatalyos: retegTerkep[tetel.documentId] !== "lezart" }]
+      : [];
+  });
 }
 
 /**

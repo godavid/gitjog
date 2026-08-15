@@ -29,6 +29,7 @@ import {
 import { markdownGeneralas } from "./normalize.js";
 import { megjelolesIllesztes, parsolSnapshot } from "./parse.js";
 import { modositoTorveny, riaszt, terjedelemEllenorzes } from "./health.js";
+import type { IndexTetel } from "./kereso-index.js";
 import {
   ADAT_REPO_DIR,
   allapotShaTerkep,
@@ -240,7 +241,7 @@ async function fut(): Promise<void> {
   // vadonatúj jogszabály (pl. friss kihirdetés) bekerül a listaindexbe is
   const listaIndex = JSON.parse(
     await readFile(join(ADAT_REPO_DIR, "index", "jogszabalyok.json"), "utf8"),
-  ) as { slug: string; documentId: string; megjeloles: string; cim: string; rovidites: string | null }[];
+  ) as IndexTetel[];
   const listaSlugok = new Set(listaIndex.map((t) => t.slug));
   for (const { js } of esemenyek) {
     if (listaSlugok.has(js.slug)) continue;
@@ -267,7 +268,7 @@ async function fut(): Promise<void> {
     console.log("Push KÉSZ.");
   }
 
-  await keresoIndexSzinkron(valtozottSlugok, jogszabalyok, retegTerkep);
+  await keresoIndexSzinkron(valtozottSlugok, listaIndex, retegTerkep);
 }
 
 /**
@@ -278,7 +279,7 @@ async function fut(): Promise<void> {
  */
 async function keresoIndexSzinkron(
   valtozottSlugok: string[],
-  jogszabalyok: Jogszabaly[],
+  listaIndex: IndexTetel[],
   retegTerkep: RetegTerkep,
 ): Promise<void> {
   const dbUrl = process.env.NYILT_DB_URL;
@@ -288,24 +289,8 @@ async function keresoIndexSzinkron(
   }
   try {
     const { default: postgres } = await import("postgres");
-    const { szinkronizal } = await import("./kereso-index.js");
-    const terkep = new Map(jogszabalyok.map((j) => [j.slug, j]));
-    const tetelek = valtozottSlugok.flatMap((slug) => {
-      const js = terkep.get(slug);
-      if (!js) return [];
-      return [
-        {
-          tetel: {
-            slug: js.slug,
-            documentId: js.documentId,
-            megjeloles: js.megjeloles,
-            cim: js.cim,
-            rovidites: js.rovidites ?? null,
-          },
-          hatalyos: retegTerkep[js.documentId] !== "lezart",
-        },
-      ];
-    });
+    const { deltaSzinkronTetelek, szinkronizal } = await import("./kereso-index.js");
+    const tetelek = deltaSzinkronTetelek(valtozottSlugok, listaIndex, retegTerkep);
     const sql = postgres(dbUrl, { max: 2 });
     try {
       const db = await szinkronizal(sql, tetelek);

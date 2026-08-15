@@ -18,7 +18,9 @@ const REVALIDATE = 21_600; // 6 óra
  * SZERKEZETE változik (más mezők, más URL-halmaz), a régi eredmény a revalidate
  * ablak végéig kiszolgálódik — a friss kód ellenére. Ilyenkor ezt kell léptetni.
  */
-export const CACHE_VERZIO = "3";
+export const CACHE_VERZIO = "4";
+
+export type JogszabalyReteg = "aktiv" | "lezart" | "nincs-szoveg";
 
 export interface JogszabalyTetel {
   slug: string;
@@ -26,7 +28,10 @@ export interface JogszabalyTetel {
   megjeloles: string;
   cim: string;
   rovidites: string | null;
+  reteg: JogszabalyReteg;
 }
+
+type NyersJogszabalyTetel = Omit<JogszabalyTetel, "reteg">;
 
 export interface Allapot {
   datum: string; // YYYY-MM-DD
@@ -81,9 +86,20 @@ export function evOf(j: JogszabalyTetel): number {
 }
 
 export async function getJogszabalyok(): Promise<JogszabalyTetel[]> {
-  const nyers = await rawFetch("main/index/jogszabalyok.json");
-  if (!nyers) throw new Error("Hiányzó index/jogszabalyok.json az adat-repóban");
-  return JSON.parse(nyers) as JogszabalyTetel[];
+  const [nyersLista, nyersRetegTerkep] = await Promise.all([
+    rawFetch("main/index/jogszabalyok.json"),
+    rawFetch("main/index/enumeralas.json"),
+  ]);
+  if (!nyersLista) throw new Error("Hiányzó index/jogszabalyok.json az adat-repóban");
+
+  const lista = JSON.parse(nyersLista) as NyersJogszabalyTetel[];
+  const retegTerkep = nyersRetegTerkep
+    ? (JSON.parse(nyersRetegTerkep) as Record<string, JogszabalyReteg>)
+    : {};
+  return lista.map((tetel) => ({
+    ...tetel,
+    reteg: retegTerkep[tetel.documentId] ?? "aktiv",
+  }));
 }
 
 /**
