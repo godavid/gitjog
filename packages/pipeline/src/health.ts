@@ -1,7 +1,8 @@
 // Agent-őr: riasztás GitHub Issue-val. A napi delta hibáinál hívjuk —
 // rossz adat SOHA nem kerül a repóba, helyette hangos riasztás megy
-// (az issue-ról a GitHub emailt küld a gazdának). Dedup: amíg van nyitott
-// `parser-riasztas` címkéjű issue, nem nyitunk újat.
+// (az issue-ról a GitHub emailt küld a gazdának). Dedup CÍM szerint: amíg
+// ugyanezzel a címmel van nyitott `parser-riasztas` issue, nem nyitunk újat —
+// egy másfajta hiba viszont akkor is saját issue-t kap, ha egy régi még nyitva.
 
 const CIMKE = "parser-riasztas";
 
@@ -19,18 +20,23 @@ export async function riaszt(cim: string, torzs: string): Promise<void> {
     "Content-Type": "application/json",
   };
   try {
+    const teljesCim = `🚨 ${cim}`;
     const nyitottak = await fetch(
-      `https://api.github.com/repos/${repo}/issues?state=open&labels=${CIMKE}&per_page=1`,
+      `https://api.github.com/repos/${repo}/issues?state=open&labels=${CIMKE}&per_page=50`,
       { headers: fejlecek },
     );
-    if (nyitottak.ok && ((await nyitottak.json()) as unknown[]).length > 0) {
-      console.error(`[riasztás — már van nyitott ${CIMKE} issue] ${cim}`);
-      return;
+    if (nyitottak.ok) {
+      const lista = (await nyitottak.json()) as { title?: string; html_url?: string }[];
+      const azonos = lista.find((i) => i.title === teljesCim);
+      if (azonos) {
+        console.error(`[riasztás — már nyitva: ${azonos.html_url ?? ""}] ${cim}`);
+        return;
+      }
     }
     const valasz = await fetch(`https://api.github.com/repos/${repo}/issues`, {
       method: "POST",
       headers: fejlecek,
-      body: JSON.stringify({ title: `🚨 ${cim}`, body: torzs, labels: [CIMKE] }),
+      body: JSON.stringify({ title: teljesCim, body: torzs, labels: [CIMKE] }),
     });
     if (!valasz.ok) {
       console.error(`[riasztás — issue-nyitás sikertelen: HTTP ${valasz.status}] ${cim}`);
@@ -55,13 +61,21 @@ export function modositoTorveny(cim: string): boolean {
   return /módosításáról\s*$/iu.test(cim.trim());
 }
 
+/** A terjedelem-őr hibája — a hívó ezt jogszabályonként kezeli, nem futás-szinten. */
+export class TerjedelemAnomalia extends Error {}
+
 /**
  * Terjedelem-őr: az új szöveg gyanús mértékű zsugorodása/duzzadása njt-törésre
  * utal (pl. üres vagy csonka oldal) — ilyenkor inkább hibázunk, mint commitolunk.
  *
- * A `zsugorodhat` jelzés (módosító törvény) csak az ALSÓ küszöböt engedi le: a
- * duzzadás ott is gyanús marad, és a szöveg teljes eltűnését is elfogjuk — a
- * cím és a preambulum ugyanis a kiürült módosító törvényekben is megmarad.
+ * A `zsugorodhat` jelzés (módosító törvény) MINDKÉT küszöböt elengedi, a teljes
+ * eltűnés (5% alá) kivételével — a cím és a preambulum ugyanis a kiürült
+ * módosító törvényekben is megmarad. A duzzadás azért nem gyanús: egy több
+ * lépcsőben hatályba lépő módosító törvény szakaszai a hatálybalépésük napján
+ * megjelennek a konszolidált szövegben, majd másnap, beépülve a módosított
+ * törvénybe, kiürülnek. Valós eset (2026. évi XVIII.): 16 590 → 111 538 →
+ * 17 225 karakter három egymást követő időállapotban — ez a normális
+ * életciklus, 2026-08-26-tól mégis kilenc napra leállította a napi deltát.
  */
 export function terjedelemEllenorzes(
   regiHossz: number,
@@ -72,8 +86,9 @@ export function terjedelemEllenorzes(
   if (regiHossz < 10_000) return; // kis fájlnál a nagy relatív ugrás normális
   const arany = ujHossz / regiHossz;
   const also = opciok.zsugorodhat ? 0.05 : 0.5;
-  if (arany < also || arany > 2.0) {
-    throw new Error(
+  const felso = opciok.zsugorodhat ? Infinity : 2.0;
+  if (arany < also || arany > felso) {
+    throw new TerjedelemAnomalia(
       `Terjedelem-anomália (${mi}): ${regiHossz} → ${ujHossz} kar (${(arany * 100).toFixed(0)}%) — nem commitolom`,
     );
   }

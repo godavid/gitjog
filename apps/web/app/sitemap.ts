@@ -9,8 +9,12 @@ export async function generateSitemaps() {
   return Array.from({ length: SITEMAP_SHARDOK }, (_, id) => ({ id }));
 }
 
-export default async function sitemap({ id }: { id: number }): Promise<MetadataRoute.Sitemap> {
-  // az id stringként is megérkezhet a metadata-route-tól: számmá kell alakítani,
-  // különben az aritmetika konkatenálna és a shardok átfednének
-  return sitemapShard(Number(id));
+export default async function sitemap({
+  id,
+}: {
+  id: Promise<string>;
+}): Promise<MetadataRoute.Sitemap> {
+  // Next 16-tól az id Promise, és stringként érkezik: meg kell várni és számmá
+  // alakítani — a `Number(promise)` NaN lenne, és minden shard üresen jönne vissza.
+  return sitemapShard(Number(await id));
 }

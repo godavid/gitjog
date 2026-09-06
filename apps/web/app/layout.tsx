@@ -53,8 +53,11 @@ const OLDAL_JSONLD = {
 };
 
 export default function GyokerElrendezes({ children }: { children: React.ReactNode }) {
+  // data-scroll-behavior: Next 16-tól a globális `scroll-behavior: smooth`-t
+  // navigációkor csak ezzel a jelzéssel írja felül — enélkül minden oldalváltás
+  // lassú „simán görgetés a tetejére" lenne.
   return (
-    <html lang="hu">
+    <html lang="hu" data-scroll-behavior="smooth">
       <body>
         <script
           type="application/ld+json"

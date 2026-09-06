@@ -28,7 +28,7 @@ import {
 } from "./enumeralas.js";
 import { markdownGeneralas } from "./normalize.js";
 import { megjelolesIllesztes, parsolSnapshot } from "./parse.js";
-import { modositoTorveny, riaszt, terjedelemEllenorzes } from "./health.js";
+import { modositoTorveny, riaszt, TerjedelemAnomalia, terjedelemEllenorzes } from "./health.js";
 import type { IndexTetel } from "./kereso-index.js";
 import {
   ADAT_REPO_DIR,
@@ -80,6 +80,16 @@ interface UjEsemeny {
 async function retegTerkepMentes(terkep: RetegTerkep): Promise<void> {
   await fajlIras(RETEG_FAJL, retegTerkepJson(terkep));
 }
+
+/**
+ * Terjedelem-anomáliára futott jogszabályok (slug → a hiba üzenete). Ezeket a
+ * futás kihagyja — a mai további állapotaikkal együtt, hogy a HEAD ne egy
+ * későbbi állapotot mutasson, miközben egy korábbi hiányzik —, a többi
+ * jogszabály viszont normálisan bekerül. A végén riasztunk. Egy jogszabály
+ * tartalmi anomáliája nem állíthatja le az egész napi frissítést: 2026-08-26-tól
+ * kilenc napig egyetlen módosító törvény miatt 37 új időállapot nem került be.
+ */
+const anomaliak = new Map<string, string>();
 
 async function fut(): Promise<void> {
   if (!existsSync(join(ADAT_REPO_DIR, "index", "allapotok.json"))) {
@@ -171,6 +181,7 @@ async function fut(): Promise<void> {
     }
     const uzenetSorok: string[] = [];
     for (const { js, allapot } of napiak) {
+      if (anomaliak.has(js.slug)) continue; // egy korábbi állapota ma kimaradt — ez sem mehet be
       const s = await getTeljesSnapshot(js.documentId, allapot.version);
       const p = parsolSnapshot(s, js.documentId);
       const illesztes = megjelolesIllesztes(js.megjeloles, p.megjeloles);
@@ -197,17 +208,28 @@ async function fut(): Promise<void> {
             `[terjedelem-őr átengedve: --anomalia-ok] ${js.slug}: ${regi.length} → ${md.length} kar`,
           );
         } else {
-          // a generált listából jövő tételeknél a config-beli cím üres,
-          // ezért a ténylegesen parse-olt cím az elsődleges
-          terjedelemEllenorzes(regi.length, md.length, js.slug, {
-            zsugorodhat: modositoTorveny(cim || js.cim),
-          });
+          try {
+            // a generált listából jövő tételeknél a config-beli cím üres,
+            // ezért a ténylegesen parse-olt cím az elsődleges
+            terjedelemEllenorzes(regi.length, md.length, js.slug, {
+              zsugorodhat: modositoTorveny(cim || js.cim),
+            });
+          } catch (e) {
+            if (!(e instanceof TerjedelemAnomalia)) throw e;
+            anomaliak.set(js.slug, e.message);
+            console.error(`[kihagyva] ${e.message}`);
+            continue;
+          }
         }
       }
+      // Az index bejegyzései sha-t is hordoznak; a meta.json állapotlistájába
+      // csak (datum, verzio) való — különben a sha beszivárog a meta.json-ba.
       const allapotok = [
         ...(ismertNyers[js.slug] ?? []).filter((a) => a.datum !== allapot.hatalyba),
         { datum: allapot.hatalyba, verzio: allapot.version },
-      ].sort((a, b) => (a.datum < b.datum ? -1 : 1));
+      ]
+        .map(({ datum, verzio }) => ({ datum, verzio }))
+        .sort((a, b) => (a.datum < b.datum ? -1 : 1));
       ismertNyers[js.slug] = allapotok;
       await fajlIras(`jogszabalyok/${js.slug}/szoveg.md`, md);
       await fajlIras(`jogszabalyok/${js.slug}/meta.json`, metaJson(js, cim, allapotok));
@@ -215,7 +237,10 @@ async function fut(): Promise<void> {
         `${js.rovidites ?? js.megjeloles}: ${NJT_BASE}/jogszabaly/${js.documentId}.${allapot.version}`,
       );
     }
-    const nevek = napiak.map((n) => n.js.rovidites ?? n.js.megjeloles);
+    if (uzenetSorok.length === 0) continue; // a nap minden tétele kimaradt
+    const nevek = napiak
+      .filter((n) => !anomaliak.has(n.js.slug))
+      .map((n) => n.js.rovidites ?? n.js.megjeloles);
     const cim =
       nevek.length === 1
         ? `${nevek[0]} — időállapot ${datum}`
@@ -226,7 +251,8 @@ async function fut(): Promise<void> {
 
   // 3. index frissítése külön utócommitban — CSAK a változott jogszabályokra
   // (5585 jogszabálynál a teljes újraépítés naponta fölösleges git-log-ezrek lenne)
-  const valtozottSlugok = [...new Set(esemenyek.map((e) => e.js.slug))];
+  const bekerult = esemenyek.filter((e) => !anomaliak.has(e.js.slug));
+  const valtozottSlugok = [...new Set(bekerult.map((e) => e.js.slug))];
   const allapotIndex = JSON.parse(
     await readFile(join(ADAT_REPO_DIR, "index", "allapotok.json"), "utf8"),
   ) as Record<string, { datum: string; verzio: number; sha: string }[]>;
@@ -243,7 +269,7 @@ async function fut(): Promise<void> {
     await readFile(join(ADAT_REPO_DIR, "index", "jogszabalyok.json"), "utf8"),
   ) as IndexTetel[];
   const listaSlugok = new Set(listaIndex.map((t) => t.slug));
-  for (const { js } of esemenyek) {
+  for (const { js } of bekerult) {
     if (listaSlugok.has(js.slug)) continue;
     const meta = JSON.parse(
       await readFile(join(ADAT_REPO_DIR, "jogszabalyok", js.slug, "meta.json"), "utf8"),
@@ -269,6 +295,19 @@ async function fut(): Promise<void> {
   }
 
   await keresoIndexSzinkron(valtozottSlugok, listaIndex, retegTerkep);
+
+  if (anomaliak.size > 0) {
+    const sorok = [...anomaliak.values()].map((s) => `- ${s}`).join("\n");
+    console.error(`${anomaliak.size} jogszabály terjedelem-anomália miatt kimaradt:\n${sorok}`);
+    await riaszt(
+      "Terjedelem-anomália — kézi ellenőrzés kell",
+      `A napi delta lefutott, a többi jogszabály bekerült, de az alábbiak kimaradtak, ` +
+        `mert a szövegük terjedelme gyanúsan változott:\n\n${sorok}\n\n` +
+        `Teendő: ellenőrizd az njt-n, hogy a változás valós-e. Ha igen, egyszeri kézi futás:\n` +
+        `\`pnpm --filter @nyilt-jogtar/pipeline delta -- --anomalia-ok=${[...anomaliak.keys()].join(",")}\`\n` +
+        `(a kimaradt állapotokat a következő futások addig minden nap újra megpróbálják).`,
+    );
+  }
 }
 
 /**

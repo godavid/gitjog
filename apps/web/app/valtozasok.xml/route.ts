@@ -1,5 +1,5 @@
-// A legutóbbi jogszabály-módosítások RSS-feedje. Next 15-ben a route handler
-// GET-je alapból nem cache-elt, ezért kell a force-static + revalidate páros.
+// A legutóbbi jogszabály-módosítások RSS-feedje. A route handler GET-je
+// alapból nem cache-elt (Next 15 óta), ezért kell a force-static + revalidate páros.
 
 import { getLegutobbiValtozasok } from "@/lib/adat";
 import { OLDAL_URL } from "@/lib/sitemap";
