@@ -2,10 +2,10 @@
 // kiemelve az ISMERT_OSZTALYOK-on kívülieket — a normalize bővítéséhez.
 import * as cheerio from "cheerio";
 import { JOGSZABALYOK } from "./config.js";
-import { getIdoallapotok, getTeljesSnapshot } from "./crawl.js";
+import { getIdoallapotok, getTeljesSnapshot, maiNapBudapest } from "./crawl.js";
 import { ISMERT_OSZTALYOK } from "./parse.js";
 
-const ma = new Date().toISOString().slice(0, 10);
+const ma = maiNapBudapest();
 const ismeretlenek = new Map<string, string[]>(); // osztály → mely törvényekben
 
 for (const js of JOGSZABALYOK) {

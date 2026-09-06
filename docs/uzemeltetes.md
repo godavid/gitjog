@@ -98,12 +98,22 @@
   a Keresés szakasz horgony-invariánsát).
 - `kereso-index.ts` + `kereso-feltoltes.ts` — a keresőindex szinkronja és teljes
   újraépítése (lásd a Keresés szakaszt).
-- `health.ts` — riasztás (Issue) + terjedelem-anomália-őr.
+- `health.ts` — riasztás (Issue) + terjedelem-anomália-őr. A riasztás CÍM szerint
+  dedupol: azonos című nyitott issue mellett nem nyit újat, más hibafajta viszont
+  saját issue-t kap.
+- A napi-delta.yml két példányban él: az élő az adat-repo `.github/workflows/`-ában,
+  a forrás itt a `packages/pipeline/adatrepo/`-ban — módosításnál MINDKETTŐT frissítsd.
 
 ## Ha törik a parser (njt-átdizájn)
 
-Tünet: piros napi delta futás + `parser-riasztas` issue. A delta ilyenkor SEMMIT nem
-commitol — rossz adat nem kerülhet a repóba.
+Tünet: piros napi delta futás + `parser-riasztas` issue. Szerkezeti hibánál (cím-,
+hatálydátum-eltérés, ismeretlen osztály, splicing) a delta SEMMIT nem commitol —
+rossz adat nem kerülhet a repóba. A terjedelem-anomália ezzel szemben
+JOGSZABÁLYONKÉNTI: az érintett jogszabályt (és aznapi további állapotait) kihagyja,
+a többit normálisan commitolja, a végén külön issue-val riaszt, és a kihagyott
+állapotokat a következő futások újra megpróbálják. (2026-08-26-tól kilenc napig
+egyetlen módosító törvény duzzadása miatt 37 más törvény állapota sem került be —
+ez volt a tanulság.)
 
 1. Nézd meg a hibát az Actions logban (melyik jogszabály, melyik osztály/feltevés).
 2. Lokálisan reprodukáld: `pnpm exec tsx src/parse-proba.ts <documentId> <verzió> /tmp/ki.md`
@@ -123,8 +133,12 @@ commitol — rossz adat nem kerülhet a repóba.
      módosító törvényeknél ez a normális életciklus —, a futás egyszer
      átengedhető: `pnpm delta -- --anomalia-ok=<slug>` (vesszővel több is).
      A „…módosításáról" végű című törvényeket az őr 2026-08-15 óta magától
-     engedékenyebben kezeli (`modositoTorveny()` a `health.ts`-ben): náluk csak
-     5% alatti maradék, illetve a duzzadás számít anomáliának.
+     engedékenyebben kezeli (`modositoTorveny()` a `health.ts`-ben): náluk csak az
+     5% alatti maradék számít anomáliának, a duzzadás NEM. A módosító törvény
+     szakaszai ugyanis a hatálybalépésük napján megjelennek a konszolidált
+     szövegben, másnap beépülve kiürülnek — a 2026. évi XVIII. például
+     16 590 → 111 538 → 17 225 karakter volt három egymást követő napon, és a régi
+     2× felső küszöb ezen akadt el.
 4. Tesztek: `pnpm test`. Ha a normalizálás SZÁNDÉKOSAN változott, regeneráld a
    golden hasheket (`parse-proba` + `shasum -a 256`) a `test/normalize.test.ts`-ben.
    Vigyázz: a golden-változás azt jelenti, hogy a teljes history diffje "ugrik" egyet

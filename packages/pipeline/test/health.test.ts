@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { modositoTorveny, terjedelemEllenorzes } from "../src/health.js";
+import { modositoTorveny, TerjedelemAnomalia, terjedelemEllenorzes } from "../src/health.js";
 import { parsolSnapshot } from "../src/parse.js";
 
 describe("terjedelemEllenorzes (agent-őr)", () => {
@@ -8,6 +8,9 @@ describe("terjedelemEllenorzes (agent-őr)", () => {
   });
   it("gyanús zsugorodásnál dob (fél alá)", () => {
     expect(() => terjedelemEllenorzes(100_000, 40_000, "teszt")).toThrow(/anomália/);
+  });
+  it("a hiba típusa TerjedelemAnomalia (a delta jogszabályonként kezeli)", () => {
+    expect(() => terjedelemEllenorzes(100_000, 40_000, "teszt")).toThrow(TerjedelemAnomalia);
   });
   it("gyanús duzzadásnál dob (dupla fölé)", () => {
     expect(() => terjedelemEllenorzes(100_000, 250_000, "teszt")).toThrow(/anomália/);
@@ -43,10 +46,18 @@ describe("módosító törvények kiürülése", () => {
       /anomália/,
     );
   });
-  it("a duzzadás módosító törvénynél is gyanús marad", () => {
-    expect(() => terjedelemEllenorzes(100_000, 250_000, "teszt", { zsugorodhat: true })).toThrow(
-      /anomália/,
-    );
+  it("módosító törvénynél a duzzadás megengedett (valós eset: 2026. évi XVIII., 2026-08-26)", () => {
+    // a lépcsőzetes hatálybalépés napján a beépülő szakaszok egy napra megjelennek
+    expect(() =>
+      terjedelemEllenorzes(16_590, 111_538, "teszt", { zsugorodhat: true }),
+    ).not.toThrow();
+    // …és másnap kiürülnek
+    expect(() =>
+      terjedelemEllenorzes(111_538, 17_225, "teszt", { zsugorodhat: true }),
+    ).not.toThrow();
+  });
+  it("ugyanez a duzzadás jelzés nélkül továbbra is dob", () => {
+    expect(() => terjedelemEllenorzes(16_590, 111_538, "teszt")).toThrow(/anomália/);
   });
 });
 
