@@ -13,3 +13,7 @@ supabase/.temp/
 
 # a tsc inkrementális build-állapota
 *.tsbuildinfo
+
+# a Next 16 dev-szerver generálja minden indításnál
+apps/web/AGENTS.md
+apps/web/CLAUDE.md

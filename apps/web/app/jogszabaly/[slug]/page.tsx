@@ -104,7 +104,7 @@ export default async function JogszabalyOldal({
           "Hatálybalépése óta nem módosult."
         )}
       </p>
-      <div className="eszkozsor">
+      <nav className="eszkozsor" aria-label="A jogszabály további nézetei">
         <Link href={`/jogszabaly/${slug}/idovonal`}>Időállapotok</Link>
         {elozo && utolso ? (
           <Link href={`/jogszabaly/${slug}/diff/${elozo.datum}/${utolso.datum}`}>
@@ -117,7 +117,7 @@ export default async function JogszabalyOldal({
         </a>
         <a href={`/jogszabaly/${slug}/szoveg.md`}>Nyers szöveg (.md)</a>
         <a href={`/jogszabaly/${slug}/valtozasok.xml`}>RSS</a>
-      </div>
+      </nav>
       <article className="jogszoveg" dangerouslySetInnerHTML={{ __html: html }} />
     </main>
   );

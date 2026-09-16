@@ -54,10 +54,12 @@ export default async function ValtozasokOldal() {
               <ul className="valtozas-nap">
                 {nap.tetelek.map((v) => (
                   <li key={`${v.tetel.slug}-${v.datum}`}>
-                    <Link href={`/jogszabaly/${v.tetel.slug}`}>
-                      {v.tetel.rovidites ?? v.tetel.megjeloles}
-                    </Link>{" "}
-                    <span className="valtozas-cim">{v.tetel.cim}</span>{" "}
+                    <span className="valtozas-tetel">
+                      <Link href={`/jogszabaly/${v.tetel.slug}`}>
+                        {v.tetel.rovidites ?? v.tetel.megjeloles}
+                      </Link>{" "}
+                      <span className="valtozas-cim">{v.tetel.cim}</span>
+                    </span>
                     {v.elozoDatum ? (
                       <Link
                         href={`/jogszabaly/${v.tetel.slug}/diff/${v.elozoDatum}/${v.datum}`}

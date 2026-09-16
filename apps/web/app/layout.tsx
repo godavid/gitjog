@@ -63,6 +63,9 @@ export default function GyokerElrendezes({ children }: { children: React.ReactNo
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLdSzoveg(OLDAL_JSONLD) }}
         />
+        <a className="ugras-tartalomra" href="#tartalom">
+          Ugrás a tartalomra
+        </a>
         <header className="fejlec">
           <div className="fejlec-belso">
             <Link href="/" className="wordmark">
@@ -81,7 +84,7 @@ export default function GyokerElrendezes({ children }: { children: React.ReactNo
             </form>
           </div>
         </header>
-        {children}
+        <div id="tartalom">{children}</div>
         <footer className="lablec">
           <div className="lablec-belso">
             <span>

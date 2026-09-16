@@ -124,6 +124,27 @@ git blame jogszabalyok/2013-evi-v-torveny-ptk/szoveg.md`}
       </section>
 
       <section className="szoveg-szekcio">
+        <h2>Gépi felületek</h2>
+        <p>
+          Minden felület süti és kulcs nélkül, egyszerű GET-tel elérhető, és ugyanarról a
+          domainről szolgál ki, mint az olvasható oldalak:
+        </p>
+        <pre className="kodblokk">
+          <code>
+            {`/llms.txt                              belépési pont ügynököknek
+/jogszabaly/<slug>/szoveg.md           egy törvény nyers Markdown-szövege
+/jogszabaly/<slug>/valtozasok.xml      egy törvény módosításai (RSS)
+/valtozasok.xml                        az összes friss módosítás (RSS)
+/sitemap/<n>.xml                       az oldaltérkép szeletei`}
+          </code>
+        </pre>
+        <p>
+          A slug az index-fájlban szerepel, és megegyezik az adat-repó könyvtárnevével —{" "}
+          <a href="/llms.txt">/llms.txt</a> mindezt géppel olvasható alakban is leírja.
+        </p>
+      </section>
+
+      <section className="szoveg-szekcio">
         <h2>Figyelmeztetés</h2>
         <p>
           Nem hiteles jogforrás. Tájékozódási és kutatási célra készült, automatikus feldolgozással.

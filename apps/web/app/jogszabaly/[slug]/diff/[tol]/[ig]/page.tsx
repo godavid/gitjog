@@ -84,7 +84,7 @@ export default async function DiffOldal({
           </>
         ) : null}
       </p>
-      <div className="eszkozsor">
+      <nav className="eszkozsor" aria-label="Léptetés a módosítások között">
         {elozoPar ? (
           <Link href={`/jogszabaly/${slug}/diff/${elozoPar[0].datum}/${elozoPar[1].datum}`}>
             ← {kozvetlenSzomszed ? "Előző" : "Korábbi"} módosítás ({datumSzoveg(elozoPar[1].datum)})
@@ -97,7 +97,7 @@ export default async function DiffOldal({
         ) : null}
         <Link href={`/jogszabaly/${slug}/idovonal`}>Időállapotok</Link>
         <Link href={`/jogszabaly/${slug}`}>Hatályos szöveg</Link>
-      </div>
+      </nav>
       <DiffNezet blokkok={blokkok} />
     </main>
   );
