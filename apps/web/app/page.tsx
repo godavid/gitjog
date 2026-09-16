@@ -83,27 +83,34 @@ export default async function Fooldal() {
 
       <section className="fo-szekcio">
         <h2>Legutóbbi változások</h2>
-        <ul className="friss-lista">
-          {frissek.map((v) => (
-            <li key={`${v.tetel.slug}-${v.datum}`}>
-              <span className="friss-datum">{datumSzoveg(v.datum)}</span>
-              <Link className="friss-nev" href={`/jogszabaly/${v.tetel.slug}`}>
-                {v.tetel.rovidites ?? v.tetel.megjeloles}
-              </Link>
-              <span className="friss-cim">{v.tetel.cim}</span>
-              {v.elozoDatum ? (
-                <Link
-                  className="friss-diff"
-                  href={`/jogszabaly/${v.tetel.slug}/diff/${v.elozoDatum}/${v.datum}`}
-                >
-                  mi változott?
+        {frissek.length === 0 ? (
+          <p className="ures-allapot">
+            Az elmúlt időszakban nem lépett hatályba módosítás.{" "}
+            <Link href="/valtozasok">Korábbi változások</Link>
+          </p>
+        ) : (
+          <ul className="friss-lista">
+            {frissek.map((v) => (
+              <li key={`${v.tetel.slug}-${v.datum}`}>
+                <span className="friss-datum">{datumSzoveg(v.datum)}</span>
+                <Link className="friss-nev" href={`/jogszabaly/${v.tetel.slug}`}>
+                  {v.tetel.rovidites ?? v.tetel.megjeloles}
                 </Link>
-              ) : (
-                <span className="friss-diff">hatálybalépés</span>
-              )}
-            </li>
-          ))}
-        </ul>
+                <span className="friss-cim">{v.tetel.cim}</span>
+                {v.elozoDatum ? (
+                  <Link
+                    className="friss-diff"
+                    href={`/jogszabaly/${v.tetel.slug}/diff/${v.elozoDatum}/${v.datum}`}
+                  >
+                    mi változott?
+                  </Link>
+                ) : (
+                  <span className="friss-diff">hatálybalépés</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
         <p className="szekcio-lab">
           <Link href="/valtozasok">Összes változás</Link>
           {" · "}

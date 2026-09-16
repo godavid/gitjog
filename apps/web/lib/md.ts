@@ -85,7 +85,7 @@ export function mdRender(md: string): { html: string; jegyzek: Szakaszjegyzek[] 
     if (sor.startsWith("| ")) {
       listaZar(0);
       if (!tablaban) {
-        ki.push(`<div class="tabla-gorgeto"><table><tbody>`);
+        ki.push(`<div class="tabla-gorgeto" tabindex="0"><table><tbody>`);
         tablaban = true;
         tablaSor = 0;
       }

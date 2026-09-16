@@ -107,7 +107,7 @@ export default async function HonapOldal({ params }: { params: Promise<{ ho: str
         pontos szövegváltozás — mi került bele a szövegbe és mi került ki belőle.
       </p>
 
-      <div className="eszkozsor">
+      <nav className="eszkozsor" aria-label="Léptetés a hónapok között">
         {adat.elozo ? (
           <Link href={`/valtozasok/${adat.elozo}`}>← {honapSzoveg(adat.elozo)}</Link>
         ) : null}
@@ -115,7 +115,7 @@ export default async function HonapOldal({ params }: { params: Promise<{ ho: str
           <Link href={`/valtozasok/${adat.kovetkezo}`}>{honapSzoveg(adat.kovetkezo)} →</Link>
         ) : null}
         <Link href="/valtozasok">Friss változások</Link>
-      </div>
+      </nav>
 
       <ol className="idovonal">
         {napok.map((nap) => (
@@ -124,10 +124,12 @@ export default async function HonapOldal({ params }: { params: Promise<{ ho: str
             <ul className="valtozas-nap">
               {nap.tetelek.map((v) => (
                 <li key={`${v.tetel.slug}-${v.datum}`}>
-                  <Link href={`/jogszabaly/${v.tetel.slug}`}>
-                    {v.tetel.rovidites ?? v.tetel.megjeloles}
-                  </Link>{" "}
-                  <span className="valtozas-cim">{v.tetel.cim}</span>{" "}
+                  <span className="valtozas-tetel">
+                    <Link href={`/jogszabaly/${v.tetel.slug}`}>
+                      {v.tetel.rovidites ?? v.tetel.megjeloles}
+                    </Link>{" "}
+                    <span className="valtozas-cim">{v.tetel.cim}</span>
+                  </span>
                   {v.elozoDatum ? (
                     <Link
                       href={`/jogszabaly/${v.tetel.slug}/diff/${v.elozoDatum}/${v.datum}`}

@@ -100,11 +100,11 @@ export default async function KeresesOldal({
 
       {talalatok.map((t, i) => (
         <div className="talalat" key={i}>
-          <h3>
+          <h2>
             <Link href={`/jogszabaly/${t.slug}${t.horgony ? `#${t.horgony}` : ""}`}>
               {t.szakasz || t.jogszabaly}
             </Link>
-          </h3>
+          </h2>
           <p className="forras">
             {t.jogszabaly}
             {t.hatalyos ? null : <span className="hatalytalan-jel">hatályát vesztette</span>}
