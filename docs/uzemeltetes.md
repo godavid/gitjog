@@ -265,7 +265,7 @@ művelet, kulcs nélkül, ugyanabban a Next appban:
   a felhasználó gépén) majd `mcp-publisher publish`. Új verziónál a `server.json`
   `version` mezőjét is léptesd.
 - **Füstteszt deploy után:** `curl "$OLDAL/api/v1/kereses?q=Ptk.+6:272.+§"`,
-  `.../szakasz?slug=2013-evi-cxxii-torveny-foldforgalmi`, `.../valtozasok?since=2026-01-01&q=föld`,
+  `.../szakasz?slug=2013-evi-cxxii-torveny-foldforgalmi`, `.../valtozasok?since=2026-01-01&q=termőföld|földek forgalm|Földalap`,
   `.../diff?slug=…&tol=…&ig=…`, `.../openapi.json`; MCP: `curl -X POST $OLDAL/api/mcp -H 'Accept: application/json, text/event-stream' -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`;
   `POST /api/revalidate` aláírás nélkül → 401.
 
