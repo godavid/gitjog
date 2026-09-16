@@ -72,7 +72,7 @@ export function GET() {
             q("since", L.since, datum),
             q("until", L.until, datum),
             q("slugs", `${L.slugs} Vesszővel elválasztva.`, { type: "string" }),
-            q("q", L.qSzuro, { type: "string", example: "föld" }),
+            q("q", L.qSzuro, { type: "string", example: "termőföld|földek forgalm|Földalap" }),
             q("limit", L.valtozasokLimit, { type: "integer", default: KORLAT.valtozasokAlap, maximum: KORLAT.valtozasokMax }),
           ],
           responses: valasz("Változás-tételek", "ValtozasokValasz"),

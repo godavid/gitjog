@@ -17,7 +17,8 @@ const L = {
   since: "Hatálybalépés napjától (YYYY-MM-DD).",
   until: "Hatálybalépés napjáig (YYYY-MM-DD).",
   slugs: "Csak ezek a jogszabályok.",
-  qSzuro: "Jogszabálycímre/rövidítésre illesztett részszó (kisbetű- és ékezet-független), pl. „föld”.",
+  qSzuro:
+    "Jogszabálycímre/rövidítésre illesztett szókezdet (kisbetű- és ékezet-független), „|”-vel több alternatíva, többszavas tag is lehet: „termőföld|földek forgalm|Földalap”. A tag szó elején illeszkedik („föld” → „földek”, de nem „külföld”); a puszta „föld” túl tág (földgáz, földmérés is).",
   valtozasokLimit: `Tételek száma (alap ${KORLAT.valtozasokAlap}, max ${KORLAT.valtozasokMax}).`,
   tol: "A korábbi időállapot napja (YYYY-MM-DD).",
   ig: "A későbbi időállapot napja (YYYY-MM-DD).",

@@ -1,0 +1,10 @@
+# A Vercel-deploy a monorepo gyökeréből indul (root directory: apps/web);
+# az adat-repo klónja és a cache nem tartozik a feltöltésbe.
+data/
+node_modules/
+.next/
+.git/
+docs/
+supabase/
+packages/pipeline/test/
+*.log

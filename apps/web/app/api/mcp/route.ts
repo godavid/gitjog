@@ -73,7 +73,7 @@ const handler = createMcpHandler(
         title: "Mi változott?",
         description:
           "Hatályba lépett módosítások listája az érintett §-ok régi/új szövegével — egy hívás elég egy értesítéshez. " +
-          "Figyeléshez: add meg a `felveve_utan` cursort (első hívásnál egy időbélyeg, utána a válasz `kovetkezo_felveve_utan` mezője) és szűrj `q`-val (címrészlet, pl. „föld”) vagy `slugs`-szal. " +
+          "Figyeléshez: add meg a `felveve_utan` cursort (első hívásnál egy időbélyeg, utána a válasz `kovetkezo_felveve_utan` mezője) és szűrj `q`-val (címbeli szókezdet, pl. „termőföld|földek forgalm|Földalap”) vagy `slugs`-szal. " +
           "Történeti kérdésre (`mi változott a Btk.-ban 2024-ben?`) a `since`/`until`/`slugs` szűrők valók.",
         inputSchema: MCP.valtozasok,
         annotations: OLVASO,

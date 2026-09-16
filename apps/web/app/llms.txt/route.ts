@@ -49,13 +49,13 @@ Négy művelet, REST-en és MCP-toolként ugyanúgy:
 - szakasz — egy § egy adott napon hatályos szövege; § nélkül a jogszabály időállapotai és tartalomjegyzéke.
   ${OLDAL_URL}/api/v1/szakasz?slug=2013-evi-cxxii-torveny-foldforgalmi&paragrafus=18.+§&datum=2024-01-01
 - valtozasok — mi változott: cursorral (felveve_utan) vagy since/until/slugs szűrővel; az érintett §-ok régi/új szövegével.
-  ${OLDAL_URL}/api/v1/valtozasok?since=2026-01-01&q=föld
+  ${OLDAL_URL}/api/v1/valtozasok?since=2026-01-01&q=termőföld|földek forgalm|Földalap
 - diff — két időállapot teljes §-szintű összevetése.
   ${OLDAL_URL}/api/v1/diff?slug=2013-evi-cxxii-torveny-foldforgalmi&tol=2023-01-01&ig=2024-01-01
 
 ### Változásfigyelés (recept ütemezett agentnek)
 
-1. Első futásnál hívd: /api/v1/valtozasok?felveve_utan=<mostani időbélyeg>&q=föld (vagy slugs=…).
+1. Első futásnál hívd: /api/v1/valtozasok?felveve_utan=<mostani időbélyeg>&q=termőföld|földek forgalm|Földalap (vagy slugs=…).
 2. Tárold el a válasz kovetkezo_felveve_utan mezőjét — ez a cursor.
 3. Naponta (a frissítés 03:30 UTC után) hívd újra a tárolt cursorral. Üres tetelek = nincs újdonság.
 4. Ha van tétel: az erintett_szakaszok régi/új szövegéből írj összefoglalót, a diff_url a teljes különbség.

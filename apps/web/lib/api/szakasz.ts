@@ -1,7 +1,7 @@
 // `szakasz`: egy § szövege egy időállapotban (pár KB, nem az egész törvény);
 // § nélkül a jogszabály metaadata, időállapotai és tartalomjegyzéke.
 
-import { szakaszKeres, szakaszokraBont } from "@gitjog/szoveg";
+import { paragrafusKivag, szakaszKeres, szakaszokraBont } from "@gitjog/szoveg";
 import { getAllapotokSlug, getSzoveg, getSzovegAt, type Allapot } from "@/lib/adat";
 import {
   ApiHiba,
@@ -27,6 +27,8 @@ export interface SzakaszValasz extends JogszabalyMeta {
   sha: string;
   horgony: string;
   szakasz_cim: string;
+  /** ha a § nem külön heading, hanem egy alcím alatti bekezdés-futam: a § jele */
+  paragrafus?: string;
   szoveg: string;
   nyers_url: string;
   megjegyzes: string;
@@ -91,6 +93,22 @@ export async function szakaszApi(p: SzakaszParam): Promise<SzakaszValasz | Jogsz
     ? szakaszok.find((s) => s.horgony === p.horgony)
     : szakaszKeres(szakaszok, p.paragrafus!);
   if (!sz) {
+    // sok törvényben a § nem heading, hanem alcím alatti bekezdés („18. § (1) …")
+    const r = p.paragrafus ? paragrafusKivag(md, p.paragrafus) : undefined;
+    if (r) {
+      return {
+        ...meta,
+        url: jogszabalyUrl(p.slug, r.horgony),
+        datum: allapot.datum,
+        sha: allapot.sha,
+        horgony: r.horgony,
+        szakasz_cim: r.cim,
+        paragrafus: r.paragrafus,
+        szoveg: r.szoveg,
+        nyers_url: nyersUrl(allapot.sha, p.slug),
+        megjegyzes: MEGJEGYZES,
+      };
+    }
     const mi = p.horgony ? `horgony „${p.horgony}”` : p.paragrafus!;
     throw new ApiHiba(404, `Nincs ${mi} a(z) ${tetel.megjeloles} ${allapot.datum}-i szövegében`);
   }

@@ -2,7 +2,7 @@
 // indexből oldunk fel (pontos, DB nélkül is megy), különben teljes szövegű
 // keresés. A találat egy körben citálható: a § teljes szövege + stabil URL.
 
-import { hivatkozasParse, szakaszKeres, szakaszokraBont } from "@gitjog/szoveg";
+import { hivatkozasParse, paragrafusKivag, szakaszKeres, szakaszokraBont } from "@gitjog/szoveg";
 import { getSzoveg, type JogszabalyTetel } from "@/lib/adat";
 import { keresTeljes } from "@/lib/kereso";
 import {
@@ -41,6 +41,21 @@ export interface KeresesParam {
   limit?: number;
 }
 
+/**
+ * Az index csak ~36 törvénynél hordoz rövidítést; a gyakorlatban használt
+ * rövidítések egy része hiányzik vagy más alakban áll („Földforgalmi tv." vs.
+ * „Fftv."). Kis, kézzel ellenőrzött kiegészítés — normalizált kulcs → documentId.
+ */
+const ROVIDITES_ALIAS: Record<string, string> = {
+  fftv: "2013-122-00-00", // a mező- és erdőgazdasági földek forgalmáról
+  foldforgalmi: "2013-122-00-00",
+  fetv: "2013-212-00-00", // a Fftv.-vel összefüggő egyes rendelkezésekről és átmeneti szabályokról
+  tft: "1994-55-00-00", // a termőföldről
+  nfatv: "2001-116-00-00", // a Nemzeti Földalapról
+  szjt: "1999-76-00-00", // a szerzői jogról
+  kp: "2017-1-00-00", // a közigazgatási perrendtartásról
+};
+
 function jogszabalyFeloldas(
   terkep: Map<string, JogszabalyTetel>,
   h: { documentId?: string; rovidites?: string },
@@ -49,7 +64,15 @@ function jogszabalyFeloldas(
   if (h.documentId) return lista.find((t) => t.documentId === h.documentId);
   if (h.rovidites) {
     const cel = normalizal(h.rovidites);
-    return lista.find((t) => t.rovidites && normalizal(t.rovidites) === cel);
+    // csak a KÜLÖN SZÓ „tv."/„törvény" utótag esik le („Földforgalmi tv" → „foldforgalmi");
+    // a „Fftv" végén a „tv" a rövidítés része
+    const tomorit = (r: string) => r.replace(/ (tv|torveny)$/, "").replace(/[^a-z0-9]/g, "");
+    const rovid = tomorit(cel);
+    return (
+      lista.find((t) => t.rovidites && normalizal(t.rovidites) === cel) ??
+      lista.find((t) => t.rovidites && tomorit(normalizal(t.rovidites)) === rovid) ??
+      (ROVIDITES_ALIAS[rovid] ? lista.find((t) => t.documentId === ROVIDITES_ALIAS[rovid]) : undefined)
+    );
   }
   return undefined;
 }
@@ -71,7 +94,15 @@ async function hivatkozasTalalat(
   if (paragrafus) {
     const sz = szakaszKeres(szakaszok, paragrafus);
     if (!sz) {
-      throw new ApiHiba(404, `Nincs ${paragrafus} a(z) ${tetel.megjeloles} szövegében`, "q");
+      const r = paragrafusKivag(md, paragrafus);
+      if (!r) throw new ApiHiba(404, `Nincs ${paragrafus} a(z) ${tetel.megjeloles} szövegében`, "q");
+      return {
+        ...alap,
+        szakasz_cim: r.cim,
+        horgony: r.horgony,
+        ...csonkol(r.szoveg, KORLAT.keresesSzoveg),
+        url: jogszabalyUrl(tetel.slug, r.horgony),
+      };
     }
     return {
       ...alap,

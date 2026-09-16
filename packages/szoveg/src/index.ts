@@ -18,3 +18,4 @@ export {
   type SzakaszValtozas,
   type SzakaszValtozasTipus,
 } from "./szakasz-diff";
+export { paragrafusKivag, type ParagrafusReszlet } from "./paragrafus";

@@ -79,16 +79,23 @@ interface Nyers {
 
 function szurok(p: ValtozasokParam, terkep: Map<string, JogszabalyTetel>): (n: Nyers) => boolean {
   const slugok = p.slugs && p.slugs.length > 0 ? new Set(p.slugs) : null;
-  const q = p.q ? normalizal(p.q) : null;
+  // Szóeleji illesztés, „|”-vel elválasztott alternatívákkal: a „föld" a
+  // „földek"-re és a „Földalap"-ra illik, a „külföldre"-re nem; az összetett
+  // szavakhoz („termőföld") a hívó ad külön tagot: q=föld|termőföld.
+  const tagok = p.q
+    ? p.q.split("|").map((t) => normalizal(t)).filter(Boolean)
+    : [];
+  const illik = (mezo: string) =>
+    tagok.some((tag) => mezo === tag || mezo.startsWith(`${tag}`) || mezo.includes(` ${tag}`) || mezo.includes(`-${tag}`));
   return (n) => {
     if (slugok && !slugok.has(n.slug)) return false;
     if (p.since && n.datum < p.since) return false;
     if (p.until && n.datum > p.until) return false;
-    if (q) {
+    if (tagok.length > 0) {
       const t = terkep.get(n.slug);
       if (!t) return false;
       const mezok = [t.cim, t.rovidites ?? "", t.megjeloles].map(normalizal);
-      if (!mezok.some((m) => m.includes(q))) return false;
+      if (!mezok.some(illik)) return false;
     }
     return terkep.has(n.slug);
   };

@@ -149,7 +149,7 @@ git blame jogszabalyok/2013-evi-v-torveny-ptk/szoveg.md`}
         <pre className="kodblokk">
           <code>
             {`# mi változott a földjogi törvényekben 2026 óta?
-curl '${OLDAL_URL}/api/v1/valtozasok?since=2026-01-01&q=föld'`}
+curl '${OLDAL_URL}/api/v1/valtozasok?since=2026-01-01&q=termőföld|földek forgalm|Földalap'`}
           </code>
         </pre>
         <p>
