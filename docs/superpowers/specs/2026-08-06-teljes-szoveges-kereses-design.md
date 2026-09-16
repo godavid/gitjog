@@ -49,7 +49,7 @@ Az adat-repo marad az igazság forrása. A Postgres **származtatott index**, am
 bármikor eldobható és újraépíthető — ez a tulajdonság a hibatűrés alapja.
 
 ```
-magyar-jogtar (git)              Supabase Postgres           Vercel (Next.js)
+magyar-jog (git)              Supabase Postgres           Vercel (Next.js)
   jogszabalyok/*/szoveg.md  ──►   jogszabaly  (4332 sor)  ◄──RPC──  /kereses
   index/jogszabalyok.json         szakasz     (~100e sor)
   index/enumeralas.json  ─────►     └─ GIN index a tsvectoron

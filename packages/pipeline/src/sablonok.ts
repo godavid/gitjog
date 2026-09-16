@@ -1,6 +1,6 @@
 // Az adat-repo statikus váz-fájljai (README, DISCLAIMER, LICENSE, .gitattributes).
 
-export const README_MD = `# Magyar Jogtár — a magyar jogrendszer git-natív verziókövetése
+export const README_MD = `# GitJog — a magyar jogrendszer git-natív verziókövetése
 
 Ez a repó a legfontosabb magyar jogszabályok **konszolidált szövegét** tartalmazza
 Markdown formátumban, úgy, hogy **a git history maga a jogtörténet**:
@@ -42,7 +42,7 @@ szöveg** — a hiteles jogforrás a njt.jog.gov.hu és a Magyar Közlöny. Rés
 A repót napi automatikus futás (GitHub Actions) tartja karban: az aznap hatályba
 lépő új időállapotokat commitolja. A feldolgozó kód nyílt:
 [godavid/gitjog](https://github.com/godavid/gitjog). Weboldal:
-[jogtar.remenyfarm.hu](https://jogtar.remenyfarm.hu).
+[gitjog.remenyfarm.hu](https://gitjog.remenyfarm.hu).
 
 ## Licenc
 

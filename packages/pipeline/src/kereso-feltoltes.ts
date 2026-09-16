@@ -1,5 +1,5 @@
 // A keresőindex teljes újraépítése az adat-repóból.
-//   NYILT_DB_URL=postgres://... pnpm --filter @nyilt-jogtar/pipeline kereso-feltoltes
+//   NYILT_DB_URL=postgres://... pnpm --filter @gitjog/pipeline kereso-feltoltes
 // Újrafuttatható: jogszabályonként törlés + beszúrás, tranzakcióban.
 
 import { readFile } from "node:fs/promises";

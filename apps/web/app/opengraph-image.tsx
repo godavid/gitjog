@@ -4,7 +4,7 @@
 import { ImageResponse } from "next/og";
 import { evOf, getJogszabalyok } from "@/lib/adat";
 
-export const alt = "Nyílt Jogtár — a magyar törvények szövege és változástörténete";
+export const alt = "GitJog — a magyar törvények szövege és változástörténete";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const revalidate = 86400;
@@ -34,7 +34,7 @@ export default async function Kep() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12, color: PECSET, fontSize: 26 }}>
           <span style={{ fontSize: 34 }}>§</span>
-          <span style={{ letterSpacing: 2 }}>NYÍLT JOGTÁR</span>
+          <span style={{ letterSpacing: 2 }}>GITJOG</span>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", marginTop: 56, flexGrow: 1 }}>
@@ -57,7 +57,7 @@ export default async function Kep() {
           }}
         >
           <span>{`${jogszabalyok.length} törvény, ${elsoEv} óta`}</span>
-          <span>jogtar.remenyfarm.hu</span>
+          <span>gitjog.remenyfarm.hu</span>
         </div>
       </div>
     ),

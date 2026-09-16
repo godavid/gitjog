@@ -1,10 +1,10 @@
-// Adatréteg: a magyar-jogtar adat-repo tartalma raw.githubusercontent.com-ról.
+// Adatréteg: a magyar-jog adat-repo tartalma raw.githubusercontent.com-ról.
 // A HEAD-re mutató kérések naponta revalidálódnak (ISR), a commit-SHA-s
 // kérések változhatatlanok, ezért örökre cache-elhetők.
 
 import { unstable_cache } from "next/cache";
 
-export const ADAT_REPO = "godavid/magyar-jogtar";
+export const ADAT_REPO = "godavid/magyar-jog";
 const RAW = `https://raw.githubusercontent.com/${ADAT_REPO}`;
 
 // A tartalom naponta egyszer frissül (napi delta workflow), ezért ennél

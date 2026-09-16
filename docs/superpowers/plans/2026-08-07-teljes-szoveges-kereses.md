@@ -18,7 +18,7 @@
 - **Horgony-invariáns:** a keresőtalálat `horgony` mezője BIT SZERINT egyezzen azzal az `id`-vel, amit az `apps/web/lib/md.ts` `mdRender()`-e generál ugyanarra a szövegre — beleértve az ismétlődő címek `-2`, `-3` utótagos ütközésfeloldását. Enélkül a mélylink rossz §-ra visz.
 - **A napi delta soha nem bukhat el az index-szinkron miatt.** Az adat-repo integritása előbbre való a keresőnél.
 - **Nincs `any` típus.** Az adatalakokhoz `interface` a fájl tetején.
-- Tesztfuttatás: `pnpm --filter @nyilt-jogtar/pipeline test` · típusellenőrzés: `cd packages/pipeline && npx tsc --noEmit`
+- Tesztfuttatás: `pnpm --filter @gitjog/pipeline test` · típusellenőrzés: `cd packages/pipeline && npx tsc --noEmit`
 
 ## Fájlszerkezet
 
@@ -107,7 +107,7 @@ describe("szakaszokraBont", () => {
 
 - [ ] **2. lépés: Futtasd, győződj meg róla, hogy bukik**
 
-Futtatás: `pnpm --filter @nyilt-jogtar/pipeline exec vitest run test/szakaszok.test.ts`
+Futtatás: `pnpm --filter @gitjog/pipeline exec vitest run test/szakaszok.test.ts`
 Várt: FAIL — `Cannot find module '../src/szakaszok.js'`
 
 - [ ] **3. lépés: Írd meg a modult**
@@ -185,7 +185,7 @@ export function szakaszokraBont(md: string): Szakasz[] {
 
 - [ ] **4. lépés: Futtasd, győződj meg róla, hogy zöld**
 
-Futtatás: `pnpm --filter @nyilt-jogtar/pipeline exec vitest run test/szakaszok.test.ts`
+Futtatás: `pnpm --filter @gitjog/pipeline exec vitest run test/szakaszok.test.ts`
 Várt: PASS, 9 teszt.
 
 Ha a horgony-invariáns teszt bukik: az `mdRender` MINDEN `##`–`####` headinget beszámít az ütközés-számlálóba, tehát a `hasznaltIdk` frissítésének a bontóban is minden headingnél meg kell történnie — akkor is, ha a szakasz üres lesz és nem kerül a kimenetbe.
@@ -216,7 +216,7 @@ git commit -m "Szakaszokra bontó modul a keresőindexhez, horgony-invariáns te
 
 ```sql
 -- Keresőindex séma. Származtatott adat: bármikor eldobható és újraépíthető
--- a kereso-feltoltes.ts szkripttel. Az igazság forrása a magyar-jogtar repo.
+-- a kereso-feltoltes.ts szkripttel. Az igazság forrása a magyar-jog repo.
 
 create table if not exists jogszabaly (
   slug        text primary key,
@@ -343,7 +343,7 @@ git commit -m "Keresőindex SQL: séma, GIN index, RLS és a kereses() függvén
 - [ ] **1. lépés: Vedd fel a függőséget és a scriptet**
 
 ```bash
-pnpm --filter @nyilt-jogtar/pipeline add postgres
+pnpm --filter @gitjog/pipeline add postgres
 ```
 
 A `packages/pipeline/package.json` `scripts` blokkjába:
@@ -390,7 +390,7 @@ describe("szakaszSorok", () => {
 
 - [ ] **3. lépés: Futtasd, győződj meg róla, hogy bukik**
 
-Futtatás: `pnpm --filter @nyilt-jogtar/pipeline exec vitest run test/kereso-index.test.ts`
+Futtatás: `pnpm --filter @gitjog/pipeline exec vitest run test/kereso-index.test.ts`
 Várt: FAIL — `Cannot find module '../src/kereso-index.js'`
 
 - [ ] **4. lépés: Írd meg a modult**
@@ -484,7 +484,7 @@ export async function szinkronizal(
 
 - [ ] **5. lépés: Futtasd a tesztet**
 
-Futtatás: `pnpm --filter @nyilt-jogtar/pipeline exec vitest run test/kereso-index.test.ts`
+Futtatás: `pnpm --filter @gitjog/pipeline exec vitest run test/kereso-index.test.ts`
 Várt: PASS, 4 teszt.
 
 - [ ] **6. lépés: Írd meg a feltöltő CLI-t**
@@ -493,7 +493,7 @@ Várt: PASS, 4 teszt.
 
 ```ts
 // A keresőindex teljes újraépítése az adat-repóból.
-//   NYILT_DB_URL=postgres://... pnpm --filter @nyilt-jogtar/pipeline kereso-feltoltes
+//   NYILT_DB_URL=postgres://... pnpm --filter @gitjog/pipeline kereso-feltoltes
 // Újrafuttatható: jogszabályonként törlés + beszúrás, tranzakcióban.
 
 import { readFile } from "node:fs/promises";
@@ -594,7 +594,7 @@ A `delta.ts`-ben a `if (push) { await git(["push", "origin", "main"]); ... }` bl
       `A napi delta adata rendben bekerült, de a keresőindex frissítése elhasalt.\n\n` +
         `\`\`\`\n${uzenet}\n\`\`\`\n\n` +
         `Teendő: a következő futás újrapróbálja. Ha ismétlődik, teljes újraépítés:\n` +
-        `\`NYILT_DB_URL=... pnpm --filter @nyilt-jogtar/pipeline kereso-feltoltes\``,
+        `\`NYILT_DB_URL=... pnpm --filter @gitjog/pipeline kereso-feltoltes\``,
     );
   }
 ```
@@ -611,7 +611,7 @@ A `delta.ts`-ben a `if (push) { await git(["push", "origin", "main"]); ... }` bl
 
 - [ ] **3. lépés: Ellenőrizd, hogy a delta titok nélkül is fut**
 
-Futtatás: `pnpm --filter @nyilt-jogtar/pipeline test && cd packages/pipeline && npx tsc --noEmit`
+Futtatás: `pnpm --filter @gitjog/pipeline test && cd packages/pipeline && npx tsc --noEmit`
 Várt: PASS. A szinkron `NYILT_DB_URL` nélkül csak kiír egy sort és kilép — a régi viselkedés sértetlen.
 
 - [ ] **4. lépés: Szinkronizáld a workflow két példányát és commitolj**
@@ -637,8 +637,8 @@ git commit -m "Napi delta: keresőindex-szinkron külön hibaágon"
 - [ ] **1. lépés: Cseréld a függőséget**
 
 ```bash
-pnpm --filter @nyilt-jogtar/web remove minisearch
-pnpm --filter @nyilt-jogtar/web add @supabase/supabase-js
+pnpm --filter @gitjog/web remove minisearch
+pnpm --filter @gitjog/web add @supabase/supabase-js
 ```
 
 - [ ] **2. lépés: Írd újra a keresőt**
@@ -863,7 +863,7 @@ git commit -m "Keresőoldal: hatálytalan törvények kapcsolója, találat-kiem
 - [ ] **1. lépés: Töltsd fel az indexet**
 
 ```bash
-NYILT_DB_URL='postgres://...' pnpm --filter @nyilt-jogtar/pipeline kereso-feltoltes
+NYILT_DB_URL='postgres://...' pnpm --filter @gitjog/pipeline kereso-feltoltes
 ```
 
 Várt: `KÉSZ: 4332 jogszabály, ~100000 szakasz.`
@@ -882,15 +882,15 @@ Elvárás: a „szerződést" ragozott alak találjon a „szerződés" szót ta
 - [ ] **3. lépés: Állítsd be a GitHub secretet**
 
 ```bash
-gh secret set NYILT_DB_URL -R godavid/magyar-jogtar
+gh secret set NYILT_DB_URL -R godavid/magyar-jog
 ```
 
 - [ ] **4. lépés: Deployolj és verifikálj**
 
 ```bash
 cd apps/web && vercel --prod --yes && cd ../..
-curl -s "https://jogtar.remenyfarm.hu/kereses?q=szerz%C5%91d%C3%A9st" | grep -c "<mark>"
-curl -s -o /dev/null -w "%{http_code}\n" "https://jogtar.remenyfarm.hu/kereses?q=el%C3%A9v%C3%BCl%C3%A9s&mind=1"
+curl -s "https://gitjog.remenyfarm.hu/kereses?q=szerz%C5%91d%C3%A9st" | grep -c "<mark>"
+curl -s -o /dev/null -w "%{http_code}\n" "https://gitjog.remenyfarm.hu/kereses?q=el%C3%A9v%C3%BCl%C3%A9s&mind=1"
 ```
 
 Elvárás: a `<mark>` előfordulások száma nagyobb nullánál, a második kérés 200-as.
@@ -902,7 +902,7 @@ Elvárás: a `<mark>` előfordulások száma nagyobb nullánál, a második kér
 
 1. A „Titkok" szakasz szövege ma azt állítja, hogy nincsenek titkok. Írd át: az adat-repo `NYILT_DB_URL` secretet használ a keresőindex-szinkronhoz; a Vercel oldalon `NEXT_PUBLIC_SUPABASE_URL` és `SUPABASE_ANON_KEY` él; a web anon kulccsal, RLS mögött csak olvas.
 2. A pipeline-felsorolásba: `szakaszok.ts` (markdown → §-szakaszok, horgony-invariánssal) és `kereso-index.ts` (a keresőindex szinkronja).
-3. A „Skálázás" szakaszban a keresőre vonatkozó nyitott pont törlendő, helyette az újraépítési recept: `NYILT_DB_URL=... pnpm --filter @nyilt-jogtar/pipeline kereso-feltoltes` — az index származtatott, bármikor eldobható.
+3. A „Skálázás" szakaszban a keresőre vonatkozó nyitott pont törlendő, helyette az újraépítési recept: `NYILT_DB_URL=... pnpm --filter @gitjog/pipeline kereso-feltoltes` — az index származtatott, bármikor eldobható.
 
 - [ ] **6. lépés: Commitolj és pushol**
 

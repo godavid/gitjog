@@ -14,7 +14,7 @@ const GYOKER = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 export const ADAT_REPO_DIR = process.env.NYILT_ADAT_REPO_DIR ?? join(GYOKER, "data", "repo");
 
 /** a commit-szerző az adat-repóban */
-const BOT_NEV = "Nyílt Jogtár";
+const BOT_NEV = "GitJog";
 const BOT_EMAIL = "info@remenyfarm.hu";
 
 export async function git(args: string[], opts: { datum?: string } = {}): Promise<string> {

@@ -304,7 +304,7 @@ async function fut(): Promise<void> {
       `A napi delta lefutott, a többi jogszabály bekerült, de az alábbiak kimaradtak, ` +
         `mert a szövegük terjedelme gyanúsan változott:\n\n${sorok}\n\n` +
         `Teendő: ellenőrizd az njt-n, hogy a változás valós-e. Ha igen, egyszeri kézi futás:\n` +
-        `\`pnpm --filter @nyilt-jogtar/pipeline delta -- --anomalia-ok=${[...anomaliak.keys()].join(",")}\`\n` +
+        `\`pnpm --filter @gitjog/pipeline delta -- --anomalia-ok=${[...anomaliak.keys()].join(",")}\`\n` +
         `(a kimaradt állapotokat a következő futások addig minden nap újra megpróbálják).`,
     );
   }
@@ -345,7 +345,7 @@ async function keresoIndexSzinkron(
       `A napi delta adata rendben bekerült a repóba, de a keresőindex frissítése elhasalt.\n\n` +
         `\`\`\`\n${uzenet}\n\`\`\`\n\n` +
         `Teendő: a következő futás újrapróbálja. Ha ismétlődik, teljes újraépítés:\n` +
-        `\`NYILT_DB_URL=... pnpm --filter @nyilt-jogtar/pipeline kereso-feltoltes\``,
+        `\`NYILT_DB_URL=... pnpm --filter @gitjog/pipeline kereso-feltoltes\``,
     );
   }
 }

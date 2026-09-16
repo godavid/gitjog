@@ -10,8 +10,8 @@ const LEIRAS =
 
 export const metadata: Metadata = {
   title: {
-    default: "Nyílt Jogtár",
-    template: "%s · Nyílt Jogtár",
+    default: "GitJog",
+    template: "%s · GitJog",
   },
   description: LEIRAS,
   metadataBase: new URL(OLDAL_URL),
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "hu_HU",
-    siteName: "Nyílt Jogtár",
+    siteName: "GitJog",
   },
   twitter: { card: "summary_large_image" },
   // A tulajdonjog-igazolás tokenjei környezeti változóból jönnek: így a
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
 const OLDAL_JSONLD = {
   "@context": "https://schema.org",
   "@type": "WebSite",
-  name: "Nyílt Jogtár",
+  name: "GitJog",
   alternateName: "A magyar törvények szövege és változástörténete",
   url: OLDAL_URL,
   inLanguage: "hu",
@@ -66,7 +66,7 @@ export default function GyokerElrendezes({ children }: { children: React.ReactNo
         <header className="fejlec">
           <div className="fejlec-belso">
             <Link href="/" className="wordmark">
-              <span className="pecsetjel">§</span>Nyílt Jogtár
+              <span className="pecsetjel">§</span>GitJog
             </Link>
             <form className="fejlec-kereso" action="/kereses" role="search">
               <input
@@ -95,7 +95,7 @@ export default function GyokerElrendezes({ children }: { children: React.ReactNo
               {" · "}
               <Link href="/valtozasok">Változások</Link>
               {" · "}
-              <a href="https://github.com/godavid/magyar-jogtar" rel="noopener">
+              <a href="https://github.com/godavid/magyar-jog" rel="noopener">
                 Adat-repo (git)
               </a>
               {" · "}

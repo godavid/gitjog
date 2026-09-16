@@ -1,4 +1,4 @@
-# DESIGN.md — Nyílt Jogtár
+# DESIGN.md — GitJog
 
 ## Jelenet-mondat (téma-döntés)
 

@@ -1,11 +1,11 @@
-# PRODUCT.md — Nyílt Jogtár
+# PRODUCT.md — GitJog
 
 register: product
 
 ## Mi ez
 
 A magyar jogrendszer git-natív, publikus verziókövetésének weboldala
-(jogtar.remenyfarm.hu). A termék szíve a godavid/magyar-jogtar adat-repo;
+(gitjog.remenyfarm.hu). A termék szíve a godavid/magyar-jog adat-repo;
 a weboldal ezt teszi laikusnak is hozzáférhetővé: jogszabály-lista, teljes
 hatályos szöveg, időállapot-idővonal, két állapot diffje, teljes szövegű keresés.
 
@@ -19,7 +19,7 @@ hatályos szöveg, időállapot-idővonal, két állapot diffje, teljes szöveg�
 
 Közérdekű átláthatósági infrastruktúra: pontos, nyugodt, hivatali komolyság
 melegséggel — irattár, nem startup. Magyar nyelvű UI. A tipográfia a hosszú
-jogszabályszöveg olvasására van hangolva (nyomtatott jogtár-érzés, képernyőn).
+jogszabályszöveg olvasására van hangolva (nyomtatott törvénytár-érzés, képernyőn).
 
 ## Anti-referenciák
 

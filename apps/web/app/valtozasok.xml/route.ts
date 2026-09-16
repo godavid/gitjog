@@ -46,7 +46,7 @@ export async function GET() {
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">',
     "  <channel>",
-    "    <title>Nyílt Jogtár — mi változott</title>",
+    "    <title>GitJog — mi változott</title>",
     `    <link>${OLDAL_URL}/valtozasok</link>`,
     `    <atom:link href="${OLDAL_URL}/valtozasok.xml" rel="self" type="application/rss+xml" />`,
     "    <description>A legutóbb hatályba lépett magyar törvénymódosítások, mindegyiknél a pontos szövegváltozással.</description>",
