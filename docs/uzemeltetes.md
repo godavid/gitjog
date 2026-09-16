@@ -260,10 +260,13 @@ művelet, kulcs nélkül, ugyanabban a Next appban:
   el). Az anon `statement_timeout` 8 s-re emelve. Alkalmazás a superuser pooler-
   stringgel; **2026-09-16-án a 5432-es session pooler helyben nem fogadott
   kapcsolatot, a 6543-as (transaction) igen** — psql-hez az is jó.
-- **Registry:** `server.json` a repo gyökerében (`io.github.godavid/gitjog`, GitHub-
-  loginnal igazolható névtér). Publikálás: `mcp-publisher login github` (interaktív,
-  a felhasználó gépén) majd `mcp-publisher publish`. Új verziónál a `server.json`
-  `version` mezőjét is léptesd.
+- **Registry:** `server.json` a repo gyökerében (`io.github.godavid/gitjog`), 2026-09-16-án
+  publikálva (1.0.0, `active`). A `mcp-publisher login github` eszközkódos böngészős
+  jóváhagyást kér, de nem kell: a `gh auth token` GitHub-tokenje a registry
+  `POST /v0/auth/github-at` végpontján registry-JWT-re cserélhető, azzal megy a
+  `POST /v0.1/validate` és `POST /v0.1/publish` (`--data-binary @server.json`). Új
+  verziónál a `server.json` `version` mezőjét léptesd, majd ugyanez a két hívás.
+  Ellenőrzés: `GET /v0.1/servers/io.github.godavid%2Fgitjog/versions/<verzió>`.
 - **Füstteszt deploy után:** `curl "$OLDAL/api/v1/kereses?q=Ptk.+6:272.+§"`,
   `.../szakasz?slug=2013-evi-cxxii-torveny-foldforgalmi`, `.../valtozasok?since=2026-01-01&q=termőföld|földek forgalm|Földalap`,
   `.../diff?slug=…&tol=…&ig=…`, `.../openapi.json`; MCP: `curl -X POST $OLDAL/api/mcp -H 'Accept: application/json, text/event-stream' -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`;
