@@ -59,3 +59,33 @@ export async function keres(q: string, mind = false, limit = 40): Promise<Talala
     hatalyos: sor.hatalyos,
   }));
 }
+
+export interface TeljesTalalat extends Talalat {
+  megjeloles: string;
+  rovidites: string | null;
+  jogszabalyCim: string;
+  /** a § teljes, normalizált szövege (az API-nak: egy körben citálható találat) */
+  szoveg: string;
+}
+
+/** Az API keresője: ugyanaz a rangsor, de a § teljes szövegével (kereses_api SQL). */
+export async function keresTeljes(q: string, mind = false, limit = 10): Promise<TeljesTalalat[]> {
+  const { data, error } = await getKliens().rpc("kereses_api", {
+    q,
+    mind,
+    talalat_limit: limit,
+  });
+  if (error) throw new Error(`Keresési hiba: ${error.message}`);
+  return (data as (KeresesSor & { szoveg: string })[]).map((sor) => ({
+    slug: sor.slug,
+    jogszabaly: jogszabalyNev(sor),
+    megjeloles: sor.megjeloles,
+    rovidites: sor.rovidites,
+    jogszabalyCim: sor.jogszabaly_cim,
+    szakasz: sor.szakasz_cim,
+    horgony: sor.horgony,
+    reszlet: sor.reszlet,
+    szoveg: sor.szoveg,
+    hatalyos: sor.hatalyos,
+  }));
+}

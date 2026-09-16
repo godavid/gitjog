@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { arabbolRomai } from "./romai.js";
+import { arabbolRomai } from "@gitjog/szoveg";
 
 export interface TorvenyBejegyzes {
   documentId: string;

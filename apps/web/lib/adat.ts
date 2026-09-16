@@ -19,6 +19,8 @@ const REVALIDATE = 21_600; // 6 óra
  * ablak végéig kiszolgálódik — a friss kód ellenére. Ilyenkor ezt kell léptetni.
  */
 export const CACHE_VERZIO = "4";
+/** on-demand revalidate címke: az adat-repo push-webhookja (/api/revalidate) ezt dobja */
+export const ADAT_TAG = "adat-repo";
 
 export type JogszabalyReteg = "aktiv" | "lezart" | "nincs-szoveg";
 
@@ -66,7 +68,7 @@ async function rawFetch(utvonal: string, mod: Mod = "napi"): Promise<string | nu
       url,
       mod === "friss"
         ? { cache: "no-store" }
-        : { next: { revalidate: mod === "orokre" ? false : REVALIDATE } },
+        : { next: { revalidate: mod === "orokre" ? false : REVALIDATE, tags: [ADAT_TAG] } },
     );
     if (valasz.status === 404) return null;
     if (valasz.ok) return valasz.text();
@@ -149,7 +151,7 @@ export async function legutobbiValtozasokFrissen(limit: number): Promise<Valtoza
 export const getLegutobbiValtozasok = unstable_cache(
   legutobbiValtozasokFrissen,
   ["legutobbi-valtozasok", CACHE_VERZIO],
-  { revalidate: REVALIDATE },
+  { revalidate: REVALIDATE, tags: [ADAT_TAG] },
 );
 
 /**
@@ -185,7 +187,7 @@ export const getHaviBontas = unstable_cache(
     return { slugok, honapok };
   },
   ["havi-bontas", CACHE_VERZIO],
-  { revalidate: REVALIDATE },
+  { revalidate: REVALIDATE, tags: [ADAT_TAG] },
 );
 
 /** Darabszámok az /adatok oldalhoz — a nagy állapot-térképből, kis eredménnyel. */
@@ -198,7 +200,7 @@ export const getAllomanyStatisztika = unstable_cache(
     };
   },
   ["allomany-statisztika", CACHE_VERZIO],
-  { revalidate: REVALIDATE },
+  { revalidate: REVALIDATE, tags: [ADAT_TAG] },
 );
 
 /** egy jogszabály állapotlistája a kis per-törvény fájlból */
@@ -219,4 +221,22 @@ export async function getSzovegAt(sha: string, slug: string): Promise<string | n
 
 export function nyersUrl(sha: string, slug: string): string {
   return `${RAW}/${sha}/jogszabalyok/${slug}/szoveg.md`;
+}
+
+export interface FelvetelSor {
+  /** a delta-futás időbélyege (ISO, UTC) — a „mi új azóta" cursor */
+  felveve: string;
+  slug: string;
+  datum: string;
+  sha: string;
+}
+
+/** a felvételi napló egy havi fájlja („2026-09"); hiányzó hónapra `null` */
+export async function getFelvetelNaplo(honap: string): Promise<FelvetelSor[] | null> {
+  const nyers = await rawFetch(`main/index/felvetel/${honap}.jsonl`);
+  if (nyers === null) return null;
+  return nyers
+    .split("\n")
+    .filter((sor) => sor.trim() !== "")
+    .map((sor) => JSON.parse(sor) as FelvetelSor);
 }

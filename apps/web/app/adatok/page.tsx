@@ -131,11 +131,25 @@ git blame jogszabalyok/2013-evi-v-torveny-ptk/szoveg.md`}
         </p>
         <pre className="kodblokk">
           <code>
-            {`/llms.txt                              belépési pont ügynököknek
+            {`/api/mcp                               MCP-szerver (streamable HTTP) AI-asszisztenseknek
+/api/v1/openapi.json                   REST-leírás: kereses, szakasz, valtozasok, diff
+/llms.txt                              belépési pont ügynököknek, receptekkel
 /jogszabaly/<slug>/szoveg.md           egy törvény nyers Markdown-szövege
 /jogszabaly/<slug>/valtozasok.xml      egy törvény módosításai (RSS)
 /valtozasok.xml                        az összes friss módosítás (RSS)
 /sitemap/<n>.xml                       az oldaltérkép szeletei`}
+          </code>
+        </pre>
+        <p>
+          Az MCP-szerver és a REST négy műveletet ad, §-szinten: keresés a § teljes szövegével,
+          egy § egy adott napon, „mi változott” cursorral (értesítéshez elég egy hívás), és két
+          időállapot §-szintű különbsége. Claude, ChatGPT vagy Cursor beköti az MCP-címet; egy
+          egyszerű szkript a REST-et hívja. Példa:
+        </p>
+        <pre className="kodblokk">
+          <code>
+            {`# mi változott a földjogi törvényekben 2026 óta?
+curl '${OLDAL_URL}/api/v1/valtozasok?since=2026-01-01&q=föld'`}
           </code>
         </pre>
         <p>

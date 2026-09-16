@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { horgonyId, szakaszokraBont } from "../src/szakaszok.js";
+import { horgonyId, szakaszokraBont } from "../src/szakaszok";
 import { mdRender } from "../../../apps/web/lib/md.js";
 
 describe("horgonyId", () => {

@@ -28,7 +28,9 @@ import {
 } from "./enumeralas.js";
 import { markdownGeneralas } from "./normalize.js";
 import { megjelolesIllesztes, parsolSnapshot } from "./parse.js";
+import { naploIras, type FelvetelTetel } from "./felvetel.js";
 import { modositoTorveny, riaszt, TerjedelemAnomalia, terjedelemEllenorzes } from "./health.js";
+import { AGENTS_MD } from "./sablonok.js";
 import type { IndexTetel } from "./kereso-index.js";
 import {
   ADAT_REPO_DIR,
@@ -256,6 +258,9 @@ async function fut(): Promise<void> {
   const allapotIndex = JSON.parse(
     await readFile(join(ADAT_REPO_DIR, "index", "allapotok.json"), "utf8"),
   ) as Record<string, { datum: string; verzio: number; sha: string }[]>;
+  // A felvételi napló a „mikor került be" kérdés cursora (lásd felvetel.ts):
+  // a ma bekerült állapotok a friss SHA-térképből kapják a commitjukat.
+  const naploTetelek: FelvetelTetel[] = [];
   for (const slug of valtozottSlugok) {
     const shak = await allapotShaTerkep(slug);
     const sajat = (ismertNyers[slug] ?? [])
@@ -263,6 +268,10 @@ async function fut(): Promise<void> {
       .filter((a) => a.sha !== "");
     allapotIndex[slug] = sajat;
     await fajlIras(`jogszabalyok/${slug}/allapotok.json`, JSON.stringify(sajat, null, 2) + "\n");
+    for (const e of bekerult) {
+      const sha = e.js.slug === slug ? shak.get(e.allapot.hatalyba) : undefined;
+      if (sha) naploTetelek.push({ slug, datum: e.allapot.hatalyba, sha });
+    }
   }
   // vadonatúj jogszabály (pl. friss kihirdetés) bekerül a listaindexbe is
   const listaIndex = JSON.parse(
@@ -287,7 +296,9 @@ async function fut(): Promise<void> {
   await fajlIras("index/jogszabalyok.json", JSON.stringify(listaIndex, null, 2) + "\n");
   await fajlIras("index/allapotok.json", JSON.stringify(allapotIndex, null, 2) + "\n");
   await retegTerkepMentes(retegTerkep);
-  await commit("Index frissítés (allapotok.json, enumeralas.json)");
+  await naploIras(new Date(), naploTetelek);
+  await fajlIras("AGENTS.md", AGENTS_MD);
+  await commit("Index frissítés (allapotok.json, enumeralas.json, felvételi napló)");
 
   if (push) {
     await pushRebase();
