@@ -34,7 +34,34 @@ időállapot (a commit dátuma a hatálybalépés napja), a diff maga a törvén
 - [Egy hónap összes módosítása](${OLDAL_URL}/valtozasok/{ev}-{ho}) — pl. /valtozasok/2026-01
 - [Az adatokról](${OLDAL_URL}/adatok)
 
-## Gépi felületek
+## MCP-szerver és API (ezt használd — §-szintű, pár KB-os válaszok)
+
+Ne olvass be egész törvényt (0,1–1,4 MB): a §-szintű végpontok adják, ami kell.
+
+- MCP (streamable HTTP, auth nélkül): ${OLDAL_URL}/api/mcp
+- REST, OpenAPI-leírással: ${OLDAL_URL}/api/v1/openapi.json
+
+Négy művelet, REST-en és MCP-toolként ugyanúgy:
+
+- kereses — „melyik § szabályozza X-et?”, vagy hivatkozás feloldása („Ptk. 6:272. §”, „2013. évi CXXII. törvény 18. §”).
+  A találat a § teljes szövegét és URL-jét hozza: egy körben citálható.
+  ${OLDAL_URL}/api/v1/kereses?q=termőföld+elővásárlási+jog
+- szakasz — egy § egy adott napon hatályos szövege; § nélkül a jogszabály időállapotai és tartalomjegyzéke.
+  ${OLDAL_URL}/api/v1/szakasz?slug=2013-evi-cxxii-torveny-foldforgalmi&paragrafus=18.+§&datum=2024-01-01
+- valtozasok — mi változott: cursorral (felveve_utan) vagy since/until/slugs szűrővel; az érintett §-ok régi/új szövegével.
+  ${OLDAL_URL}/api/v1/valtozasok?since=2026-01-01&q=termőföld|földek forgalm|Földalap
+- diff — két időállapot teljes §-szintű összevetése.
+  ${OLDAL_URL}/api/v1/diff?slug=2013-evi-cxxii-torveny-foldforgalmi&tol=2023-01-01&ig=2024-01-01
+
+### Változásfigyelés (recept ütemezett agentnek)
+
+1. Első futásnál hívd: /api/v1/valtozasok?felveve_utan=<mostani időbélyeg>&q=termőföld|földek forgalm|Földalap (vagy slugs=…).
+2. Tárold el a válasz kovetkezo_felveve_utan mezőjét — ez a cursor.
+3. Naponta (a frissítés 03:30 UTC után) hívd újra a tárolt cursorral. Üres tetelek = nincs újdonság.
+4. Ha van tétel: az erintett_szakaszok régi/új szövegéből írj összefoglalót, a diff_url a teljes különbség.
+A cursor a repóba kerülés ideje, nem a hatálybalépés: a késve felvett, régi dátumú állapotot is jelzi.
+
+## További gépi felületek
 
 - Egy jogszabály nyers Markdown-szövege: ${OLDAL_URL}/jogszabaly/{slug}/szoveg.md
 - Egy jogszabály változásainak RSS-feedje: ${OLDAL_URL}/jogszabaly/{slug}/valtozasok.xml
@@ -44,7 +71,9 @@ időállapot (a commit dátuma a hatálybalépés napja), a diff maga a törvén
 - Repó: https://github.com/${ADAT_REPO}
 - Nyers szöveg (Markdown): ${RAW}/jogszabalyok/{slug}/szoveg.md
 - Jogszabály-index: ${RAW}/index/jogszabalyok.json — slug, documentId, megjelölés, cím, rövidítés
-- Időállapot-térkép: ${RAW}/index/allapotok.json — slugonként [{datum, verzio, sha}]
+- Időállapot-térkép: ${RAW}/index/allapotok.json — slugonként [{datum, verzio, sha}] (4+ MB; egy törvényhez: ${RAW}/jogszabalyok/{slug}/allapotok.json)
+- Felvételi napló: ${RAW}/index/felvetel/{ÉÉÉÉ-HH}.jsonl — soronként {felveve, slug, datum, sha}: mikor került be egy időállapot
+- Agent-útmutató a klónozott repóhoz: https://github.com/${ADAT_REPO}/blob/main/AGENTS.md
 - Egy múltbeli állapot szövege: https://raw.githubusercontent.com/${ADAT_REPO}/{sha}/jogszabalyok/{slug}/szoveg.md
 
 ## Megjegyzés

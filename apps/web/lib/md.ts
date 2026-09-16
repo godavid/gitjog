@@ -7,20 +7,15 @@
 // ellenséges markdown-bemenet sem tud tag-et vagy attribútumot injektálni.
 // Ezt az invariánst minden módosításnál tartsd fenn.
 
+import { horgonyId } from "@gitjog/szoveg";
+
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-export function horgonyId(cim: string): string {
-  return cim
-    .toLowerCase()
-    .replace(/§/g, "sz")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-}
+// A horgony-generálás a megosztott csomagból jön: a keresőindex §-darabolása
+// (packages/szoveg) ugyanezt hívja, így a mélylinkek bit szerint egyeznek.
+export { horgonyId };
 
 export interface Szakaszjegyzek {
   id: string;

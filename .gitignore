@@ -17,3 +17,5 @@ supabase/.temp/
 # a Next 16 dev-szerver generálja minden indításnál
 apps/web/AGENTS.md
 apps/web/CLAUDE.md
+.vercel
+.env*

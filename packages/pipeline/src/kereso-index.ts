@@ -6,7 +6,7 @@ import { join } from "node:path";
 import type { Sql } from "postgres";
 import { ADAT_REPO_DIR } from "./commit.js";
 import type { RetegTerkep } from "./enumeralas.js";
-import { szakaszokraBont } from "./szakaszok.js";
+import { szakaszokraBont } from "@gitjog/szoveg";
 
 export interface IndexTetel {
   slug: string;

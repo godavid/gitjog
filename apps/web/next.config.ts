@@ -4,6 +4,8 @@ const config: NextConfig = {
   // A tartalom a magyar-jog adat-repóból jön (raw.githubusercontent.com),
   // build-time + ISR fetch-ekkel; képeket nem szolgálunk ki külső forrásból.
   reactStrictMode: true,
+  // a megosztott szövegmodul TS-forrásként jön a workspace-ből
+  transpilePackages: ["@gitjog/szoveg"],
   // 2026-09-16: az oldal Nyílt Jogtárról GitJogra nevezve (védjegyfelszólítás).
   // A régi aldomain a bejövő linkek miatt még átirányít az újra.
   async redirects() {

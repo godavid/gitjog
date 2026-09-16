@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { arabbolRomai, romaibolArab } from "../src/romai.js";
+import { arabbolRomai, romaibolArab } from "../src/romai";
 
 describe("arabbolRomai", () => {
   it.each([
