@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.godavid/gitjog",
+  "title": "GitJog — Hungarian legislation",
+  "description": "Full text and amendment history of Hungarian acts: section-level search, point-in-time text, diffs.",
+  "version": "1.0.0",
+  "websiteUrl": "https://gitjog.remenyfarm.hu",
+  "repository": {
+    "url": "https://github.com/godavid/gitjog",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://gitjog.remenyfarm.hu/api/mcp"
+    }
+  ]
+}

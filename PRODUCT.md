@@ -54,7 +54,7 @@ adatbázis, hanem adat, amihez a felület csak hozzáférés.
 - **Kiszolgálás:** Vercel. A main-re pusholás önmagában NEM deployol — a produkciós
   deploy CLI-ből indul. Keresés: Supabase Postgres FTS, magyar szótövezéssel.
 - **Találkozási pontok:** keresőtalálat egy „mi változott” kérdésre, RSS-feed,
-  `git clone`, illetve AI-asszisztens, amely a domain gépi végpontjait olvassa.
+  `git clone`, illetve AI-asszisztens, amely a domain gépi végpontjait olvassa, vagy az MCP-szerverhez kapcsolódik (Claude, ChatGPT, Cursor).
 - Részletes üzemeltetési leírás: `docs/uzemeltetes.md`.
 
 ## Capabilities and Constraints
@@ -64,10 +64,14 @@ adatbázis, hanem adat, amihez a felület csak hozzáférés.
   njt.jog.gov.hu-n és a Magyar Közlönyben van.
 - **Termékhatár (megerősítve 2026-09-16):** csak törvények; rendeletek és egyéb
   jogszabálytípusok később — előbb a meglévő állomány minősége.
-- **Vállalt irány:** a gépi felületek bővítése (strukturált / JSON végpontok a mai
-  `llms.txt`, nyers `szoveg.md` és RSS mellé).
-- **Passzív terjesztés:** nincs outreach, sajtó, közösségi poszt; a termék magától
-  talál közönséget.
+- **Gépi felület (2026-09-16 óta):** REST API (`/api/v1`, OpenAPI) és MCP-szerver
+  (`/api/mcp`) §-szintű műveletekkel — keresés a § teljes szövegével, egy § egy adott
+  napon, „mi változott" cursorral, két időállapot diffje. Az agent egy körben citálható
+  választ kap; egész törvényt nem kell beolvasnia.
+- **Terjesztés:** az emberi közönség felé passzív (nincs sajtó, közösségi poszt,
+  outreach). Az MCP-szerverre 2026-09-16-án külön döntés született: hivatalos
+  MCP-registry bejegyzés és fejlesztői csatornák (GitHub topicok, awesome-listák) —
+  ez katalógus-jelenlét a gépi közönségnek, nem kampány.
 - Nincs süti-banner, nincs modál, nincs fölösleges JS. Mérés csak süti nélküli,
   a látogatót nem azonosító, oldalszintű forgalmi statisztika lehet.
 - A keresés kérés-időben fut az adatbázison; ha az nem elérhető, a jogszabályok

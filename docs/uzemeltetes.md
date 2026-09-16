@@ -42,7 +42,8 @@
   12 hónap generálódik, a többi első kérésre (ISR).
 - **Gépi felületek**: `/jogszabaly/{slug}/szoveg.md` (nyers Markdown azonos eredetről) és
   `/jogszabaly/{slug}/valtozasok.xml` (egy törvény változásainak RSS-e — a fizetős
-  a fizetős jogi adatbázisok „figyeltetés" funkciójának ingyenes megfelelője).
+  jogi adatbázisok „figyeltetés" funkciójának ingyenes megfelelője). 2026-09-16 óta
+  **REST API és MCP-szerver** is — lásd a külön szakaszt lent.
 - **Strukturált adat**: `Legislation` a törvényoldalon (`legislationDate` és
   `temporalCoverage` is), `Dataset` az `/adatok`-on, `BreadcrumbList` az idővonal- és
   diff-oldalakon, `WebSite` a layoutban. A sitelinks-keresődoboz (`SearchAction`)
@@ -213,8 +214,60 @@ csak OLVAS: a két táblán RLS engedi a `select`-et, az írás joga a connectio
 stringé. A kulcsok szándékosan nem `NEXT_PUBLIC_` előtagúak — a keresés szerver
 oldalon fut, így semmi nem kerül belőlük a kliens bundle-be.
 
+A Vercel oldalon él még a `GITHUB_WEBHOOK_SECRET` (Production): az adat-repo
+push-webhookjának HMAC-titka (`/api/revalidate`). Ugyanez a titok a
+`godavid/magyar-jog` repo webhook-beállításában; cserénél mindkét helyen.
+
 A Vercel-deploy a `remenyfarm` fiókhoz kötött, és **nem automatikus a git
-push-ra**: `cd apps/web && vercel --prod --yes`.
+push-ra**: a monorepo GYÖKERÉBŐL `vercel --prod --yes` (root directory: `apps/web`).
+
+## Agent-felület: REST API + MCP-szerver (2026-09-16)
+
+Spec: `docs/superpowers/specs/2026-09-16-agent-felulet-design.md`. Négy read-only
+művelet, kulcs nélkül, ugyanabban a Next appban:
+
+| művelet | REST | mire |
+|---|---|---|
+| `kereses` | `GET /api/v1/kereses?q=` | hivatkozás-feloldás (index) vagy FTS (`kereses_api` SQL), a § teljes szövegével |
+| `szakasz` | `GET /api/v1/szakasz?slug=&paragrafus=&datum=` | egy § egy időállapotban; § nélkül meta + időállapotok + tartalomjegyzék |
+| `valtozasok` | `GET /api/v1/valtozasok?felveve_utan=&q=` | mi változott — napló-cursorral vagy since/until/slugs szűrővel, érintett §-okkal |
+| `diff` | `GET /api/v1/diff?slug=&tol=&ig=` | két időállapot §-szintű diffje |
+
+- **Rétegek:** `packages/szoveg` (megosztott: §-darabolás, horgony, hivatkozás-parser,
+  §-diff — a pipeline és a web is innen importál, ez váltotta a két külön implementáció
+  bit-egyezés tesztjét), `apps/web/lib/api/*` (szolgáltatásréteg, JSON), `app/api/v1/*`
+  (REST, zod-validálás, `Cache-Control: s-maxage`), `app/api/mcp/route.ts` (`mcp-handler`
+  2.x, stateless streamable HTTP; a négy tool + ChatGPT `search`/`fetch` alias),
+  `app/api/v1/openapi.json`.
+- **Felvételi napló:** a delta minden futás végén `index/felvetel/ÉÉÉÉ-HH.jsonl`-be írja a
+  bekerült állapotokat (`felveve, slug, datum, sha`). Ez a `valtozasok` cursora — a
+  commit-dátum a hatálybalépés, NEM a bekerülés ideje, ezért kell külön napló. Backfill
+  nem ír naplót; ha egy hónapra nincs fájl, a végpont a hatálybalépés-ágra esik vissza.
+- **AGENTS.md az adat-repóban:** forrása a `sablonok.ts` `AGENTS_MD`; a delta minden
+  futáskor kiírja, változásnál az index-utócommitba kerül. Kézzel ne szerkeszd az
+  adat-repóban — a következő futás visszaírja.
+- **Frissesség:** GitHub push-webhook a `godavid/magyar-jog`-on → `POST /api/revalidate`
+  (HMAC, `GITHUB_WEBHOOK_SECRET` Vercel env) → `revalidateTag("adat-repo", "max")`. Az
+  adat-cache minden `napi` fetch-e és `unstable_cache`-e ezt a címkét viseli. A REST-
+  válaszok CDN-cache-e: `valtozasok` 15 perc, `kereses` 1 óra, `szakasz`/`diff` konkrét
+  dátummal 1 nap. Ha a webhook elromlik, a 6 órás revalidate továbbra is frissít.
+- **Deploy-változás:** a `workspace:*` függőség miatt a Vercel-projekt root directory-ja
+  `apps/web`, és a deploy a **monorepo gyökeréből** indul: `vercel --prod --yes` a
+  gitjog gyökérben (nem az `apps/web`-ben — onnan npm-mel próbálna telepíteni és elhasal).
+- **SQL:** `04-api-kereses.sql` (`kereses_api`, a § szövegével) és `05-kereses-gyors.sql`
+  (a `ts_headline` csak a limitált találatokra fut — a „termőföld" 2,8 s → 70 ms; előtte
+  az anon 3 s-os statement_timeout-ja miatt a webes kereső rendszeresen 500-zal esett
+  el). Az anon `statement_timeout` 8 s-re emelve. Alkalmazás a superuser pooler-
+  stringgel; **2026-09-16-án a 5432-es session pooler helyben nem fogadott
+  kapcsolatot, a 6543-as (transaction) igen** — psql-hez az is jó.
+- **Registry:** `server.json` a repo gyökerében (`io.github.godavid/gitjog`, GitHub-
+  loginnal igazolható névtér). Publikálás: `mcp-publisher login github` (interaktív,
+  a felhasználó gépén) majd `mcp-publisher publish`. Új verziónál a `server.json`
+  `version` mezőjét is léptesd.
+- **Füstteszt deploy után:** `curl "$OLDAL/api/v1/kereses?q=Ptk.+6:272.+§"`,
+  `.../szakasz?slug=2013-evi-cxxii-torveny-foldforgalmi`, `.../valtozasok?since=2026-01-01&q=föld`,
+  `.../diff?slug=…&tol=…&ig=…`, `.../openapi.json`; MCP: `curl -X POST $OLDAL/api/mcp -H 'Accept: application/json, text/event-stream' -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`;
+  `POST /api/revalidate` aláírás nélkül → 401.
 
 ## Ismert korlátok
 
