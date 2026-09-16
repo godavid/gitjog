@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const jogszabalyok = await getJogszabalyok();
   const elsoEv = Math.min(...jogszabalyok.map(evOf));
   return {
-    title: { absolute: "Nyílt Jogtár — a magyar törvények szövege és változástörténete" },
+    title: { absolute: "GitJog — a magyar törvények szövege és változástörténete" },
     description:
       `A magyar törvények teljes szövege és változástörténete. ${jogszabalyok.length} törvény ` +
       `${elsoEv} óta, minden módosításnál látható, mi került bele és mi került ki. Nem hiteles jogforrás.`,

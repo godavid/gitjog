@@ -1,6 +1,6 @@
 // Az index/enumeralas.json első feltöltése a meglévő lemez-cache-ből.
 //
-//   pnpm --filter @nyilt-jogtar/pipeline enumeralas-init [-- --push]
+//   pnpm --filter @gitjog/pipeline enumeralas-init [-- --push]
 //
 // A backfill után a data/cache minden jogszabály versions.json-ját tartalmazza,
 // ezért a besorolás hálózati kérés nélkül elkészül. Ahol mégis hiányzik a

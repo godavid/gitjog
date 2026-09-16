@@ -60,7 +60,7 @@ export default async function DiffOldal({
   const kovetkezoPar = igIdx + 1 < sajat.length ? [sajat[igIdx]!, sajat[igIdx + 1]!] : null;
 
   const morzsa = morzsaJsonLd([
-    { name: "Nyílt Jogtár", item: OLDAL_URL },
+    { name: "GitJog", item: OLDAL_URL },
     { name: `${evOf(tetel)}. évi törvények`, item: `${OLDAL_URL}/evek/${evOf(tetel)}` },
     { name: tetel.rovidites ?? tetel.megjeloles, item: `${OLDAL_URL}/jogszabaly/${slug}` },
     {

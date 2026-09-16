@@ -16,7 +16,7 @@ export async function GET() {
   ]);
   const elsoEv = Math.min(...jogszabalyok.map(evOf));
 
-  const szoveg = `# Nyílt Jogtár
+  const szoveg = `# GitJog
 
 > A magyar törvények teljes szövege és teljes változástörténete: ${jogszabalySzam} törvény
 > ${elsoEv} óta, ${allapotSzam} időállapottal, naponta frissítve. Minden módosításnál elérhető a

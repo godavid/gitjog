@@ -5,7 +5,7 @@ import { unstable_cache } from "next/cache";
 import type { MetadataRoute } from "next";
 import { CACHE_VERZIO, evOf, getAllapotok, getJogszabalyok } from "@/lib/adat";
 
-export const OLDAL_URL = "https://jogtar.remenyfarm.hu";
+export const OLDAL_URL = "https://gitjog.remenyfarm.hu";
 
 // ~31 500 URL-nél egyetlen fájl is beleférne a sitemaponkénti 50 000-es limitbe,
 // de a diff-oldalak száma minden módosítással nő, és egy 3–4 MB-os XML-t

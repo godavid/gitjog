@@ -1,5 +1,5 @@
 -- Keresőindex séma. Származtatott adat: bármikor eldobható és újraépíthető
--- a kereso-feltoltes.ts szkripttel. Az igazság forrása a magyar-jogtar repo.
+-- a kereso-feltoltes.ts szkripttel. Az igazság forrása a magyar-jog repo.
 
 create table if not exists jogszabaly (
   slug        text primary key,

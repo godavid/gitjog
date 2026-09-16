@@ -40,7 +40,7 @@ export default async function IdovonalOldal({
 
   const forditott = [...sajat].reverse(); // legfrissebb felül
   const morzsa = morzsaJsonLd([
-    { name: "Nyílt Jogtár", item: OLDAL_URL },
+    { name: "GitJog", item: OLDAL_URL },
     { name: `${evOf(tetel)}. évi törvények`, item: `${OLDAL_URL}/evek/${evOf(tetel)}` },
     { name: tetel.rovidites ?? tetel.megjeloles, item: `${OLDAL_URL}/jogszabaly/${slug}` },
     { name: "Összes időállapot", item: `${OLDAL_URL}/jogszabaly/${slug}/idovonal` },
@@ -73,7 +73,7 @@ export default async function IdovonalOldal({
                   "hatálybalépés"
                 )}
                 <a
-                  href={`https://github.com/godavid/magyar-jogtar/blob/${a.sha}/jogszabalyok/${slug}/szoveg.md`}
+                  href={`https://github.com/godavid/magyar-jog/blob/${a.sha}/jogszabalyok/${slug}/szoveg.md`}
                   rel="noopener"
                 >
                   szöveg ekkor

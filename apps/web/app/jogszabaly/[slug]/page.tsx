@@ -79,7 +79,7 @@ export default async function JogszabalyOldal({
     jurisdiction: "HU",
     legislationJurisdiction: "HU",
     inLanguage: "hu",
-    url: `https://jogtar.remenyfarm.hu/jogszabaly/${slug}`,
+    url: `https://gitjog.remenyfarm.hu/jogszabaly/${slug}`,
     sameAs: `https://njt.jog.gov.hu/jogszabaly/${tetel.documentId}`,
   };
 

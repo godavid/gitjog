@@ -8,7 +8,7 @@ const CIMKE = "parser-riasztas";
 
 export async function riaszt(cim: string, torzs: string): Promise<void> {
   const token = process.env.GITHUB_TOKEN;
-  const repo = process.env.GITHUB_REPOSITORY; // pl. "godavid/magyar-jogtar"
+  const repo = process.env.GITHUB_REPOSITORY; // pl. "godavid/magyar-jog"
   if (!token || !repo) {
     console.error(`[riasztás — nincs GITHUB_TOKEN/GITHUB_REPOSITORY] ${cim}\n${torzs}`);
     return;
@@ -16,7 +16,7 @@ export async function riaszt(cim: string, torzs: string): Promise<void> {
   const fejlecek = {
     Authorization: `Bearer ${token}`,
     Accept: "application/vnd.github+json",
-    "User-Agent": "nyilt-jogtar-agent-or",
+    "User-Agent": "gitjog-agent-or",
     "Content-Type": "application/json",
   };
   try {

@@ -1,8 +1,8 @@
 {
-  "name": "@nyilt-jogtar/web",
+  "name": "@gitjog/web",
   "private": true,
   "version": "0.1.0",
-  "description": "Nyílt Jogtár weboldal — jogszabály-böngésző, idővonal, diff",
+  "description": "GitJog weboldal — jogszabály-böngésző, idővonal, diff",
   "license": "MIT",
   "scripts": {
     "dev": "next dev",

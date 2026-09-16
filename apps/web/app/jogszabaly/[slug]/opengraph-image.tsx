@@ -5,7 +5,7 @@
 import { ImageResponse } from "next/og";
 import { getAllapotokSlug, getJogszabalyok } from "@/lib/adat";
 
-export const alt = "Nyílt Jogtár — jogszabály";
+export const alt = "GitJog — jogszabály";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const revalidate = 86400;
@@ -41,7 +41,7 @@ export default async function Kep({ params }: { params: Promise<{ slug: string }
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12, color: PECSET, fontSize: 26 }}>
           <span style={{ fontSize: 34 }}>§</span>
-          <span style={{ letterSpacing: 2 }}>NYÍLT JOGTÁR</span>
+          <span style={{ letterSpacing: 2 }}>GITJOG</span>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", marginTop: 48, flexGrow: 1 }}>

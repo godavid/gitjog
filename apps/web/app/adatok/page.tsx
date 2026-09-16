@@ -6,7 +6,7 @@ import { OLDAL_URL } from "@/lib/sitemap";
 export const revalidate = 86400;
 
 export const metadata: Metadata = {
-  title: "Adatok és git-repó — hogyan épül a Nyílt Jogtár",
+  title: "Adatok és git-repó — hogyan épül a GitJog",
   description:
     "Honnan jönnek a szövegek, milyen szerkezetben, milyen gyakran frissülnek, és hogyan használhatók fel újra. A teljes állomány egyetlen git repóból klónozható.",
   alternates: { canonical: "/adatok" },
@@ -24,7 +24,7 @@ export default async function AdatokOldal() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Dataset",
-    name: "Nyílt Jogtár — a magyar törvények szövege és változástörténete",
+    name: "GitJog — a magyar törvények szövege és változástörténete",
     description:
       `${jogszabalySzam} magyar törvény konszolidált szövege ${allapotSzam} időállapottal, ` +
       "git-verziókövetésben: minden commit egy időállapot, a commit dátuma a hatálybalépés napja.",
@@ -33,7 +33,7 @@ export default async function AdatokOldal() {
     isAccessibleForFree: true,
     temporalCoverage: `${elsoEv}/..`,
     license: "https://creativecommons.org/publicdomain/zero/1.0/",
-    creator: { "@type": "Organization", name: "Nyílt Jogtár", url: OLDAL_URL },
+    creator: { "@type": "Organization", name: "GitJog", url: OLDAL_URL },
     distribution: [
       {
         "@type": "DataDownload",

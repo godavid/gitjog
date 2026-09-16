@@ -1,12 +1,12 @@
-# Nyílt Jogtár — üzemeltetési leírás
+# GitJog — üzemeltetési leírás
 
 ## Áttekintés
 
 | Mi | Hol |
 |---|---|
 | Kód (crawler, parser, pipeline, weboldal) | `godavid/gitjog` (ez a repo) |
-| Adat (jogszabályok + git-history) | `godavid/magyar-jogtar` (publikus) |
-| Weboldal | `jogtar.remenyfarm.hu` (Vercel, projekt: `jogtar`, scope: `remenyfarm`) |
+| Adat (jogszabályok + git-history) | `godavid/magyar-jog` (publikus) |
+| Weboldal | `gitjog.remenyfarm.hu` (Vercel, projekt: `gitjog`, scope: `remenyfarm`) |
 | Napi frissítés | GitHub Actions az adat-repóban (`.github/workflows/napi-delta.yml`), 03:30 UTC |
 | Riasztás | GitHub Issue az adat-repóban, `parser-riasztas` címkével (a GitHub emailt küld) |
 | IndexNow-bejelentés | Vercel cron, `/api/indexnow`, 06:00 UTC (a napi delta után) |
@@ -42,7 +42,7 @@
   12 hónap generálódik, a többi első kérésre (ISR).
 - **Gépi felületek**: `/jogszabaly/{slug}/szoveg.md` (nyers Markdown azonos eredetről) és
   `/jogszabaly/{slug}/valtozasok.xml` (egy törvény változásainak RSS-e — a fizetős
-  Jogtár „figyeltetés" funkciójának ingyenes megfelelője).
+  a fizetős jogi adatbázisok „figyeltetés" funkciójának ingyenes megfelelője).
 - **Strukturált adat**: `Legislation` a törvényoldalon (`legislationDate` és
   `temporalCoverage` is), `Dataset` az `/adatok`-on, `BreadcrumbList` az idővonal- és
   diff-oldalakon, `WebSite` a layoutban. A sitelinks-keresődoboz (`SearchAction`)
@@ -89,7 +89,7 @@
   és a napi terhelés egyenletes. A delta minden lekérdezésnél frissíti a réteget.
   Jelenlegi arány: 2043 aktív / 2296 lezárt / 1247 szöveg nélküli → ~2550 kérés
   és ~23 perc naponta az 5586 helyett.
-  A térkép első feltöltése a lemez-cache-ből: `pnpm --filter @nyilt-jogtar/pipeline
+  A térkép első feltöltése a lemez-cache-ből: `pnpm --filter @gitjog/pipeline
   enumeralas-init [-- --push]` (a backfill után; utána a delta tartja karban).
   Ha a fájl hiányzik vagy sérült, a delta a teljes végigjárásra esik vissza —
   lassabb, de nem hagy ki adatot.
@@ -171,7 +171,7 @@ kiemeltekre szűkítve; ez megszűnt.
   „szerződést" a „szerződés" szóra. A generált oszlop csak a KÉTARGUMENTUMOS
   alakot fogadja el (az egyargumentumos nem immutable).
 - **Az index származtatott adat.** Bármikor eldobható és újraépíthető:
-  `NYILT_DB_URL=... pnpm --filter @nyilt-jogtar/pipeline kereso-feltoltes`
+  `NYILT_DB_URL=... pnpm --filter @gitjog/pipeline kereso-feltoltes`
   (~4332 jogszabály, teljes újraépítés kb. háromnegyed óra Frankfurtba).
 - **Napi szinkron:** a delta a push után frissíti a változott jogszabályokat.
   KÜLÖN hibaágon: ha a szinkron elhasal, riasztó issue-t nyit, de a delta
@@ -230,3 +230,19 @@ push-ra**: `cd apps/web && vercel --prod --yes`.
   CÍMÉBEN, MEGJELÖLÉSÉBEN és RÖVIDÍTÉSÉBEN is keres (`01-sema.sql` és
   `02-kereses.sql` unió). A jogszabály-cím találatok kiemelt rangsorolással
   közvetlenül a törvény hatályos oldalára mutatnak.
+
+## Átnevezés: Nyílt Jogtár → GitJog (2026-09-16)
+
+A Wolters Kluwer Hungary Kft. védjegyfelszólítása („Jogtár", lajstromszám 207067 és
+185290) miatt a projekt neve GitJog lett. Ami változott, és ami szándékosan nem:
+
+- Weboldal: `gitjog.remenyfarm.hu`; a régi `jogtar.remenyfarm.hu` a `next.config.ts`
+  host-alapú redirectjével 308-cal az újra mutat (bejövő linkek miatt marad).
+- Adat-repo: `godavid/magyar-jogtar` → `godavid/magyar-jog` (a GitHub a régi nevet
+  átirányítja, amíg nem jön létre ugyanazon a néven új repó — ne jöjjön).
+- Vercel-projekt: `jogtar` → `gitjog`; csomagnevek: `@nyilt-jogtar/*` → `@gitjog/*`
+  (a napi-delta.yml mindkét példányában is).
+- NEM változott: a Supabase-projekt neve (`nyilt-jogtar`, csak belső), a
+  `jogtar_szinkron` DB-szerep, a `NYILT_DB_URL` secret. Ezek nem publikusak.
+- A „jogtár" szót a kommunikációban ne használjuk; a WK termékére utaló
+  hivatkozás (összehasonlítás) jogszerű, de ne legyen rá szükség.
