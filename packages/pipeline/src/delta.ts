@@ -324,8 +324,9 @@ async function fut(): Promise<void> {
 /**
  * Keresőindex-szinkron a változott jogszabályokra. KÜLÖN hibaágon fut: az
  * index származtatott adat, a hibája nem ronthatja el a delta kilépési
- * kódját — az adat-repo integritása előbbre való. Riasztunk, és a
- * következő futás úgyis újraírja a változott jogszabályokat.
+ * kódját — az adat-repo integritása előbbre való. Riasztunk a pótló
+ * paranccsal: a következő futás csak a SAJÁT változásait szinkronizálja,
+ * az itt kimaradt jogszabályokat magától nem pótolja.
  */
 async function keresoIndexSzinkron(
   valtozottSlugok: string[],
@@ -350,13 +351,17 @@ async function keresoIndexSzinkron(
     }
   } catch (e) {
     const uzenet = e instanceof Error ? (e.stack ?? e.message) : String(e);
-    console.error(`Keresőindex-szinkron HIBA (a delta adata rendben van):\n${uzenet}`);
+    console.error(
+      `Keresőindex-szinkron HIBA (a delta adata rendben van), kimaradt: ${valtozottSlugok.join(",")}\n${uzenet}`,
+    );
     await riaszt(
       "Keresőindex-szinkron hiba",
       `A napi delta adata rendben bekerült a repóba, de a keresőindex frissítése elhasalt.\n\n` +
         `\`\`\`\n${uzenet}\n\`\`\`\n\n` +
-        `Teendő: a következő futás újrapróbálja. Ha ismétlődik, teljes újraépítés:\n` +
-        `\`NYILT_DB_URL=... pnpm --filter @gitjog/pipeline kereso-feltoltes\``,
+        `Kimaradt jogszabályok (a következő futás ezeket NEM pótolja): ${valtozottSlugok.join(", ")}\n\n` +
+        `Teendő: a hiba javítása után célzott pótlás:\n` +
+        `\`NYILT_DB_URL=... pnpm --filter @gitjog/pipeline kereso-feltoltes -- --slugok=${valtozottSlugok.join(",")}\`\n\n` +
+        `Ha a riasztás már nyitva volt, a későbbi napok kimaradt slugjai csak az Actions logban látszanak.`,
     );
   }
 }
