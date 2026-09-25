@@ -221,6 +221,32 @@ push-webhookjának HMAC-titka (`/api/revalidate`). Ugyanez a titok a
 A Vercel-deploy a `remenyfarm` fiókhoz kötött, és **nem automatikus a git
 push-ra**: a monorepo GYÖKERÉBŐL `vercel --prod --yes` (root directory: `apps/web`).
 
+## Biztonsági scan (2026-09-25)
+
+A repo publikus, és a napi delta a gitjog **main** ágát futtatja írási joggal az
+adat-repóban — ami a main-re kerül, az ott kódként fut. Ezért a main védett:
+
+- **Ruleset (`main`):** csak PR-en át (squash), kötelező a `biztonsag` check
+  és a CodeQL (high vagy súlyosabb riasztás blokkol), force-push és törlés
+  tiltva. A repo-admin megkerülheti — ez vészhelyzetre van, nem napi útnak;
+  a közvetlen push után a scan ugyanúgy lefut, és pirosat mutat, ha gond van.
+- **`.github/workflows/biztonsag.yml`:** gitleaks a teljes előzményen,
+  `pnpm audit --audit-level=high`, PR-en dependency review, zizmor a
+  workflow-kra (a `packages/pipeline/adatrepo/napi-delta.yml` forrásra is).
+  Hetente ütemezve is fut, hogy az új CVE-k a változatlan kódra is kiderüljenek.
+- **GitHub-oldalon:** CodeQL default setup, Dependabot-riasztás és biztonsági
+  frissítés-PR-ek, secret scanning + push protection, a `GITHUB_TOKEN`
+  alapból csak olvas, külsős fork-PR workflow-ja csak jóváhagyással indul.
+
+Hamis riasztásnál: gitleaks → `.gitleaks.toml` allowlist (a `[allowlist]`
+alá a konkrét commit vagy útvonal, soha nem egész szabály); zizmor → sor
+végi `# zizmor: ignore[<audit>]` indoklással; `pnpm audit` → előbb
+`overrides` a `pnpm-workspace.yaml`-ban a javított verzióra, csak ha nincs
+javítás, akkor `auditConfig.ignoreGhsas` a GHSA-azonosítóval és indokkal.
+
+A `napi-delta.yml` actionjei SHA-ra pinneltek; **módosításkor az adat-repo élő
+példányát is frissíteni kell** (lásd a pipeline-szakaszt).
+
 ## Agent-felület: REST API + MCP-szerver (2026-09-16)
 
 Spec: `docs/superpowers/specs/2026-09-16-agent-felulet-design.md`. Négy read-only

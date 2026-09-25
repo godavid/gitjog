@@ -1,0 +1,16 @@
+version: 2
+updates:
+  # a workflow-k SHA-ra pinnelt actionjeinek frissítése
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+  # npm: csak biztonsági frissítés-PR (verziófrissítés-PR nem nyílik)
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
