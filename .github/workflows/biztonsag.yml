@@ -1,0 +1,104 @@
+# Biztonsági scan — a main ruleset a `biztonsag` összesítő jobot követeli meg
+# minden PR-en. Titok nem kell hozzá, és szándékosan `pull_request` (nem
+# `pull_request_target`): forkból jövő PR így semmilyen titokhoz nem fér hozzá.
+# A CodeQL a GitHub default setupjával fut, nem ebből a fájlból.
+name: Biztonság
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 4 * * 1" # hetente: új CVE a már bent lévő függőségekre is
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: biztonsag-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  titkok:
+    name: Titkok (gitleaks, teljes előzmény)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: gitleaks telepítése (rögzített verzió, checksum)
+        env:
+          VERZIO: 8.30.1
+          SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          curl -sSfL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${VERZIO}/gitleaks_${VERZIO}_linux_x64.tar.gz"
+          echo "${SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+      - name: Scan
+        run: ./gitleaks git --redact --no-banner --exit-code 1 .
+
+  fuggosegek:
+    name: Függőségek (pnpm audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 12
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Audit (magas és kritikus súlyosság bukik)
+        run: pnpm audit --audit-level=high
+
+  fuggoseg-review:
+    name: Új függőségek (dependency review)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+
+  workflowk:
+    name: GitHub Actions workflow-k (zizmor)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Az adat-repo élő napi-delta.yml-jének forrása is itt van: az írási
+      # joggal fut a magyar-jog repóban, ezért azt is ellenőrizzük.
+      - name: Scan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          pipx run zizmor==1.30.1 --format=github --min-severity=medium
+          .github/workflows packages/pipeline/adatrepo/napi-delta.yml
+
+  biztonsag:
+    name: biztonsag
+    if: always()
+    needs: [titkok, fuggosegek, fuggoseg-review, workflowk]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Összesítés
+        env:
+          EREDMENYEK: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$EREDMENYEK"
+          # a dependency review push-on és ütemezett futáson kihagyott — az rendben van
+          if echo "$EREDMENYEK" | grep -qE '"(failure|cancelled)"'; then
+            echo "::error::Legalább egy biztonsági ellenőrzés elbukott."
+            exit 1
+          fi
