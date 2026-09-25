@@ -93,8 +93,9 @@ export function megjelolesEgyezik(vart: string, kapott: string): boolean {
   return megjelolesIllesztes(vart, kapott).ok;
 }
 
-function cellaTisztitas(s: string): string {
-  return szovegTisztitas(s).replace(/\|/g, "\\|");
+export function cellaTisztitas(s: string): string {
+  // előbb a backslash, különben a cellavégi „\" a „|" escape-jét nyelné el
+  return szovegTisztitas(s).replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
 }
 
 /**

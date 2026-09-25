@@ -25,6 +25,12 @@ const L = {
   diffHorgony: "Csak ezt a §-t (horgony).",
 };
 
+// Felső hosszkorlát minden szabad szöveges paraméteren: a kereső-regexek és az
+// FTS-lekérdezés ne kapjon tetszőleges méretű bemenetet.
+const MAX = 200;
+const szoveg = () => z.string().max(MAX);
+const cursor = z.string().max(40);
+
 const datum = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD");
 const restBool = z
   .enum(["true", "false", "1", "0"])
@@ -33,60 +39,61 @@ const restSzam = z.coerce.number().int().positive();
 
 export const MCP = {
   kereses: z.object({
-    q: z.string().min(1).describe(L.q),
+    q: szoveg().min(1).describe(L.q),
     hatalyos: z.boolean().optional().describe(L.hatalyos),
     limit: z.number().int().positive().optional().describe(L.keresesLimit),
   }),
   szakasz: z.object({
-    slug: z.string().min(1).describe(L.slug),
-    horgony: z.string().optional().describe(L.horgony),
-    paragrafus: z.string().optional().describe(L.paragrafus),
+    slug: szoveg().min(1).describe(L.slug),
+    horgony: szoveg().optional().describe(L.horgony),
+    paragrafus: szoveg().optional().describe(L.paragrafus),
     datum: datum.optional().describe(L.datum),
   }),
   valtozasok: z.object({
-    felveve_utan: z.string().optional().describe(L.felveve_utan),
+    felveve_utan: cursor.optional().describe(L.felveve_utan),
     since: datum.optional().describe(L.since),
     until: datum.optional().describe(L.until),
-    slugs: z.array(z.string()).optional().describe(L.slugs),
-    q: z.string().optional().describe(L.qSzuro),
+    slugs: z.array(szoveg()).max(KORLAT.valtozasokMax).optional().describe(L.slugs),
+    q: szoveg().optional().describe(L.qSzuro),
     limit: z.number().int().positive().optional().describe(L.valtozasokLimit),
   }),
   diff: z.object({
-    slug: z.string().min(1).describe(L.slug),
+    slug: szoveg().min(1).describe(L.slug),
     tol: datum.describe(L.tol),
     ig: datum.describe(L.ig),
-    horgony: z.string().optional().describe(L.diffHorgony),
+    horgony: szoveg().optional().describe(L.diffHorgony),
   }),
 };
 
 export const REST = {
   kereses: z.object({
-    q: z.string().min(1),
+    q: szoveg().min(1),
     hatalyos: restBool.optional(),
     limit: restSzam.optional(),
   }),
   szakasz: z.object({
-    slug: z.string().min(1),
-    horgony: z.string().optional(),
-    paragrafus: z.string().optional(),
+    slug: szoveg().min(1),
+    horgony: szoveg().optional(),
+    paragrafus: szoveg().optional(),
     datum: datum.optional(),
   }),
   valtozasok: z.object({
-    felveve_utan: z.string().optional(),
+    felveve_utan: cursor.optional(),
     since: datum.optional(),
     until: datum.optional(),
     slugs: z
       .string()
+      .max(MAX * 10)
       .optional()
       .transform((s) => (s ? s.split(",").map((x) => x.trim()).filter(Boolean) : undefined)),
-    q: z.string().optional(),
+    q: szoveg().optional(),
     limit: restSzam.optional(),
   }),
   diff: z.object({
-    slug: z.string().min(1),
+    slug: szoveg().min(1),
     tol: datum,
     ig: datum,
-    horgony: z.string().optional(),
+    horgony: szoveg().optional(),
   }),
 };
 

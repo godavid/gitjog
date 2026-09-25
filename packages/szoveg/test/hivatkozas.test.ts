@@ -54,3 +54,11 @@ describe("szakaszKeres", () => {
     expect(szakaszKeres(sz, "99. §")).toBeUndefined();
   });
 });
+
+describe("hivatkozasParse — hosszú bemenet", () => {
+  it("hosszú számsoron is gyors (nincs négyzetes visszalépés)", () => {
+    const kezdet = performance.now();
+    hivatkozasParse("9".repeat(50_000));
+    expect(performance.now() - kezdet).toBeLessThan(200);
+  });
+});

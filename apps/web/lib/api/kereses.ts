@@ -145,7 +145,9 @@ export async function keresesApi({ q, hatalyos = true, limit }: KeresesParam): P
   try {
     sorok = await keresTeljes(keresett, !hatalyos, darab);
   } catch (e) {
-    throw new ApiHiba(503, `A kereső adatbázis nem elérhető: ${(e as Error).message}`);
+    // a DB-hiba részlete csak a logba kerül, a kliens felé nem
+    console.error("kereses: adatbázis-hiba", e);
+    throw new ApiHiba(503, "A kereső adatbázis nem elérhető");
   }
   return {
     mod: "szoveg",

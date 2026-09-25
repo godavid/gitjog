@@ -22,7 +22,8 @@ export interface Hivatkozas {
 }
 
 const MEGJELOLES = /^(\d{4})\.?\s*évi\s+([ivxlcdm]+)\.?\s*(?:törvény|tv\.?)?/i;
-const PARAGRAFUS = /(\d+(?::\d+)?(?:\/[a-z])?)\.?\s*§/i;
+// korlátos számjegyek: a nyílt \d+ hosszú számsoron négyzetes (ReDoS)
+const PARAGRAFUS = /(\d{1,5}(?::\d{1,5})?(?:\/[a-z])?)\.?\s*§/i;
 // 1–2 szó, az első nagybetűs, max 12 karakter — „Ptk.", „Fftv.", „Áfa tv."
 const ROVIDITES = /^([A-ZÁÉÍÓÖŐÚÜŰ][A-Za-záéíóöőúüű]{0,11}\.?(?:\s+tv\.?)?)$/;
 
