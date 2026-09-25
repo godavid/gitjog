@@ -14,7 +14,8 @@ const MERET = 300; // ennyi legutóbbi időállapotból szűrünk
 
 export async function GET(request: Request) {
   const titok = process.env.CRON_SECRET;
-  if (titok && request.headers.get("authorization") !== `Bearer ${titok}`) {
+  // fail-closed: titok nélkül se legyen nyilvánosan hívható (kimenő IndexNow-spam)
+  if (!titok || request.headers.get("authorization") !== `Bearer ${titok}`) {
     return Response.json({ hiba: "Nincs jogosultság" }, { status: 401 });
   }
 

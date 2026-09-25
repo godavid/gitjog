@@ -8,7 +8,8 @@ export async function generateMetadata({
   searchParams: Promise<{ q?: string }>;
 }): Promise<Metadata> {
   const { q } = await searchParams;
-  const kifejezes = (q ?? "").trim();
+  // hosszkorlát, mint az API-n (lib/api/semak.ts): az FTS ne kapjon óriás bemenetet
+  const kifejezes = (q ?? "").trim().slice(0, 200);
   return {
     title: kifejezes
       ? `„${kifejezes}” — keresés a törvények szövegében`
@@ -36,7 +37,8 @@ export default async function KeresesOldal({
   searchParams: Promise<{ q?: string; mind?: string }>;
 }) {
   const { q, mind } = await searchParams;
-  const kifejezes = (q ?? "").trim();
+  // hosszkorlát, mint az API-n (lib/api/semak.ts): az FTS ne kapjon óriás bemenetet
+  const kifejezes = (q ?? "").trim().slice(0, 200);
   const mindenben = mind === "1";
 
   let talalatok: Talalat[] = [];
@@ -57,6 +59,7 @@ export default async function KeresesOldal({
         <input
           type="search"
           name="q"
+          maxLength={200}
           defaultValue={kifejezes}
           placeholder="Keresés a törvények teljes szövegében…"
           aria-label="Keresés a törvények teljes szövegében"
