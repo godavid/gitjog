@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { ADAT_REPO, evOf, getAllomanyStatisztika, getJogszabalyok } from "@/lib/adat";
 import { jsonLdSzoveg } from "@/lib/jsonld";
 import { OLDAL_URL } from "@/lib/sitemap";
@@ -124,37 +125,18 @@ git blame jogszabalyok/2013-evi-v-torveny-ptk/szoveg.md`}
       </section>
 
       <section className="szoveg-szekcio">
-        <h2>Gépi felületek</h2>
+        <h2>Gépi felületek és értesítés</h2>
         <p>
-          Minden felület süti és kulcs nélkül, egyszerű GET-tel elérhető, és ugyanarról a
-          domainről szolgál ki, mint az olvasható oldalak:
+          Az állomány gépi alakban is elérhető, süti és kulcs nélkül, ugyanarról a domainről: MCP-szerver
+          AI-asszisztenseknek, REST API OpenAPI-leírással, RSS-feed az összes és minden egyes törvény
+          módosításairól, valamint a nyers Markdown-szöveg. A címek, a kliensenkénti bekötés és a
+          változásfigyelés receptje:{" "}
+          <Link href="/agenteknek">MCP-szerver, API és értesítés</Link>. Ugyanez géppel olvasható
+          alakban: <a href="/llms.txt">/llms.txt</a>.
         </p>
-        <pre className="kodblokk">
-          <code>
-            {`/api/mcp                               MCP-szerver (streamable HTTP) AI-asszisztenseknek
-/api/v1/openapi.json                   REST-leírás: kereses, szakasz, valtozasok, diff
-/llms.txt                              belépési pont ügynököknek, receptekkel
-/jogszabaly/<slug>/szoveg.md           egy törvény nyers Markdown-szövege
-/jogszabaly/<slug>/valtozasok.xml      egy törvény módosításai (RSS)
-/valtozasok.xml                        az összes friss módosítás (RSS)
-/sitemap/<n>.xml                       az oldaltérkép szeletei`}
-          </code>
-        </pre>
         <p>
-          Az MCP-szerver és a REST négy műveletet ad, §-szinten: keresés a § teljes szövegével,
-          egy § egy adott napon, „mi változott” cursorral (értesítéshez elég egy hívás), és két
-          időállapot §-szintű különbsége. Claude, ChatGPT vagy Cursor beköti az MCP-címet; egy
-          egyszerű szkript a REST-et hívja. Példa:
-        </p>
-        <pre className="kodblokk">
-          <code>
-            {`# mi változott a földjogi törvényekben 2026 óta?
-curl '${OLDAL_URL}/api/v1/valtozasok?since=2026-01-01&q=termőföld|földek forgalm|Földalap'`}
-          </code>
-        </pre>
-        <p>
-          A slug az index-fájlban szerepel, és megegyezik az adat-repó könyvtárnevével —{" "}
-          <a href="/llms.txt">/llms.txt</a> mindezt géppel olvasható alakban is leírja.
+          Felvételi napló: <code>index/felvetel/ÉÉÉÉ-HH.jsonl</code> a repóban — soronként mikor került be
+          egy időállapot. A slug az index-fájlban szerepel, és megegyezik az adat-repó könyvtárnevével.
         </p>
       </section>
 

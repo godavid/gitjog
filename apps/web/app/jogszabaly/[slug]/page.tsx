@@ -117,6 +117,7 @@ export default async function JogszabalyOldal({
         </a>
         <a href={`/jogszabaly/${slug}/szoveg.md`}>Nyers szöveg (.md)</a>
         <a href={`/jogszabaly/${slug}/valtozasok.xml`}>RSS</a>
+        <a href={`/jogszabaly/${slug}/idovonal#figyeles`}>Figyelés (MCP, API)</a>
       </nav>
       <article className="jogszoveg" dangerouslySetInnerHTML={{ __html: html }} />
     </main>

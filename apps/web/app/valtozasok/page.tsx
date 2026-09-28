@@ -10,7 +10,7 @@ const DARAB = 100;
 export const metadata: Metadata = {
   title: "Mi változott a magyar jogban? — friss módosítások",
   description:
-    "Mi változott mostanában a magyar jogban? A legutóbb hatályba lépett törvénymódosítások, mindegyiknél a pontos szövegváltozással.",
+    "Mi változott mostanában a magyar jogban? A legutóbb hatályba lépett törvénymódosítások, mindegyiknél a pontos szövegváltozással. RSS-en és API-n is figyelhető.",
   alternates: {
     canonical: "/valtozasok",
     types: { "application/rss+xml": "/valtozasok.xml" },
@@ -41,7 +41,8 @@ export default async function ValtozasokOldal() {
       <p className="alcim-sor">
         A legutóbb hatályba lépett törvénymódosítások. Minden tételnél megnézhető a pontos
         szövegváltozás — mi került bele, mi került ki. Feedben is olvasható:{" "}
-        <a href="/valtozasok.xml">/valtozasok.xml</a>
+        <a href="/valtozasok.xml">/valtozasok.xml</a>; agentnek és szkriptnek{" "}
+        <a href="/agenteknek#figyeles">MCP-n és API-n</a>.
       </p>
 
       {napok.length === 0 ? (

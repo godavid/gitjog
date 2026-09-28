@@ -2,6 +2,7 @@
 // Route handler, nem statikus fájl, hogy a számok ne avuljanak el.
 
 import { ADAT_REPO, evOf, getAllomanyStatisztika, getJogszabalyok } from "@/lib/adat";
+import { MCP_KLIENSEK, MCP_REGISTRY_NEV, MCP_URL, githubAtom } from "@/lib/csatornak";
 import { OLDAL_URL } from "@/lib/sitemap";
 
 export const dynamic = "force-static";
@@ -15,6 +16,11 @@ export async function GET() {
     getAllomanyStatisztika(),
   ]);
   const elsoEv = Math.min(...jogszabalyok.map(evOf));
+  // kliensenként egy listaelem, alatta a szó szerint másolható kód (a listaelembe
+  // behúzott, kerített blokk — így Markdownként is a listaelemhez tartozik)
+  const bekotes = MCP_KLIENSEK.map(
+    (k) => `- ${k.nev} — ${k.hol}:\n\n  \`\`\`\n  ${k.kod.replace(/\n/g, "\n  ")}\n  \`\`\``,
+  ).join("\n\n");
 
   const szoveg = `# GitJog
 
@@ -33,13 +39,18 @@ időállapot (a commit dátuma a hatálybalépés napja), a diff maga a törvén
 - [Legutóbbi változások](${OLDAL_URL}/valtozasok) — RSS: ${OLDAL_URL}/valtozasok.xml
 - [Egy hónap összes módosítása](${OLDAL_URL}/valtozasok/{ev}-{ho}) — pl. /valtozasok/2026-01
 - [Az adatokról](${OLDAL_URL}/adatok)
+- [MCP-szerver, API és értesítés](${OLDAL_URL}/agenteknek) — ez a leírás emberi olvasásra, bekötési példákkal
 
 ## MCP-szerver és API (ezt használd — §-szintű, pár KB-os válaszok)
 
 Ne olvass be egész törvényt (0,1–1,4 MB): a §-szintű végpontok adják, ami kell.
 
-- MCP (streamable HTTP, auth nélkül): ${OLDAL_URL}/api/mcp
+- MCP (streamable HTTP, auth nélkül): ${MCP_URL} — registry: ${MCP_REGISTRY_NEV}
 - REST, OpenAPI-leírással: ${OLDAL_URL}/api/v1/openapi.json
+
+Bekötés MCP-kliensbe:
+
+${bekotes}
 
 Négy művelet, REST-en és MCP-toolként ugyanúgy:
 
@@ -61,10 +72,16 @@ Négy művelet, REST-en és MCP-toolként ugyanúgy:
 4. Ha van tétel: az erintett_szakaszok régi/új szövegéből írj összefoglalót, a diff_url a teljes különbség.
 A cursor a repóba kerülés ideje, nem a hatálybalépés: a késve felvett, régi dátumú állapotot is jelzi.
 
+## Értesítés (ember és gép)
+
+- Az összes friss módosítás RSS-feedje: ${OLDAL_URL}/valtozasok.xml
+- Egy jogszabály változásainak RSS-feedje: ${OLDAL_URL}/jogszabaly/{slug}/valtozasok.xml
+- Az adat-repó commit-feedje (Atom): ${githubAtom()} — egy jogszabályé: ${githubAtom("{slug}")}
+- Ütemezett agent: a fenti cursoros recept (MCP-n a \`valtozasok\` tool, ugyanezekkel a paraméterekkel)
+
 ## További gépi felületek
 
 - Egy jogszabály nyers Markdown-szövege: ${OLDAL_URL}/jogszabaly/{slug}/szoveg.md
-- Egy jogszabály változásainak RSS-feedje: ${OLDAL_URL}/jogszabaly/{slug}/valtozasok.xml
 
 ## Adat
 
