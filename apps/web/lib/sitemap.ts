@@ -60,6 +60,12 @@ async function sitemapUrlok(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly",
       priority: 0.3,
     },
+    {
+      url: `${OLDAL_URL}/agenteknek`,
+      lastModified: globalis,
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
   ];
 
   // havi változás-oldalak: hónaponként a legkésőbbi hatálybalépés a lastmod.

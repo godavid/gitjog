@@ -18,7 +18,7 @@ const REVALIDATE = 21_600; // 6 óra
  * SZERKEZETE változik (más mezők, más URL-halmaz), a régi eredmény a revalidate
  * ablak végéig kiszolgálódik — a friss kód ellenére. Ilyenkor ezt kell léptetni.
  */
-export const CACHE_VERZIO = "4";
+export const CACHE_VERZIO = "5";
 /** on-demand revalidate címke: az adat-repo push-webhookja (/api/revalidate) ezt dobja */
 export const ADAT_TAG = "adat-repo";
 

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { KodSor } from "@/components/KodSor";
 import { evOf, getJogszabalyok, getLegutobbiValtozasok } from "@/lib/adat";
+import { ADAT_REPO_URL, MCP_URL } from "@/lib/csatornak";
 import { datumSzoveg } from "@/lib/datum";
 
 export const revalidate = 21600;
@@ -14,7 +16,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { absolute: "GitJog — a magyar törvények szövege és változástörténete" },
     description:
       `A magyar törvények teljes szövege és változástörténete. ${jogszabalyok.length} törvény ` +
-      `${elsoEv} óta, minden módosításnál látható, mi került bele és mi került ki. Nem hiteles jogforrás.`,
+      `${elsoEv} óta, minden módosításnál látható, mi került bele és mi került ki. RSS-en, API-n és ` +
+      "MCP-szerveren AI-agenteknek is. Nem hiteles jogforrás.",
     alternates: {
       canonical: "/",
       // a page alternates-e teljesen kicseréli a layoutét, ezért az RSS-t itt is meg kell adni
@@ -60,10 +63,11 @@ export default async function Fooldal() {
 
   return (
     <main className="lap">
-      <h1>A magyar törvények szövege és változástörténete</h1>
+      <h1 className="fo-cim">A magyar törvények szövege és változástörténete</h1>
       <p className="alcim-sor">
         {jogszabalyok.length} törvény, {evek[0]}-től napjainkig. Minden módosításnál látszik, mi
-        került bele a szövegbe és mi került ki belőle. Naponta frissül.
+        került bele a szövegbe és mi került ki belőle. Naponta frissül — itt olvasható, RSS-en
+        figyelhető, és <Link href="/agenteknek">MCP-szerveren át AI-agentek is kérdezhetik</Link>.
       </p>
 
       <form className="fo-kereso" action="/kereses" method="get">
@@ -115,6 +119,59 @@ export default async function Fooldal() {
           <Link href="/valtozasok">Összes változás</Link>
           {" · "}
           <a href="/valtozasok.xml">RSS</a>
+        </p>
+      </section>
+
+      <section className="gepi-sav" aria-labelledby="gepi-cim">
+        <h2 id="gepi-cim">
+          <span className="pecsetjel" aria-hidden="true">
+            §
+          </span>
+          Embernek és agentnek
+        </h2>
+        <p className="szekcio-bev">
+          Ugyanez az állomány gépi alakban is, kulcs és regisztráció nélkül. Egy AI-asszisztens a §
+          szövegét és a változásait közvetlenül kérdezheti; a módosításokról RSS és git is szól.
+        </p>
+        <dl className="csatorna-sorok">
+          <div className="csatorna-fo">
+            <dt>MCP-szerver</dt>
+            <dd className="csatorna-hol">
+              <KodSor kod={MCP_URL} mit="az MCP-szerver címe" kiemelt />
+            </dd>
+            <dd className="csatorna-mit">
+              Claude, ChatGPT, Cursor, VS Code: keresés, egy § egy adott napon, mi változott, diff.{" "}
+              <a href="/agenteknek#mcp">Bekötés</a>
+            </dd>
+          </div>
+          <div>
+            <dt>RSS</dt>
+            <dd className="csatorna-mit">minden módosítás, vagy törvényenként külön feed</dd>
+            <dd className="csatorna-hol">
+              <a href="/valtozasok.xml">/valtozasok.xml</a>
+            </dd>
+          </div>
+          <div>
+            <dt>REST API</dt>
+            <dd className="csatorna-mit">ugyanaz a négy művelet GET-tel, JSON-válasszal</dd>
+            <dd className="csatorna-hol">
+              <a href="/api/v1/openapi.json">/api/v1/openapi.json</a>
+            </dd>
+          </div>
+          <div>
+            <dt>git</dt>
+            <dd className="csatorna-mit">az egész állomány; minden időállapot egy commit</dd>
+            <dd className="csatorna-hol">
+              <a href={ADAT_REPO_URL} rel="noopener">
+                github.com/godavid/magyar-jog
+              </a>
+            </dd>
+          </div>
+        </dl>
+        <p className="szekcio-lab">
+          <Link href="/agenteknek">Bekötés és értesítés lépésről lépésre</Link>
+          {" · "}
+          <a href="/llms.txt">llms.txt</a>
         </p>
       </section>
 

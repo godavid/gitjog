@@ -37,3 +37,20 @@ törvényszöveget és diffet görget: VILÁGOS téma az alap (papír-érzet),
 - § headingek horgony-linkkel (hover-en látszó ¶ jel, pecsétzöld).
 - Disclaimersáv: keskeny, papírnál egy árnyalattal sötétebb sáv, nem banner.
 - Fókuszgyűrű: 2px pecsétzöld outline, offset 2px — minden interaktív elemen.
+- Gépi belépés sávja (főoldal, `.gepi-sav`): a lap egyetlen teljes szélességű,
+  mélyebb papír-sávja, hajszálvonalakkal; benne a pecsétzöld § és a nagy mono
+  MCP-cím. Kártya nem lesz belőle, és más oldalon nem ismétlődik.
+- Másolható kódsor (`KodSor`): mono kódblokk, jobb felső sarkában „Másolás” gomb,
+  amely JS nélkül nem jelenik meg (a szöveg akkor is kijelölhető). Keskeny
+  képernyőn a kiemelt cím egy sorban marad, a gomb alá kerül.
+- Tipográfiai csúcs: a 36 px-es fokot csak a főoldal címe (`h1.fo-cim`) használja.
+
+## Mozgás
+
+- Egyetlen szerzett pillanat: megérkezés egy hivatkozott helyre (`:target`) — a cél
+  pecsétzöld kiemelést kap, ami kitart a görgetés alatt, majd elhalványul. Ez az
+  agent-válaszokban citált §-URL-ek landolása. Horgonyos belső link ezért sima `<a>`
+  (a `:target` kliens-navigáció után nem frissül).
+- Visszajelzés: sikeres másoláskor a gomb pecsétként „rányomódik” (260 ms), a keret
+  pecsétzöld lesz. Hover-színváltás 120–150 ms.
+- `prefers-reduced-motion`: a kiemelés tartós tint mozgás nélkül, a pecsételés elmarad.

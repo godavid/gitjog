@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { evOf, getAllapotokSlug, getJogszabalyok } from "@/lib/adat";
+import { githubAtom } from "@/lib/csatornak";
 import { datumSzoveg } from "@/lib/datum";
 import { morzsaJsonLd } from "@/lib/jsonld";
 import { OLDAL_URL } from "@/lib/sitemap";
@@ -58,6 +59,15 @@ export default async function IdovonalOldal({
         {sajat[0] ? ` ${sajat[0].datum.slice(0, 4)} óta` : ""} ·{" "}
         <Link href={`/jogszabaly/${slug}`}>hatályos szöveg</Link>
       </p>
+      <nav className="eszkozsor figyeles-sor" id="figyeles" aria-label="A törvény változásainak figyelése">
+        <span className="figyeles-cimke">Figyelés:</span>
+        <a href={`/jogszabaly/${slug}/valtozasok.xml`}>RSS</a>
+        <a href={githubAtom(slug)} rel="noopener">
+          GitHub-feed (Atom)
+        </a>
+        <a href={`/api/v1/valtozasok?slugs=${slug}`}>API (JSON)</a>
+        <a href="/agenteknek#mcp">MCP-tool: valtozasok</a>
+      </nav>
       <ol className="idovonal">
         {forditott.map((a, i) => {
           const elozo = forditott[i + 1];

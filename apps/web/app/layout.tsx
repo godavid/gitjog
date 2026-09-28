@@ -63,6 +63,11 @@ export default function GyokerElrendezes({ children }: { children: React.ReactNo
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLdSzoveg(OLDAL_JSONLD) }}
         />
+        {/* Gépi belépési pontok minden oldalon. A React a <link>-et a <head>-be
+            emeli; a lapszintű `alternates` ezeket nem írja felül. A service-desc
+            az RFC 8631 szerinti API-leírás-hivatkozás. */}
+        <link rel="service-desc" type="application/vnd.oai.openapi+json" href="/api/v1/openapi.json" />
+        <link rel="help" type="text/plain" href="/llms.txt" title="llms.txt — belépési pont AI-agenteknek" />
         <a className="ugras-tartalomra" href="#tartalom">
           Ugrás a tartalomra
         </a>
@@ -71,6 +76,11 @@ export default function GyokerElrendezes({ children }: { children: React.ReactNo
             <Link href="/" className="wordmark">
               <span className="pecsetjel">§</span>GitJog
             </Link>
+            <nav className="fejlec-nav" aria-label="Fő navigáció">
+              <Link href="/valtozasok">Változások</Link>
+              <Link href="/agenteknek">Agenteknek</Link>
+              <Link href="/adatok">Adatok</Link>
+            </nav>
             <form className="fejlec-kereso" action="/kereses" role="search">
               <input
                 type="search"
@@ -97,6 +107,8 @@ export default function GyokerElrendezes({ children }: { children: React.ReactNo
               <Link href="/adatok">Az adatokról</Link>
               {" · "}
               <Link href="/valtozasok">Változások</Link>
+              {" · "}
+              <Link href="/agenteknek">MCP és API</Link>
               {" · "}
               <a href="https://github.com/godavid/magyar-jog" rel="noopener">
                 Adat-repo (git)

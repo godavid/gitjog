@@ -128,6 +128,22 @@ input[type="radio"] {
   color: var(--pecset);
   margin-right: 6px;
 }
+.fejlec-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  font-size: 14px;
+}
+.fejlec-nav a {
+  color: var(--tinta-halvany);
+  text-decoration: none;
+  padding-block: 4px;
+  transition: color 120ms ease-out;
+}
+.fejlec-nav a:hover {
+  color: var(--pecset);
+  text-decoration: underline;
+}
 .fejlec-kereso {
   margin-left: auto;
   display: flex;
@@ -182,10 +198,21 @@ h1 {
   font-weight: 600;
   text-wrap: balance;
 }
+/* a főoldal címe a skála felső fokán: ez a lap egyetlen display-pillanata */
+h1.fo-cim {
+  font-size: 36px;
+  line-height: 1.15;
+  letter-spacing: -0.005em;
+  margin-bottom: 10px;
+}
+h1.fo-cim + .alcim-sor {
+  font-size: 17px;
+}
 .alcim-sor {
   color: var(--tinta-halvany);
   margin: 0 0 28px;
   font-size: 15px;
+  max-width: 68ch;
   text-wrap: pretty;
 }
 
@@ -326,6 +353,39 @@ h4:hover .horgony,
 }
 :target > .horgony {
   opacity: 1;
+}
+
+/* ── megérkezés egy hivatkozott helyre ──
+   Egy §-ra vagy szakaszra mutató link (egy agent-válasz forrás-URL-je is ilyen)
+   a céljánál pecsétzöld kiemeléssel ér földet, amely kitart, amíg a görgetés
+   odaér, aztán elhalványul. A kiemelés árnyék-terülés, nem padding: a szöveg
+   egy képpontot sem mozdul. */
+@keyframes hivatkozott {
+  0%,
+  35% {
+    background-color: var(--kijeloles);
+    box-shadow: 0 0 0 6px var(--kijeloles);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+.jogszoveg :target,
+.szoveg-szekcio:target > h2,
+.figyeles-sor:target {
+  border-radius: 3px;
+  animation: hivatkozott 2.6s cubic-bezier(0.33, 0, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* mozgás helyett tartós jelölés: a cél állapota így is látszik */
+  .jogszoveg :target,
+  .szoveg-szekcio:target > h2,
+  .figyeles-sor:target {
+    animation: none;
+    background-color: var(--kijeloles);
+    box-shadow: 0 0 0 6px var(--kijeloles);
+  }
 }
 
 /* ── eszközsáv a szövegoldalon ── */
@@ -662,6 +722,7 @@ h4:hover .horgony,
 }
 .szoveg-szekcio p {
   margin: 0 0 12px;
+  max-width: 66ch;
   text-wrap: pretty;
 }
 .kodblokk {
@@ -703,6 +764,294 @@ h4:hover .horgony,
   white-space: nowrap;
 }
 
+/* ── gépi csatornák: másolható kód, kliens- és csatornalisták ── */
+:not(pre) > code {
+  font-family: var(--mono);
+  font-size: 0.88em;
+  background: var(--papir-melyebb);
+  border-radius: 3px;
+  padding: 1px 4px;
+  overflow-wrap: anywhere;
+}
+.kod-sor {
+  position: relative;
+  margin: 0 0 12px;
+}
+.kod-sor .kodblokk {
+  margin: 0;
+  /* a jobb felső sarokban ülő másoló gomb helye */
+  padding-right: 92px;
+}
+.masolo-gomb {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font: inherit;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--tinta-halvany);
+  background: var(--papir);
+  border: 1px solid var(--vonal);
+  border-radius: 5px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition:
+    color 150ms ease-out,
+    background-color 150ms ease-out,
+    border-color 150ms ease-out;
+}
+@media (pointer: coarse) {
+  .masolo-gomb {
+    padding: 8px 12px;
+    top: 4px;
+    right: 4px;
+  }
+}
+.masolo-gomb:hover {
+  color: var(--pecset);
+  border-color: var(--pecset);
+}
+/* sikeres másolás: a gomb pecsétként „rányomódik” (kicsit nagyobbról ül a
+   helyére), a kódblokk kerete átveszi a pecsét színét */
+@keyframes pecsetel {
+  from {
+    transform: scale(1.14);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+.masolo-gomb[data-allapot="kesz"] {
+  color: var(--papir);
+  background: var(--pecset);
+  border-color: var(--pecset);
+  animation: pecsetel 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.kod-sor .kodblokk {
+  transition: border-color 200ms ease-out;
+}
+.kod-sor:has(.masolo-gomb[data-allapot="kesz"]) .kodblokk {
+  border-color: var(--pecset);
+}
+@media (prefers-reduced-motion: reduce) {
+  .masolo-gomb[data-allapot="kesz"] {
+    animation: none;
+  }
+}
+.kod-sor-kiemelt .kodblokk {
+  font-size: 16px;
+  padding-block: 14px;
+}
+.kod-sor-kiemelt .masolo-gomb {
+  top: 10px;
+}
+.halk {
+  color: var(--tinta-halvany);
+  font-size: 14px;
+}
+.szoveg-szekcio h3 {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 600;
+  margin: 30px 0 10px;
+}
+.szoveg-szekcio ol {
+  margin: 0 0 12px;
+  padding-left: 22px;
+}
+.szoveg-szekcio ol li {
+  margin-bottom: 10px;
+}
+.szoveg-szekcio ol li .kod-sor {
+  margin-top: 8px;
+}
+
+.kliens-lista,
+.csatorna-lista {
+  margin: 0 0 12px;
+  border-top: 1px solid var(--vonal);
+}
+.kliens,
+.csatorna-lista > div {
+  padding: 14px 0 4px;
+  border-bottom: 1px solid var(--vonal);
+}
+.kliens dt,
+.csatorna-lista dt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.kliens-nev,
+.csatorna-lista dt {
+  font-weight: 600;
+}
+.kliens-hol {
+  color: var(--tinta-halvany);
+  font-size: 14px;
+  font-weight: 400;
+}
+.kliens dd,
+.csatorna-lista dd {
+  margin: 0;
+}
+
+.tool-lista {
+  margin: 0 0 12px;
+  border-top: 1px solid var(--vonal);
+}
+.tool-lista > div {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: 2px 18px;
+  align-items: baseline;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--vonal);
+}
+.tool-lista dd {
+  margin: 0;
+  color: var(--tinta-halvany);
+}
+.pelda-kerdes {
+  max-width: none;
+  font-family: var(--serif);
+  font-size: 17px;
+  background: var(--papir-melyebb);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+/* főoldal: csatornák egyetlen rácsban, mint a friss-lista */
+.szekcio-bev {
+  color: var(--tinta-halvany);
+  margin: 8px 0 0;
+  max-width: 62ch;
+  text-wrap: pretty;
+}
+.csatorna-sorok {
+  margin: 20px 0 0;
+  border-top: 1px solid var(--vonal);
+}
+.csatorna-sorok > div {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr) minmax(0, max-content);
+  gap: 4px 20px;
+  align-items: center;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--vonal);
+}
+.csatorna-sorok dt {
+  font-family: var(--serif);
+  font-weight: 600;
+}
+.csatorna-sorok dd {
+  margin: 0;
+}
+.csatorna-mit {
+  color: var(--tinta-halvany);
+}
+.csatorna-hol {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.csatorna-hol .kod-sor {
+  margin: 0;
+}
+.csatorna-hol .kodblokk {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  padding-block: 6px;
+}
+
+/* A gépi belépés sávja: a lap egyetlen teljes szélességű, mélyebb papír-sávja.
+   A háttér és a két hajszálvonal árnyékkal nyúlik ki a hasábból, a clip-path
+   függőlegesen levágja — így nincs 100vw-s vízszintes görgetés. */
+.gepi-sav {
+  margin-top: 64px;
+  padding: 44px 0 36px;
+  background: var(--papir-melyebb);
+  box-shadow:
+    0 0 0 100vmax var(--papir-melyebb),
+    0 -1px 0 100vmax var(--vonal),
+    0 1px 0 100vmax var(--vonal);
+  clip-path: inset(-1px -100vmax);
+}
+.gepi-sav h2 {
+  font-family: var(--serif);
+  font-size: 28px;
+  line-height: 1.2;
+  font-weight: 600;
+  margin: 0;
+  text-wrap: balance;
+}
+.gepi-sav h2 .pecsetjel {
+  color: var(--pecset);
+  margin-right: 10px;
+}
+.gepi-sav .szekcio-bev {
+  font-size: 17px;
+  margin-top: 12px;
+}
+.gepi-sav .kodblokk,
+.gepi-sav .masolo-gomb:not([data-allapot="kesz"]) {
+  background: var(--papir);
+}
+.gepi-sav .csatorna-sorok {
+  margin-top: 28px;
+}
+.csatorna-fo dt {
+  font-size: 17px;
+  align-self: start;
+  padding-top: 12px;
+}
+.csatorna-fo .csatorna-hol {
+  grid-column: 2 / -1;
+  grid-row: 1;
+}
+.csatorna-fo .csatorna-mit {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  margin-top: 6px;
+}
+.csatorna-fo .kod-sor {
+  width: fit-content;
+  max-width: 100%;
+}
+.csatorna-fo .kodblokk {
+  font-size: 20px;
+  padding: 12px 104px 12px 16px;
+}
+.csatorna-sorok > .csatorna-fo {
+  padding-block: 16px 18px;
+}
+@supports (grid-template-columns: subgrid) {
+  .csatorna-sorok {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    column-gap: 20px;
+  }
+  .csatorna-sorok > div {
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+  }
+}
+
+.agent-lap .szoveg-szekcio,
+.agent-lap .eszkozsor {
+  max-width: 48rem;
+}
+
+/* idővonal: a törvény figyelése */
+.figyeles-sor {
+  margin-top: -12px;
+}
+.figyeles-cimke {
+  color: var(--tinta);
+  font-weight: 600;
+}
+
 /* ── keskeny képernyő ── */
 @media (max-width: 640px) {
   .lap {
@@ -720,7 +1069,19 @@ h4:hover .horgony,
     flex: 1;
   }
   h1 {
-    font-size: 24px;
+    font-size: 26px;
+  }
+  .fo-szekcio h2,
+  .szoveg-szekcio h2 {
+    font-size: 20px;
+  }
+  .szoveg-szekcio h3 {
+    font-size: 17px;
+  }
+  .fejlec-nav a {
+    /* 44px-es érintési cél, a fejléc magassága nélkül */
+    padding-block: 12px;
+    margin-block: -8px;
   }
 
   .jsz-lista,
@@ -775,6 +1136,51 @@ h4:hover .horgony,
   .valtozas-diff {
     justify-self: start;
   }
+
+  .csatorna-sorok {
+    display: block;
+  }
+  .csatorna-sorok > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .csatorna-hol .kodblokk {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .gepi-sav {
+    padding-block: 32px 28px;
+  }
+  .gepi-sav h2 {
+    font-size: 22px;
+  }
+  h1.fo-cim {
+    font-size: 28px;
+  }
+  h1.fo-cim + .alcim-sor {
+    font-size: 15px;
+  }
+  .csatorna-fo dt {
+    padding-top: 0;
+  }
+  .csatorna-fo .csatorna-hol,
+  .csatorna-fo .csatorna-mit {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  /* keskenyen a kiemelt cím egy sorban marad, a másoló gomb alá kerül */
+  .kod-sor-kiemelt .kodblokk,
+  .csatorna-fo .kodblokk {
+    font-size: 14px;
+    padding-right: 14px;
+  }
+  .kod-sor-kiemelt .masolo-gomb {
+    position: static;
+    margin-top: 8px;
+  }
+  .tool-lista > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* ── nyomtatás ──
@@ -795,6 +1201,7 @@ h4:hover .horgony,
   .fejlec,
   .lablec,
   .eszkozsor,
+  .masolo-gomb,
   .fo-kereso,
   .kereso-pelda,
   .ugras-tartalomra,
