@@ -7,3 +7,5 @@ allowBuilds:
 overrides:
   # GHSA-2v37-7h3g-55p8 (high): a postcss tranzitív nanoid-ja; a javított 3.x ág
   "nanoid@<3.3.18": "^3.3.18"
+  # GHSA-rfgv-xxqx-mfg5, GHSA-w293-vg96-wgc3 (high): a cheerio tranzitív undici-ja; javított a 7.29.1
+  "undici@>=7.0.0 <7.29.1": "^7.29.1"
