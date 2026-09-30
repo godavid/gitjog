@@ -140,6 +140,13 @@ ez volt a tanulság.)
      szövegben, másnap beépülve kiürülnek — a 2026. évi XVIII. például
      16 590 → 111 538 → 17 225 karakter volt három egymást követő napon, és a régi
      2× felső küszöb ezen akadt el.
+     2026-09-30 óta ugyanez a kivétel jár akkor is, ha a változást egy beágyazott
+     módosító blokk magyarázza (`modositoBlokkValtozas()`): a „…szövegrész helyébe
+     … lép” fordulatok száma a hosszal egy irányba ugrik (≥ 20 db, és ≥ 1 db /
+     1000 kar változás). Így a nem „…módosításáról” című, de más törvényeket
+     módosító fejezetet tartalmazó törvényeket is átengedi — a 2026. évi XXXIV.
+     79 748 → 233 444 → 94 755 kar volt (0 → 718 → 1 „helyébe”), és 2026-09-27-én
+     emiatt kellett kézi futás.
 4. Tesztek: `pnpm test`. Ha a normalizálás SZÁNDÉKOSAN változott, regeneráld a
    golden hasheket (`parse-proba` + `shasum -a 256`) a `test/normalize.test.ts`-ben.
    Vigyázz: a golden-változás azt jelenti, hogy a teljes history diffje "ugrik" egyet
