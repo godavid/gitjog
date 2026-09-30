@@ -29,7 +29,13 @@ import {
 import { markdownGeneralas } from "./normalize.js";
 import { megjelolesIllesztes, parsolSnapshot } from "./parse.js";
 import { naploIras, type FelvetelTetel } from "./felvetel.js";
-import { modositoTorveny, riaszt, TerjedelemAnomalia, terjedelemEllenorzes } from "./health.js";
+import {
+  modositoBlokkValtozas,
+  modositoTorveny,
+  riaszt,
+  TerjedelemAnomalia,
+  terjedelemEllenorzes,
+} from "./health.js";
 import { AGENTS_MD } from "./sablonok.js";
 import type { IndexTetel } from "./kereso-index.js";
 import {
@@ -213,8 +219,10 @@ async function fut(): Promise<void> {
           try {
             // a generált listából jövő tételeknél a config-beli cím üres,
             // ezért a ténylegesen parse-olt cím az elsődleges
+            // beágyazott módosító blokkot (nem „…módosításáról” című
+            // törvényben) a fordulatok ugrása jelez
             terjedelemEllenorzes(regi.length, md.length, js.slug, {
-              zsugorodhat: modositoTorveny(cim || js.cim),
+              zsugorodhat: modositoTorveny(cim || js.cim) || modositoBlokkValtozas(regi, md),
             });
           } catch (e) {
             if (!(e instanceof TerjedelemAnomalia)) throw e;

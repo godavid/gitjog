@@ -61,6 +61,28 @@ export function modositoTorveny(cim: string): boolean {
   return /módosításáról\s*$/iu.test(cim.trim());
 }
 
+/**
+ * A terjedelem-változást egy beágyazott módosító blokk megjelenése vagy
+ * kiürülése magyarázza-e (a „…szövegrész helyébe … lép” fordulatok száma
+ * ugyanabba az irányba ugrik, mint a hossz).
+ *
+ * Sok érdemi törvény is tartalmaz módosító rendelkezéseket (a más törvényeket
+ * módosító fejezetet), és ezek a hatálybalépésük napján ugyanúgy megjelennek,
+ * majd másnap kiürülnek, mint a módosító törvényeké — a cím alapján viszont
+ * nem ismerhetők fel. Valós eset (2026. évi XXXIV., 2026-09-27): 79 748 →
+ * 233 444 → 94 755 karakter, 0 → 718 → 1 „helyébe”. A küszöb: legalább 20
+ * fordulat, és a hosszváltozás minden 1000 karakterére legalább egy — egy
+ * csonka vagy duplikált oldal ezt nem produkálja.
+ */
+export function modositoBlokkValtozas(regi: string, uj: string): boolean {
+  const fordulatok = (s: string) => s.match(/helyébe/gu)?.length ?? 0;
+  const dHossz = uj.length - regi.length;
+  const dFordulat = fordulatok(uj) - fordulatok(regi);
+  if (dHossz === 0 || Math.sign(dHossz) !== Math.sign(dFordulat)) return false;
+  const k = Math.abs(dFordulat);
+  return k >= 20 && (k * 1000) / Math.abs(dHossz) >= 1;
+}
+
 /** A terjedelem-őr hibája — a hívó ezt jogszabályonként kezeli, nem futás-szinten. */
 export class TerjedelemAnomalia extends Error {}
 
