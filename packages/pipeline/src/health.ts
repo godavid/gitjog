@@ -83,6 +83,25 @@ export function modositoBlokkValtozas(regi: string, uj: string): boolean {
   return k >= 20 && (k * 1000) / Math.abs(dHossz) >= 1;
 }
 
+/** Ennél régebbi hatálybalépésű új állapot már nem a napi forgalom része. */
+export const FRISS_NAPOK = 30;
+
+/**
+ * A szétcsúszás-őr ennyi új állapotot számol gyanúsnak: amelyik jogszabálynak
+ * még nincs egyetlen ismert állapota sem (a lista bővült backfill nélkül), vagy
+ * amelyik FRISS_NAPOK-nál régebben lépett hatályba (sérült/hiányos index).
+ * A friss, előzménnyel bíró állapotok száma önmagában nem gyanús: a
+ * negyedéves tömeges hatálybalépés valós — 2026-10-01-én ~210 törvénynek
+ * lett új állapota, és a darabszám-alapú őr hat napig leállította a deltát.
+ */
+export function szetcsuszasGyanu(
+  ujak: { datum: string; vanElozmeny: boolean }[],
+  ma: string,
+): number {
+  const hatar = new Date(Date.parse(ma) - FRISS_NAPOK * 86_400_000).toISOString().slice(0, 10);
+  return ujak.filter((u) => !u.vanElozmeny || u.datum < hatar).length;
+}
+
 /** A terjedelem-őr hibája — a hívó ezt jogszabályonként kezeli, nem futás-szinten. */
 export class TerjedelemAnomalia extends Error {}
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   modositoBlokkValtozas,
   modositoTorveny,
+  szetcsuszasGyanu,
   TerjedelemAnomalia,
   terjedelemEllenorzes,
 } from "../src/health.js";
@@ -133,5 +134,24 @@ describe("parser-őrfeltételek (szimulált njt-törés)", () => {
     expect(() => parsolSnapshot({ alapHtml: html, blokkHtml: "" }, "2013-5-00-00")).toThrow(
       /nincs blokk-tartalom/,
     );
+  });
+});
+
+describe("szetcsuszasGyanu (napi delta szétcsúszás-őre)", () => {
+  const ma = "2026-10-06";
+  it("a friss tömeges hatálybalépés nem gyanús (2026-10-01: ~210 törvény)", () => {
+    const ujak = Array.from({ length: 219 }, () => ({ datum: "2026-10-01", vanElozmeny: true }));
+    expect(szetcsuszasGyanu(ujak, ma)).toBe(0);
+  });
+  it("az előzmény nélküli jogszabály minden állapota gyanús (lista bővült backfill nélkül)", () => {
+    expect(szetcsuszasGyanu([{ datum: "2026-10-05", vanElozmeny: false }], ma)).toBe(1);
+  });
+  it("a 30 napnál régebbi állapot gyanús, a határnap még friss", () => {
+    const ujak = [
+      { datum: "2026-09-06", vanElozmeny: true },
+      { datum: "2026-09-05", vanElozmeny: true },
+      { datum: "2019-01-01", vanElozmeny: true },
+    ];
+    expect(szetcsuszasGyanu(ujak, ma)).toBe(2);
   });
 });
