@@ -62,12 +62,29 @@ jobs:
       - name: Vercel CLI
         run: npm install --global vercel@59.11.1
 
+      # A `vercel pull` helyett: a projektre szűkített token a team-adatot nem
+      # olvashatja, és a pull ezen elhasal (csak a deploy tolerálja). Ugyanazt
+      # írjuk ki, amit a pull: projektbeállítás + prod env, a sensitive értékek
+      # helyén `[SENSITIVE]` (azok csak futásidőben léteznek).
+      - name: Projektbeállítás és prod env
+        run: |
+          api() { curl -sSf -H "Authorization: Bearer $VERCEL_TOKEN" "https://api.vercel.com$1"; }
+          mkdir -p .vercel
+          api "/v9/projects/$VERCEL_PROJECT_ID?teamId=$VERCEL_ORG_ID" | jq --arg org "$VERCEL_ORG_ID" \
+            '{projectId: .id, orgId: $org, settings: {createdAt, framework, devCommand, installCommand,
+              buildCommand, outputDirectory, rootDirectory, directoryListing, nodeVersion}}' \
+            > .vercel/project.json
+          api "/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID" \
+            | jq '[.envs[] | select(.type == "sensitive") | .key]' > "$RUNNER_TEMP/sensitive.json"
+          api "/v3/env/pull/$VERCEL_PROJECT_ID/production?teamId=$VERCEL_ORG_ID&source=vercel-cli:pull" \
+            | jq -r --slurpfile s "$RUNNER_TEMP/sensitive.json" '.env | to_entries[]
+                | "\(.key)=\((if .value == "" and (.key | IN($s[0][])) then "[SENSITIVE]" else .value end) | @json)"' \
+            > .vercel/.env.production.local
+
       # A monorepo gyökeréből: a projekt root directoryja apps/web, a
       # `workspace:*` függőséget csak így oldja fel (lásd docs/uzemeltetes.md).
-      - name: Build (prod env)
-        run: |
-          vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
-          vercel build --prod --yes --token "$VERCEL_TOKEN"
+      - name: Build
+        run: vercel build --prod --yes --token "$VERCEL_TOKEN"
 
       - name: Deploy
         run: |
