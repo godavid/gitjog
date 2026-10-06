@@ -33,6 +33,7 @@ import {
   modositoBlokkValtozas,
   modositoTorveny,
   riaszt,
+  szetcsuszasGyanu,
   TerjedelemAnomalia,
   terjedelemEllenorzes,
 } from "./health.js";
@@ -67,11 +68,11 @@ const anomaliaOk = new Set(
 );
 
 /**
- * Biztonsági szelep: egy normál napon néhány (max pár tucat) új állapot jön.
- * Ennél sokkal több azt jelzi, hogy a config és a repo szétcsúszott (pl. a
- * generált lista bővült backfill nélkül) — ilyenkor riasztunk, nem commitolunk.
+ * Biztonsági szelep: ha a config és a repo szétcsúszott (pl. a generált lista
+ * bővült backfill nélkül), régi vagy előzmény nélküli állapotok tömege jön —
+ * ilyenkor riasztunk, nem commitolunk. Mit számol gyanúsnak: szetcsuszasGyanu.
  */
-const MAX_NAPI_UJ = 200;
+const MAX_GYANUS_UJ = 50;
 
 /**
  * Ennyi sikertelen verziólista-kérésig (a retry+backoff kimerülése UTÁN) nem
@@ -163,9 +164,16 @@ async function fut(): Promise<void> {
     console.log("Nincs új hatályos időállapot — nincs teendő.");
     return;
   }
-  if (ujak.length > MAX_NAPI_UJ) {
+  const gyanus = szetcsuszasGyanu(
+    ujak.map((u) => ({
+      datum: u.allapot.hatalyba,
+      vanElozmeny: (ismertNyers[u.js.slug] ?? []).length > 0,
+    })),
+    ma,
+  );
+  if (gyanus > MAX_GYANUS_UJ) {
     throw new Error(
-      `Gyanúsan sok (${ujak.length}) új állapot egy napi futásban — config/repo szétcsúszás? Nem commitolok.`,
+      `Gyanúsan sok (${gyanus}/${ujak.length}) régi vagy előzmény nélküli új állapot — config/repo szétcsúszás? Nem commitolok.`,
     );
   }
 
