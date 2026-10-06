@@ -225,8 +225,13 @@ A Vercel oldalon él még a `GITHUB_WEBHOOK_SECRET` (Production): az adat-repo
 push-webhookjának HMAC-titka (`/api/revalidate`). Ugyanez a titok a
 `godavid/magyar-jog` repo webhook-beállításában; cserénél mindkét helyen.
 
-A Vercel-deploy a `remenyfarm` fiókhoz kötött, és **nem automatikus a git
-push-ra**: a monorepo GYÖKERÉBŐL `vercel --prod --yes` (root directory: `apps/web`).
+A prod deploy **csak a `.github/workflows/release-production.yml`-ből** megy (2026-10-06
+óta; helyi gépről a prod deploy tiltott): a main-re érkező, webet érintő push
+automatikusan deployol, kézzel `gh workflow run release-production.yml`. Szünet:
+`DEPLOY_HOLD=true` repo-változó (`/deploy hold|resume`). Kell hozzá a `VERCEL_TOKEN`
+repo-secret — a `gitjog` projektre szűkített Vercel-token; a Vercel CLI nem tud ilyet
+kiadni (403), a dashboardon kell létrehozni. Git-integráció nincs: a Vercel
+GitHub-appja csak a Remeny-Farm orgot látja, a `godavid` fiókot nem.
 
 ## Biztonsági scan (2026-09-25)
 
@@ -285,8 +290,9 @@ művelet, kulcs nélkül, ugyanabban a Next appban:
   válaszok CDN-cache-e: `valtozasok` 15 perc, `kereses` 1 óra, `szakasz`/`diff` konkrét
   dátummal 1 nap. Ha a webhook elromlik, a 6 órás revalidate továbbra is frissít.
 - **Deploy-változás:** a `workspace:*` függőség miatt a Vercel-projekt root directory-ja
-  `apps/web`, és a deploy a **monorepo gyökeréből** indul: `vercel --prod --yes` a
-  gitjog gyökérben (nem az `apps/web`-ben — onnan npm-mel próbálna telepíteni és elhasal).
+  `apps/web`, és a build a **monorepo gyökeréből** indul (nem az `apps/web`-ben — onnan
+  npm-mel próbálna telepíteni és elhasal): `vercel build`, majd `vercel deploy --prebuilt`
+  — ezt futtatja a `release-production.yml`.
 - **SQL:** `04-api-kereses.sql` (`kereses_api`, a § szövegével) és `05-kereses-gyors.sql`
   (a `ts_headline` csak a limitált találatokra fut — a „termőföld" 2,8 s → 70 ms; előtte
   az anon 3 s-os statement_timeout-ja miatt a webes kereső rendszeresen 500-zal esett
