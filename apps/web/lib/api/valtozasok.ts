@@ -18,7 +18,6 @@ import {
 import {
   ApiHiba,
   csonkol,
-  DATUM_MINTA,
   diffUrl,
   jogszabalyTerkep,
   jogszabalyUrl,
@@ -27,6 +26,7 @@ import {
   MEGJEGYZES,
   normalizal,
 } from "./kozos";
+import { ervenyesDatum } from "./datum";
 
 export interface ValtozasokParam {
   felveve_utan?: string;
@@ -188,7 +188,8 @@ export async function valtozasokApi(p: ValtozasokParam): Promise<ValtozasokValas
     ["since", p.since],
     ["until", p.until],
   ] as const) {
-    if (ertek && !DATUM_MINTA.test(ertek)) throw new ApiHiba(400, `A \`${mezo}\` alakja YYYY-MM-DD`, mezo);
+    if (ertek && !ervenyesDatum(ertek))
+      throw new ApiHiba(400, `A \`${mezo}\` alakja YYYY-MM-DD (valódi naptári dátum)`, mezo);
   }
   if (p.felveve_utan && Number.isNaN(Date.parse(p.felveve_utan))) {
     throw new ApiHiba(400, "A `felveve_utan` ISO-8601 időbélyeg (pl. 2026-09-15T00:00:00Z)", "felveve_utan");

@@ -8,7 +8,8 @@ import {
   type SzakaszValtozas,
 } from "@gitjog/szoveg";
 import { getAllapotokSlug, getSzovegAt } from "@/lib/adat";
-import { ApiHiba, DATUM_MINTA, diffUrl, jogszabalyMeta, jogszabalyVagy404, MEGJEGYZES } from "./kozos";
+import { ApiHiba, diffUrl, jogszabalyMeta, jogszabalyVagy404, MEGJEGYZES } from "./kozos";
+import { ervenyesDatum } from "./datum";
 
 export interface DiffParam {
   slug: string;
@@ -37,7 +38,8 @@ export async function diffApi(p: DiffParam): Promise<DiffValasz> {
     ["tol", p.tol],
     ["ig", p.ig],
   ] as const) {
-    if (!DATUM_MINTA.test(ertek)) throw new ApiHiba(400, `A \`${mezo}\` alakja YYYY-MM-DD`, mezo);
+    if (!ervenyesDatum(ertek))
+      throw new ApiHiba(400, `A \`${mezo}\` alakja YYYY-MM-DD (valódi naptári dátum)`, mezo);
   }
   if (p.tol >= p.ig) throw new ApiHiba(400, "A `tol` legyen korábbi az `ig`-nél", "tol");
 
