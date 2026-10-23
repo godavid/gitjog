@@ -29,6 +29,13 @@ describe("paragrafusKivag", () => {
     expect(paragrafusKivag(MD, "18/A. §")?.szoveg).toBe("18/A. § Betűs paragrafus.");
     expect(paragrafusKivag(MD, "20. §")?.horgony).toBe("7-hatosagi-jovahagyas");
   });
+  it("a § előtti pont opcionális: „18 §” és „18.§” ugyanaz, mint „18. §”", () => {
+    const kanonikus = paragrafusKivag(MD, "18. §")?.szoveg;
+    expect(kanonikus?.startsWith("18. § (1) A föld eladása")).toBe(true);
+    expect(paragrafusKivag(MD, "18 §")?.szoveg).toBe(kanonikus);
+    expect(paragrafusKivag(MD, "18.§")?.szoveg).toBe(kanonikus);
+    expect(paragrafusKivag(MD, "18/A §")?.szoveg).toBe("18/A. § Betűs paragrafus.");
+  });
   it("hiányzó §-ra undefined; a 1. § nem illeszkedik a 18. §-ra", () => {
     expect(paragrafusKivag(MD, "1. §")).toBeUndefined();
     expect(paragrafusKivag(MD, "8. §")).toBeUndefined();
