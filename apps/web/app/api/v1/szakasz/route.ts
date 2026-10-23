@@ -2,8 +2,10 @@
 import { szakaszApi } from "@/lib/api/szakasz";
 import { REST } from "@/lib/api/semak";
 import { apiRoute } from "@/lib/api/valasz";
+import { szakaszCacheMp } from "@/lib/api/cache-ido";
 
 export const dynamic = "force-dynamic";
 
-// konkrét dátum = múltbeli, változatlan állapot → egy napig cache-elhető
-export const GET = apiRoute(REST.szakasz, szakaszApi, (p) => (p.datum ? 86_400 : 3_600));
+// csak a mai napnál korábbi dátum végleges → egy napig cache-elhető; a mai/jövőbeli
+// datumot még érintheti a napi delta, ezért rövid cache (lásd cache-ido.ts)
+export const GET = apiRoute(REST.szakasz, szakaszApi, (p) => szakaszCacheMp(p.datum));
