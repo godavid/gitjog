@@ -94,8 +94,6 @@ export function jogszabalyMeta(t: JogszabalyTetel): JogszabalyMeta {
   };
 }
 
-export const DATUM_MINTA = /^\d{4}-\d{2}-\d{2}$/;
-
 /** legfeljebb `n` párhuzamos feldolgozás — a raw GitHub 429-e ellen */
 export async function korlatozottParhuzam<T, R>(
   tetelek: T[],

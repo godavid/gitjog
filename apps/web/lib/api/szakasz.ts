@@ -3,9 +3,9 @@
 
 import { paragrafusKivag, szakaszKeres, szakaszokraBont } from "@gitjog/szoveg";
 import { getAllapotokSlug, getSzoveg, getSzovegAt, type Allapot } from "@/lib/adat";
+import { ervenyesDatum } from "./datum";
 import {
   ApiHiba,
-  DATUM_MINTA,
   jogszabalyMeta,
   jogszabalyUrl,
   jogszabalyVagy404,
@@ -46,7 +46,8 @@ export interface JogszabalyValasz extends JogszabalyMeta {
 export function idoallapotValaszt(allapotok: Allapot[], datum?: string): Allapot {
   if (allapotok.length === 0) throw new ApiHiba(404, "A jogszabálynak nincs időállapota");
   if (!datum) return allapotok.at(-1)!;
-  if (!DATUM_MINTA.test(datum)) throw new ApiHiba(400, "A `datum` alakja YYYY-MM-DD", "datum");
+  if (!ervenyesDatum(datum))
+    throw new ApiHiba(400, "A `datum` alakja YYYY-MM-DD (valódi naptári dátum)", "datum");
   const talalt = [...allapotok].reverse().find((a) => a.datum <= datum);
   if (!talalt) {
     throw new ApiHiba(

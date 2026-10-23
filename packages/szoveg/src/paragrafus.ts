@@ -20,9 +20,17 @@ export interface ParagrafusReszlet {
 const PARAGRAFUS_SOR = /^(\d+(?::\d+)?(?:\/[A-Z])?)\. §(?=\s|$)/;
 const HEADING = /^#{2,4} (.+)$/;
 
-/** „18. §" → „18"; a szövegbeli sor elejével vetjük össze */
+/**
+ * „18. §", „18 §" → „18"; a szövegbeli sor elejével vetjük össze. Regex helyett
+ * sztringművelet: a `\.?\s*§` minta sok szóközön polinomiális (ReDoS).
+ */
 function szam(paragrafus: string): string {
-  return paragrafus.replace(/\.\s*§\s*$/, "").trim().toUpperCase();
+  let s = paragrafus.trim();
+  if (s.endsWith("§")) {
+    s = s.slice(0, -1).trimEnd();
+    if (s.endsWith(".")) s = s.slice(0, -1);
+  }
+  return s.trim().toUpperCase();
 }
 
 export function paragrafusKivag(md: string, paragrafus: string): ParagrafusReszlet | undefined {

@@ -2,6 +2,7 @@
 // REST query-string mindent szövegként — ezért két alak, közös leírásokkal.
 
 import { z } from "zod";
+import { ervenyesDatum } from "./datum";
 import { KORLAT } from "./kozos";
 
 const L = {
@@ -31,7 +32,10 @@ const MAX = 200;
 const szoveg = () => z.string().max(MAX);
 const cursor = z.string().max(40);
 
-const datum = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD");
+const datum = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD")
+  .refine(ervenyesDatum, "valódi naptári dátum");
 const restBool = z
   .enum(["true", "false", "1", "0"])
   .transform((v) => v === "true" || v === "1");
