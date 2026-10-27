@@ -54,7 +54,7 @@ Ellenőrizve a kóddal: 2026-10-27.
 | 6 | Az `index/allapotok.json` lekérését `revalidate`-re állítani; a `CACHE_VERZIO` léptetését kihagyni | a Next adat-cache 2 MB-os limitje miatt némán elavult adat jön (2026-08-10) | `no-store` + `unstable_cache`; ha egy cache-elt eredmény tartalma változik, léptesd az `apps/web/lib/adat.ts` `CACHE_VERZIO`-ját |
 | 7 | HTML (`<mark>`) a keresési kiemelésben, `dangerouslySetInnerHTML` a találatra | a `ts_headline` nem escape-el: XSS | STX/ETX (`chr(2)`/`chr(3)`); a `<mark>`-ot a React építi (`apps/web/app/kereses/page.tsx`) |
 | 8 | Kliens oldali diff (`"use client"` a `DiffNezet`-ben) | a Bing és az AI-crawlerek nem futtatnak JS-t: a diff-oldalak kiesnek az indexből | a `DiffNezet` szerver-komponens marad |
-| 9 | Az adat-repo `AGENTS.md`-jének kézi szerkesztése `[kapu: a delta minden futáskor visszaírja]` | a módosítás elvész | a `packages/pipeline/src/sablonok.ts` `AGENTS_MD` sablonját módosítsd (angolul) |
+| 9 | Az adat-repo `AGENTS.md`-jének kézi szerkesztése `[kapu: a következő, új időállapotot felvevő delta-futás visszaírja]` | a módosítás elvész | a `packages/pipeline/src/sablonok.ts` `AGENTS_MD` sablonját módosítsd (angolul) |
 | 10 | A régi márkanév szava új doksiban, commitban, UI-ban | védjegyfelszólítás (2026-09-16), lásd [PRODUCT.md](PRODUCT.md) Brand Commitments | GitJog; a régi azonosítók maradnak (Szótár) |
 
 ## Parancsok
@@ -89,7 +89,7 @@ Node >= 24, pnpm; a repo gyökeréből, ha nincs más jelölve.
 | Horgony: a `szakaszokraBont()` horgonya bit szerint egyezik az `mdRender()`-ével (`-2`, `-3` utótagokkal) | `packages/szoveg/src/szakaszok.ts`, `apps/web/lib/md.ts` | `packages/szoveg/test/szakaszok.test.ts` |
 | XSS: minden szövegcsomópont `esc()`-en megy át; a horgony-id `[a-z0-9-]` | `apps/web/lib/md.ts` | csak a kódkomment (teszt nincs) |
 | Keresési kiemelés STX/ETX, nem HTML | `packages/pipeline/supabase/02-`, `04-`, `05-*.sql`; `apps/web/app/kereses/page.tsx` | csak komment |
-| Rossz adat nem kerül az adat-repóba: szerkezeti hibánál a delta semmit nem commitol, terjedelem-anomáliánál az érintett jogszabályt kihagyja | `packages/pipeline/src/delta.ts`, `health.ts` | `packages/pipeline/test/health.test.ts` (csak a terjedelem-őr) |
+| Rossz adat nem kerül az adat-repóba: szerkezeti hibánál a delta semmit nem commitol, terjedelem-anomáliánál az érintett jogszabályt kihagyja | `packages/pipeline/src/delta.ts`, `health.ts` | `packages/pipeline/test/health.test.ts` (terjedelem-őr, szétcsúszás-őr, parser-őrfeltételek; a delta commit-elhagyó ága maga teszteletlen) |
 | Az index-szinkron hibája nem buktatja a deltát | `delta.ts` `keresoIndexSzinkron()` | csak a kód |
 | A diff szerver oldalon renderel | `apps/web/components/DiffNezet.tsx` | csak a kódkomment |
 | A `napi-delta.yml` két példánya byte-azonos | `packages/pipeline/adatrepo/napi-delta.yml` ↔ `godavid/magyar-jog` | kézi |
