@@ -1,5 +1,13 @@
 # Teljes szövegű keresés — implementációs terv
 
+> **Állapot (2026-10-27): KÉSZ — archivált történeti rekord, nem utasítás.** Megvalósult
+> 2026-08-07-én (2c96bba…4013482); a nyitott checkboxok nem nyitott munkát jelentenek.
+> A deploy 2026-10-06 óta CSAK a `.github/workflows/release-production.yml`-ből megy, a
+> main-re csak PR-en át (squash) kerül kód; a benne lévő `vercel`- és
+> `git push origin main`-lépések érvénytelenek. Azóta egyes útvonalak is változtak (pl. a
+> `szakaszok.ts` és a tesztje a `packages/szoveg`-be költözött). Az aktuális állapot:
+> [docs/uzemeltetes.md](../../uzemeltetes.md).
+
 > **Ügynök-munkatársnak:** KÖTELEZŐ AL-SKILL: `superpowers:subagent-driven-development` (ajánlott) vagy `superpowers:executing-plans` a terv taskonkénti végrehajtásához. A lépések checkbox (`- [ ]`) jelöléssel követhetők.
 
 **Cél:** A weboldal keresője a 37 kiemelt törvény helyett mind a 4332 törvény hatályos szövegében keressen, magyar szótövezéssel.

@@ -13,7 +13,10 @@ export interface Talalat {
   jogszabaly: string; // "Ptk. (2013. évi V. törvény)"
   szakasz: string;
   horgony: string;
-  reszlet: string; // <mark> jelöléssel kiemelve
+  // INVARIANT: a kiemelést STX/ETX (\u0002/\u0003) jelöli, NEM HTML — a <mark>-ot a React
+  // építi (app/kereses/page.tsx kiemelve()); soha ne add át dangerouslySetInnerHTML-nek.
+  // Lásd: docs/uzemeltetes.md → Keresés, Kiemelés-invariáns.
+  reszlet: string;
   hatalyos: boolean;
 }
 

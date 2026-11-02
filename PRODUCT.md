@@ -9,7 +9,8 @@ web
 ## Users
 
 - **Elsődleges: fejlesztők és gépi felhasználók.** Klónozzák az adat-repót, vagy a
-  domain gépi végpontjait fogyasztják (`/llms.txt`, nyers `szoveg.md`, RSS, sitemap).
+  domain gépi végpontjait fogyasztják (`/llms.txt`, nyers `szoveg.md`, RSS, sitemap,
+  REST API `/api/v1`, MCP-szerver `/api/mcp`; összefoglaló: `/agenteknek`).
   Ide tartoznak az AI-asszisztensek és -crawlerek is: számukra a weboldal egyszerre
   belépési pont és kirakat. Minden későbbi terméki döntés ehhez a közönséghez igazodik.
 - Másodlagos: újságírók, kutatók, jogászok, civil szervezetek — a tényleges kérdésük
@@ -46,16 +47,23 @@ adatbázis, hanem adat, amihez a felület csak hozzáférés.
 - **Forrás:** az njt.jog.gov.hu publikus felülete, automatikus feldolgozással.
   Nem minden jogszabály szerepel: kimaradnak azok, amelyeknek nincs konszolidált
   szövegük az njt-n.
-- **Ritmus:** napi egyszeri delta (GitHub Actions az adat-repóban). Az aznap
-  hatályba lépő módosítások új commitként kerülnek be, és néhány órán belül
-  megjelennek a weben (ISR).
+- **Ritmus:** napi egyszeri delta (GitHub Actions az adat-repóban, 03:30 UTC). Az aznap
+  hatályba lépő módosítások új commitként kerülnek be; az adat-repo push-webhookja
+  (`/api/revalidate`) perceken belül frissíti a webet, tartalékként a 6 órás ISR-ablak.
+  Adatváltozáshoz nem kell deploy.
 - **Repók:** adat `github.com/godavid/magyar-jog`, kód `github.com/godavid/gitjog`
-  (pnpm monorepo: `packages/pipeline` crawler + normalizáló, `apps/web` Next.js).
-- **Kiszolgálás:** Vercel. A main-re pusholás önmagában NEM deployol — a produkciós
-  deploy CLI-ből indul. Keresés: Supabase Postgres FTS, magyar szótövezéssel.
+  (pnpm monorepo: `packages/pipeline` crawler + normalizáló, `packages/szoveg` közös
+  §-bontás, horgony és §-diff, `apps/web` Next.js).
+- **Kiszolgálás:** Vercel. A prod deploy 2026-10-06 óta CSAK a
+  `.github/workflows/release-production.yml`-ből megy: a main-re érkező, webet érintő
+  push (`apps/web/**`, `packages/szoveg/**`, gyökér `package.json`, `pnpm-lock.yaml`,
+  `pnpm-workspace.yaml`) automatikusan deployol, tehát a merge élesít; helyi gépről
+  (Vercel CLI) a prod deploy tilos. Szünet: `DEPLOY_HOLD=true` repo-változó
+  (`/deploy hold|resume`). Részletek: [docs/uzemeltetes.md](docs/uzemeltetes.md#titkok).
+  Keresés: Supabase Postgres FTS, magyar szótövezéssel.
 - **Találkozási pontok:** keresőtalálat egy „mi változott” kérdésre, RSS-feed,
   `git clone`, illetve AI-asszisztens, amely a domain gépi végpontjait olvassa, vagy az MCP-szerverhez kapcsolódik (Claude, ChatGPT, Cursor).
-- Részletes üzemeltetési leírás: `docs/uzemeltetes.md`.
+- Részletes üzemeltetési leírás: [docs/uzemeltetes.md](docs/uzemeltetes.md).
 
 ## Capabilities and Constraints
 

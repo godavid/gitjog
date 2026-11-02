@@ -87,7 +87,7 @@ A cursor a repóba kerülés ideje, nem a hatálybalépés: a késve felvett, r�
 
 - Repó: https://github.com/${ADAT_REPO}
 - Nyers szöveg (Markdown): ${RAW}/jogszabalyok/{slug}/szoveg.md
-- Jogszabály-index: ${RAW}/index/jogszabalyok.json — slug, documentId, megjelölés, cím, rövidítés
+- Jogszabály-index: ${RAW}/index/jogszabalyok.json — [{slug, documentId, megjeloles, cim, rovidites}]
 - Időállapot-térkép: ${RAW}/index/allapotok.json — slugonként [{datum, verzio, sha}] (4+ MB; egy törvényhez: ${RAW}/jogszabalyok/{slug}/allapotok.json)
 - Felvételi napló: ${RAW}/index/felvetel/{ÉÉÉÉ-HH}.jsonl — soronként {felveve, slug, datum, sha}: mikor került be egy időállapot
 - Agent-útmutató a klónozott repóhoz: https://github.com/${ADAT_REPO}/blob/main/AGENTS.md
