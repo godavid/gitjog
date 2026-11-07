@@ -1,5 +1,12 @@
 # Teljes szövegű keresés a teljes törvényállományra — terv
 
+> **Állapot (2026-11-07): KÉSZ — archivált történeti rekord, nem utasítás.** Megvalósult
+> 2026-08-07-én, még PR nélkül, közvetlen commitokkal (2c96bba…4013482; a terv:
+> [../plans/2026-08-07-teljes-szoveges-kereses.md](../plans/2026-08-07-teljes-szoveges-kereses.md)).
+> A deploy CSAK a `.github/workflows/release-production.yml`-ből megy, a main-re csak
+> PR-en át (squash) kerül kód; a benne lévő deploy- és push-lépések érvénytelenek. Az
+> aktuális állapot: [docs/uzemeltetes.md](../../uzemeltetes.md).
+
 Készült: 2026-08-06 · Állapot: jóváhagyott terv, implementáció előtt
 
 ## Miért

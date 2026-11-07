@@ -75,7 +75,7 @@
   szétcsúszás-őre leállítja a napi futást (lásd „Ha törik a parser”). Kiemelt sor
   felvételekor a slug egyezzen a már bent lévővel (ez az URL és az adat-repo
   könyvtárneve), és a `torvenylista-generalas.ts` `KIEMELT_SLUGOK`-jába is kerüljön be
-  (ezt teszt nem őrzi).
+  (a `packages/pipeline/test/kiemelt-slugok.test.ts` őrzi: a két lista slugjai egyeznek).
 - `crawl.ts` — njt-letöltés. KRITIKUS tudás: csak a `njt.jog.gov.hu` host működik
   (a `njt.hu` TLS-szinten reseteli a nem böngésző klienseket); HTTP/1.1; azonosítható
   User-Agent. Verziólista: POST `/ajax/collectAllDocumentVersion.json` (form-encoded
@@ -93,7 +93,23 @@
   `NYILT_ADAT_REPO_DIR=<adat-repo-klón> pnpm delta -- --no-push`.
   Megszakadt LOKÁLIS futás után mindig friss klónból futtasd újra (a részben
   commitolt napok + az elmaradt index-frissítés miatt); az Actions-futásnál ez
-  nem gond, mert minden futás friss checkoutot kap.
+  nem gond, mert minden futás friss checkoutot kap. A futás rendje (2026-11-07 óta):
+  - **Állapot-commitok, majd push, és CSAK UTÁNA az index.** A `pull --rebase` minden
+    helyi commit SHA-ját átírja, az `index/allapotok.json` és a felvételi napló viszont
+    SHA-kra hivatkozik; ezért a delta az állapot-commitokat előbb pusholja
+    (`pushRebase()`), az indexet már a végleges SHA-kból építi, és ha a záró
+    (index-commitos) push rebase-elt, ellenőrzi, hogy minden naplózott SHA a HEAD őse —
+    ha nem, hibával leáll. Így egy rebase nem hagyhat árva index-SHA-t.
+  - **HEAD-helyreállítás.** Ha egy jogszabálynak ma csak a legutóbb ismert állapotánál
+    RÉGEBBI állapota kerül be (a `health.ts` `regebbiAllapot()`-ja dönti el), a HEAD
+    `szoveg.md`-je a régi szöveg lenne — így tört el az `1930-evi-xxxvii-torveny`, ahol
+    egy 1930-as állapot a 2017-es után került commitra. A delta ezért a régi állapot
+    után a legutóbbi ismert állapot szövegét a saját commitjából (`git show <sha>:…`)
+    visszaírja és a saját dátumával újra commitolja („… (HEAD-helyreállítás)” üzenettel).
+    Ha az indexben nincs `sha` az utolsó állapothoz, figyelmeztet és kihagyja.
+  - **`index/kihagyottak.json` tisztítása.** A backfill kihagyási listájából a delta
+    kiveszi az azóta bekerült jogszabályokat (`kihagyottak.ts`); csak akkor ír, ha
+    változott, az index-commit része.
 - `enumeralas.ts` — réteges enumerálás: melyik jogszabályt kell MA lekérdezni.
   Az 5586-os listát végigkérdezni naponta ~51 perc lenne (550 ms rate limit),
   ezért három réteg van (az adat-repo `index/enumeralas.json`-jában):
@@ -118,15 +134,38 @@
   dedupol: azonos című nyitott issue mellett nem nyit újat, más hibafajta viszont
   saját issue-t kap.
 - `commit.ts` — dátumhelyes commit-stream (egy commit = egy hatálybalépési nap), itt
-  dől el az adat-repo helye (`NYILT_ADAT_REPO_DIR`). `felvetel.ts` — a felvételi napló
-  (lásd Agent-felület).
+  dől el az adat-repo helye (`NYILT_ADAT_REPO_DIR`). A commit-dátumot a `datumEnv()`
+  adja (1970 előtti nap → 1970-01-01; a valódi nap a commit-üzenetben). A SHA-térkép
+  (`allapotShaTerkep()`, `shaTerkepParse()`) a commit-üzenet első sorának dátumát
+  használja kulcsnak; a `jogszabalyok/<slug>/allapotok.json` útvonalát KIZÁRJA a `git
+  log`-ból, és a dátum nélküli üzenetű commitot (Index frissítés, Index újraépítés,
+  Enumerálás-térkép) kihagyja — nincs commit-dátum fallback. (2026-11 előtt 127
+  index-hivatkozás mutatott Index-commitra, mert az aznapi Index-commit ugyanarra a napra
+  esett, mint az állapot-commit.) `felvetel.ts` — a felvételi napló (lásd Agent-felület).
 - Karbantartó eszközök (a `packages/pipeline` könyvtárból,
   `NYILT_ADAT_REPO_DIR=<az adat-repo-klón abszolút útja>`-val):
-  - `pnpm index-ellenorzes` — az index-fájlok és a per-jogszabály fájlok összevetése;
-    csak olvas.
+  - `pnpm index-ellenorzes` — az index-fájlok és a per-jogszabály fájlok összevetése,
+    plusz a **HEAD-blob ellenőrzés** (`index-ellenorzes-lib.ts`): egyetlen csak olvasó
+    `git cat-file --batch-check` folyamattal összeveti a HEAD `szoveg.md`-jét az index
+    szerinti legutolsó időállapot commitjának blobjával. Csak olvas, hálózatra nem megy,
+    titok nem kell (git kell). Eltérésnél 1-gyel lép ki, és megmondja, mi a javítás:
+    index-eltérésnél az index újraépítése (lent), HEAD-blob eltérésnél NEM az — ott a
+    legutolsó időállapotot kell a pipeline-on át újra commitolni (a delta
+    HEAD-helyreállítása a jövőbeli eseteket magától kezeli). Élesben a napi delta
+    `Index-integritás` lépése futtatja (`napi-delta.yml`, a delta után, titok nélkül).
   - `pnpm exec tsx src/index-ujraepites.ts` — a teljes index újraépítése a
     `meta.json`-okból és a git-történetből; ÍR és COMMITOL az adat-repóba (pusholni kézzel
     kell). Index-séma változás után ezt használd, ne kézi szerkesztést.
+  - **Egyszeri adatjavítás (owner/orchestrator eljárás, a kódváltozás UTÁN):** az élő
+    indexben lévő Index-commitra mutató SHA-k és az `1930-evi-xxxvii-torveny` HEAD-je
+    (magyar-jog #9/14, #9/15). Lépések: (1) a delta szüneteltetése:
+    `gh workflow disable napi-delta.yml -R godavid/magyar-jog`; (2) friss klón az
+    adat-repóról (`fetch-depth` nélkül, teljes history); (3) `pnpm exec tsx
+    src/index-ujraepites.ts` a javított `commit.ts`-szel, majd `pnpm index-ellenorzes`;
+    (4) a HEAD-blob eltéréseket forward-fix-szel javítsd: a legutolsó időállapot
+    szövegét a saját SHA-jából írd vissza és commitold a saját dátumával (ugyanaz, amit a
+    delta HEAD-helyreállítása tesz), SOHA ne force-push-sal vagy history-átírással;
+    (5) push, `gh workflow enable napi-delta.yml -R godavid/magyar-jog`.
   - `pnpm exec tsx src/torvenylista-generalas.ts <sitemap.xml> data-static/torvenyek.json`
     — a törvénylista újragenerálása az njt-sitemap letöltött példányából (a
     `torvenyek.json`-t kézzel ne szerkeszd).
@@ -134,7 +173,13 @@
     és `src/crawl-teszt.ts` (a Ptk./Btk./Mt. múltbeli állapotainak letöltése cache-be) —
     egyszeri felderítő eszközök, hálózatot használnak.
 - A napi-delta.yml két példányban él: az élő az adat-repo `.github/workflows/`-ában,
-  a forrás itt a `packages/pipeline/adatrepo/`-ban — módosításnál MINDKETTŐT frissítsd.
+  a forrás itt a `packages/pipeline/adatrepo/`-ban — módosításnál MINDKETTŐT frissítsd,
+  egy körben. Ha az élőhöz a PR nem nyúlhat, a PR-ben írd le, hogy frissíteni kell. A
+  `kapuk.yml` `napi-delta-masolat` jobja hetente (hétfő 05:23 UTC) és kézi indításra
+  `cmp`-vel veti össze a kettőt; PR-en nem fut, tehát az eltérés legfeljebb egy hét
+  múlva derül ki. A fejléc-komment szerint a futás egyetlen titka az opcionális
+  `NYILT_DB_URL` (nélküle a keresőindex-szinkron kimarad), és a delta után az
+  `Index-integritás` lépés futtatja az `index-ellenorzes`-t az `adat` checkouton.
 
 ## Ha törik a parser (njt-átdizájn)
 
@@ -203,7 +248,8 @@ ez volt a tanulság.)
      idejére szokás). Ellenőrzés:
      `gh api repos/godavid/magyar-jog/actions/workflows --jq '.workflows[] | {name, state}'`;
      `disabled_manually` esetén `gh workflow enable napi-delta.yml -R godavid/magyar-jog`.
-4. Tesztek, csomagonként (CI ma EGYETLEN tesztet sem futtat — ez lokális lépés):
+4. Tesztek, csomagonként (a `Teszt` workflow a PR-en `pnpm -r test`-et futtat, lásd a
+   CI-szakaszt; lokálisan a változott csomagét futtasd):
    `pnpm --filter @gitjog/pipeline test` (parser, normalizáló, őrök), a szövegmodulé
    `pnpm --filter @gitjog/szoveg test`; egy fájl:
    `pnpm --filter @gitjog/pipeline exec vitest run test/normalize.test.ts`. A
@@ -255,7 +301,8 @@ kiemeltekre szűkítve; ez megszűnt.
   „szerződést" a „szerződés" szóra. A generált oszlop csak a KÉTARGUMENTUMOS
   alakot fogadja el (az egyargumentumos nem immutable).
 - **Az index származtatott adat.** Bármikor eldobható és újraépíthető: a 01–05 SQL
-  sorrendben (lásd fent) + az anon `statement_timeout` (lásd Agent-felület → SQL), majd
+  sorrendben (lásd fent) + a `06-anon-idokorlat.sql` (az anon `statement_timeout`, lásd
+  Agent-felület → SQL), majd
   `NYILT_DB_URL=... NYILT_ADAT_REPO_DIR=<az adat-repo-klón abszolút útja> pnpm --filter @gitjog/pipeline kereso-feltoltes`
   (~4332 jogszabály, teljes újraépítés kb. háromnegyed óra Frankfurtba; célzott pótlás:
   `-- --slugok=<slug>,<slug>`). `NYILT_ADAT_REPO_DIR` nélkül a
@@ -349,6 +396,34 @@ javítás, akkor `auditConfig.ignoreGhsas` a GHSA-azonosítóval és indokkal.
 A `napi-delta.yml` actionjei SHA-ra pinneltek; **módosításkor az adat-repo élő
 példányát is frissíteni kell** (lásd a pipeline-szakaszt).
 
+## CI: Teszt és Kapuk (2026-11-07)
+
+A `biztonsag` check csak a biztonsági scant bizonyítja. A kódhelyességet és az
+AGENTS.md prózában őrzött szabályait két további workflow adja; egyiknek sem kell
+titok, mindkettő `pull_request` (nem `pull_request_target`) és `push` a main-re.
+
+- **`.github/workflows/teszt.yml`** (`Teszt`): `pnpm install --frozen-lockfile`, `pnpm -r
+  test` (szoveg és pipeline vitest, web `node --test`; a 4 golden-hash teszt
+  lemez-cache nélkül kimarad), `tsc` a pipeline-ra (`--noEmit`) és a szoveg-re, külön
+  jobban a web `next build` (a Supabase env ártalmatlan helykitöltő, a build nem
+  használja). Összesítő check: `teszt`. A ruleset ma csak a `biztonsag`-ot és a
+  CodeQL-t követeli; a `teszt` kötelezővé tétele (ruleset 23985520) owner-lépés az első
+  zöld futás után.
+- **`.github/workflows/kapuk.yml`** (`Kapuk`): `import-hatar` (a web és a szoveg nem
+  importál a pipeline-ból; a szoveg nem importál `next`, `react`, `postgres`,
+  `cheerio`, `@supabase/`, `node:` modult; `packages/*/src` nem importál az `apps/` alól;
+  a szoveg tesztje az `apps/web` alól csak a `lib/md.js`-t; nincs `NEXT_PUBLIC_SUPABASE`),
+  `marka` (a régi márkanév szava a fában és a PR címében; kivétel az AGENTS.md, a
+  PRODUCT.md, ez a fájl, a `docs/superpowers/`, a `next.config.ts`, a `03-szinkron-szerep.sql`,
+  a lockfile és a megtartott azonosítók), `kiemeles` (az SQL-ekben nincs HTML a
+  `ts_headline` kiemelésében; `dangerouslySetInnerHTML` csak a felsorolt fájlokban, a
+  keresésben soha), hetente és kézi indításra `napi-delta-masolat` (`cmp` az élő
+  példánnyal). Összesítő check: `kapuk`. Új őrszabály ide kerül, nem prózába.
+- **pnpm 12** minden workflow-ban: a `pnpm/action-setup` lépés `version: 12`-t kap
+  (a `napi-delta.yml` másolatában is); a gyökér `package.json`-ban szándékosan nincs
+  `packageManager` mező, mert az lockfile-változást kényszerítene, és az action a kettő
+  együttes megadására hibát ad.
+
 ## Agent-felület: REST API + MCP-szerver (2026-09-16)
 
 Spec: `docs/superpowers/specs/2026-09-16-agent-felulet-design.md`. Négy read-only
@@ -358,7 +433,7 @@ művelet, kulcs nélkül, ugyanabban a Next appban:
 |---|---|---|
 | `kereses` | `GET /api/v1/kereses?q=` | hivatkozás-feloldás (index) vagy FTS (`kereses_api` SQL), a § teljes szövegével |
 | `szakasz` | `GET /api/v1/szakasz?slug=&paragrafus=&datum=` | egy § egy időállapotban; § nélkül meta + időállapotok + tartalomjegyzék |
-| `valtozasok` | `GET /api/v1/valtozasok?felveve_utan=&q=` | mi változott — napló-cursorral vagy since/until/slugs szűrővel, érintett §-okkal |
+| `valtozasok` | `GET /api/v1/valtozasok?felveve_utan=&q=` | mi változott — veszteségmentes keyset-cursorral (napló-ág, legrégebbi elöl) vagy since/until/slugs szűrővel (hatálybalépés-ág, legújabb elöl), érintett §-okkal |
 | `diff` | `GET /api/v1/diff?slug=&tol=&ig=` | két időállapot §-szintű diffje |
 
 - **Rétegek:** `packages/szoveg` (megosztott: §-darabolás, horgony, hivatkozás-parser,
@@ -369,16 +444,31 @@ művelet, kulcs nélkül, ugyanabban a Next appban:
   2.x, stateless streamable HTTP; a négy tool + ChatGPT `search`/`fetch` alias),
   `app/api/v1/openapi.json`.
 - **Felvételi napló:** a delta minden futás végén `index/felvetel/ÉÉÉÉ-HH.jsonl`-be írja a
-  bekerült állapotokat (`felveve, slug, datum, sha`). Ez a `valtozasok` cursora (ma nem
-  veszteségmentes, lásd Ismert korlátok) — a commit-dátum a hatálybalépés, NEM a
-  bekerülés ideje, ezért kell külön napló. Backfill nem ír naplót; ha a cursor hónapjától
-  máig EGYETLEN havi naplófájl sincs, a végpont a hatálybalépés-ágra esik vissza
-  (`mod: "hatalybalepes"`); ha legalább egy van, a napló-ágon marad, a fájl nélküli
-  hónapok tételei nélkül.
+  bekerült állapotokat (`felveve, slug, datum, sha`). Ebből lapoz a `valtozasok`
+  napló-ága — a commit-dátum a hatálybalépés, NEM a bekerülés ideje, ezért kell külön
+  napló. Backfill nem ír naplót; ha a cursor hónapjától máig EGYETLEN havi naplófájl
+  sincs, a végpont a hatálybalépés-ágra esik vissza (`mod: "hatalybalepes"`, legújabb
+  elöl, `kovetkezo_felveve_utan: null`); ha legalább egy van, a napló-ágon marad, a fájl
+  nélküli hónapok tételei nélkül.
+- **A `valtozasok` cursora** (`apps/web/lib/api/kurzor.ts`, #26, 2026-11-07 óta
+  veszteségmentes): keyset `(felveve, slug, datum)` szerint növekvően, a lap a cursor
+  utáni legrégebbi N sor, a `kovetkezo_felveve_utan` a lap UTOLSÓ sorának hármasa
+  `<felveve ISO másodpercre>_<slug>_<datum>` alakban (pl.
+  `2026-10-06T17:43:08Z_2013-evi-v-torveny-ptk_2026-10-01`). A kliensnek átlátszatlan
+  szöveg: változtatás nélkül adja vissza. Üres lapon a bemeneti cursor jön vissza
+  változatlanul. Első cursorként a puszta ISO-időbélyeg (vagy puszta dátum = UTC éjfél)
+  továbbra is érvényes: „szigorúan ez után a `felveve` után”. Rossz alak → 400. A régi
+  cursor (a lap legnagyobb `felveve`-je, szigorú `>`) egy napi futás 200+ azonos
+  időbélyegű sorának közepén elvesztette a köteg maradékát (2026-10-21: 221-ből 171
+  kimaradt); a `kurzor.test.ts` ezt az esetet 219 azonos `felveve`-s sorral őrzi.
 - **AGENTS.md az adat-repóban:** forrása a `sablonok.ts` `AGENTS_MD`; a delta minden
   olyan futáskor kiírja, amely új időállapotot vesz fel (az index-utócommitba kerül) —
   új időállapot nélküli futás nem frissíti. Kézzel ne szerkeszd az adat-repóban — a
-  következő ilyen futás visszaírja.
+  következő ilyen futás visszaírja. A `sablonok.ts` többi magja (`README_MD`,
+  `DISCLAIMER_MD`, `LICENSE_TXT`, `LICENSE_HU_MD`) fordítva működik: az igazság az
+  adat-repo élő fájlja, a magot csak egy friss backfill „váz” lépése írja ki, a delta
+  nem nyúl hozzá; ha az élő fájl változik, a magot kézzel kell szinkronban tartani
+  (`packages/pipeline/test/sablonok.test.ts` a tartalmi állításokat őrzi).
 - **Frissesség:** GitHub push-webhook a `godavid/magyar-jog`-on → `POST /api/revalidate`
   (HMAC, `GITHUB_WEBHOOK_SECRET` Vercel env) → `revalidateTag("adat-repo", "max")`. Az
   adat-cache minden `napi` fetch-e és `unstable_cache`-e ezt a címkét viseli. A REST-
@@ -394,12 +484,15 @@ művelet, kulcs nélkül, ugyanabban a Next appban:
 - **SQL:** `04-api-kereses.sql` (`kereses_api`, a § szövegével) és `05-kereses-gyors.sql`
   (a `ts_headline` csak a limitált találatokra fut — a „termőföld" 2,8 s → 70 ms; előtte
   az anon 3 s-os statement_timeout-ja miatt a webes kereső rendszeresen 500-zal esett
-  el). Az anon `statement_timeout` 8 s-re emelve — ez NINCS benne egyik SQL-fájlban sem:
-  új vagy újraépített DB-n kézzel kell beállítani (superuserrel:
-  `alter role anon set statement_timeout = '8s';`, majd `notify pgrst, 'reload config';`
-  <!-- INFERRED: verify -->), ellenőrzés:
-  `select rolconfig from pg_roles where rolname = 'anon';`. Alkalmazás a superuser
-  pooler-stringgel (lásd Keresés → Séma és lekérdezés); **2026-09-16-án a 5432-es
+  el). Az anon `statement_timeout` 8 s-re emelve; 2026-11-07 óta a tartós alakja a
+  `06-anon-idokorlat.sql` (idempotens: `alter role anon set statement_timeout = '8s';`,
+  majd `notify pgrst, 'reload config';`; keresési függvényt nem érint, ezért a 02 és a
+  04 újrafuttatása NEM kell és nem is szabad). A `8s` érték az élő DB-n eddig csak kézi
+  beállítás volt <!-- INFERRED: verify -->, ellenőrzés:
+  `select rolconfig from pg_roles where rolname = 'anon';` — ha eltér, a fájlt igazítsd.
+  Futtatás a **superuser** pooler-stringgel (a fájl saját kommentje `NYILT_DB_URL`-t
+  mond, de az a `jogtar_szinkron` szerepé, amely az `anon` role-t nem módosíthatja; lásd
+  Keresés → Séma és lekérdezés); **2026-09-16-án a 5432-es
   session pooler helyben nem fogadott kapcsolatot, a 6543-as (transaction) igen** —
   psql-hez az is jó.
 - **Registry:** `server.json` a repo gyökerében (`io.github.godavid/gitjog`), 2026-09-16-án
@@ -435,12 +528,9 @@ művelet, kulcs nélkül, ugyanabban a Next appban:
   oszlopa; a két tábla találatait az élő `kereses()` — `05-kereses-gyors.sql` —
   egyesíti). A jogszabály-cím találatok kiemelt rangsorolással
   közvetlenül a törvény hatályos oldalára mutatnak.
-- A `valtozasok` `felveve_utan` cursora jelenleg NEM veszteségmentes: a következő
-  cursor a lap legnagyobb `felveve`-je, a szűrés szigorú `>`, ezért ha a lap határa egy
-  azonos `felveve` időbélyegű köteg (egy napi futás akár 200+ sora) közepére esik, a
-  köteg maradékát a következő lap már nem adja vissza (#26, nyitott; 2026-10-21-i élő
-  repro: 221-ből 171 tétel kimaradt). Amíg nincs javítva, ne írd le és ne ajánld
-  veszteségmentesnek; a javítás módja az issue-ban nyitott kérdés.
+- A `valtozasok` `felveve_utan` cursora 2026-11-07 óta veszteségmentes (#26): alakja
+  `<felveve>_<slug>_<datum>`, a kliensnek átlátszatlan, a lapok a legrégebbitől
+  haladnak; részletek: Agent-felület → A `valtozasok` cursora.
 
 ## Átnevezés: Nyílt Jogtár → GitJog (2026-09-16)
 
