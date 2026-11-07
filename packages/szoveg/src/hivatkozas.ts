@@ -7,8 +7,8 @@
 // ellenőriznie („Kérdés." is átmenne a mintán). Megjelölésnél a documentId-t
 // építjük fel, mert az index kulcsa az, nem a szabadon írt megjelölés.
 
-import { romaibolArab } from "./romai";
-import { horgonyId, type Szakasz } from "./szakaszok";
+import { romaibolArab } from "./romai.js";
+import { horgonyId, type Szakasz } from "./szakaszok.js";
 
 export interface Hivatkozas {
   /** „2013-122-00-00" — csak megjelölés-alakból */

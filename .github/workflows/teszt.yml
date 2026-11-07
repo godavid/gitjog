@@ -1,0 +1,86 @@
+# Tesztek, típusellenőrzés és web build minden PR-en. A `biztonsag` csak a
+# biztonsági scant bizonyítja; ez a workflow adja a kódhelyességet. Titok nem
+# kell hozzá, és szándékosan `pull_request` (nem `pull_request_target`).
+# A pnpm verzióját a gyökér package.json `packageManager` mezője adja, ezért a
+# pnpm/action-setup `version:` bemenete szándékosan hiányzik (a kettő együtt
+# hibát ad).
+name: Teszt
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: teszt-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tesztek:
+    name: Tesztek és típusellenőrzés
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Telepítés
+        run: pnpm install --frozen-lockfile
+      # A 4 golden-hash teszt lemez-cache nélkül kimarad (lásd AGENTS.md Parancsok).
+      - name: Tesztek (minden csomag)
+        run: pnpm -r test
+      - name: Típusellenőrzés (pipeline)
+        run: pnpm --filter @gitjog/pipeline exec tsc --noEmit
+      - name: Típusellenőrzés (szoveg)
+        run: pnpm --filter @gitjog/szoveg exec tsc
+
+  web-build:
+    name: Web build (next build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Telepítés
+        run: pnpm install --frozen-lockfile
+      # A web típusait csak a `next build` ellenőrzi; a release ugyanezt futtatja.
+      # A Supabase-klienst a kereső csak futásidőben hozza létre, a build nem
+      # használja: az értékek ártalmatlan helykitöltők, nem titkok.
+      - name: Build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          SUPABASE_URL: https://helykitolto.invalid
+          SUPABASE_ANON_KEY: helykitolto
+        run: pnpm --filter @gitjog/web build
+
+  teszt:
+    name: teszt
+    if: always()
+    needs: [tesztek, web-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Összesítés
+        env:
+          EREDMENYEK: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$EREDMENYEK"
+          if echo "$EREDMENYEK" | grep -qE '"(failure|cancelled)"'; then
+            echo "::error::Legalább egy teszt- vagy build-lépés elbukott."
+            exit 1
+          fi

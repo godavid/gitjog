@@ -5,7 +5,7 @@
 // sorig vagy a következő headingig tart. Ez a modul ezt a futamot vágja ki,
 // és megmondja, melyik heading (horgony) alatt van.
 
-import { horgonyId } from "./szakaszok";
+import { horgonyId } from "./szakaszok.js";
 
 export interface ParagrafusReszlet {
   /** a tartalmazó heading horgonya (a mélylink oda visz), „" ha nincs */

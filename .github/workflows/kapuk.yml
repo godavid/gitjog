@@ -1,0 +1,174 @@
+# Kapuk: az AGENTS.md prózában őrzött szabályait grep-pel kényszerítik ki.
+# Titok nem kell, szándékosan `pull_request` (nem `pull_request_target`).
+# Kapuk: importhatár (Kódterületek), márkaszó (Ne tedd #10), keresési kiemelés
+# STX/ETX-szel (Ne tedd #7), és hetente a napi-delta.yml két példányának
+# byte-azonossága (Ne tedd #3).
+name: Kapuk
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 5 * * 1" # hetente: az adat-repó élő napi-delta.yml-je elcsúszhat
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kapuk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  import-hatar:
+    name: Importhatár (Kódterületek)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: A web és a szoveg nem importál a pipeline-ból
+        run: |
+          if git grep -nE "from ['\"](@gitjog/pipeline|[./]*packages/pipeline)" -- apps/web packages/szoveg; then
+            echo "::error::apps/web és packages/szoveg nem importálhat a packages/pipeline-ból (a változása nem deployol)."
+            exit 1
+          fi
+      - name: A szoveg tiszta marad (nincs next, react, supabase, node, postgres, cheerio)
+        run: |
+          if git grep -nE "from ['\"](next|react|@supabase/|node:|postgres|cheerio)(['\"/]|$)" -- packages/szoveg/src; then
+            echo "::error::packages/szoveg/src I/O nélküli, tiszta szövegmodul: tilos a next, react, @supabase/, node:, postgres, cheerio import."
+            exit 1
+          fi
+      - name: A csomagok forrása nem importál az apps/ alól
+        run: |
+          if git grep -nE "from ['\"].*apps/" -- 'packages/*/src'; then
+            echo "::error::packages/*/src nem importálhat az apps/ alól."
+            exit 1
+          fi
+      - name: A szoveg tesztje csak az apps/web/lib/md.js-t importálhatja
+        run: |
+          TALALAT=$(git grep -nE "from ['\"].*apps/web" -- packages/szoveg/test | grep -v "apps/web/lib/md.js" || true)
+          if [ -n "$TALALAT" ]; then
+            echo "$TALALAT"
+            echo "::error::packages/szoveg/test csak az apps/web/lib/md.js-t importálhatja (horgony-egyezés teszt)."
+            exit 1
+          fi
+      - name: Nincs NEXT_PUBLIC_SUPABASE a webben
+        run: |
+          if git grep -n "NEXT_PUBLIC_SUPABASE" -- apps/web; then
+            echo "::error::A Supabase-konfiguráció csak szerveroldali env: NEXT_PUBLIC_ előtag tilos."
+            exit 1
+          fi
+
+  marka:
+    name: Márkaszó (Ne tedd #10)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # A kivételek: a dokumentált történeti említések és a szándékosan megtartott
+      # régi azonosítók (AGENTS.md Szótár: nyilt-jogtar, jogtar_szinkron).
+      - name: A régi márkanév nem szerepel a fában
+        run: |
+          TALALAT=$(git grep -inE 'jogt[aá]r' -- . \
+            ':!AGENTS.md' ':!PRODUCT.md' ':!docs/uzemeltetes.md' ':!docs/superpowers/**' \
+            ':!apps/web/next.config.ts' ':!packages/pipeline/supabase/03-szinkron-szerep.sql' \
+            ':!pnpm-lock.yaml' ':!.github/workflows/kapuk.yml' \
+            | grep -vE 'nyilt-jogtar|jogtar_szinkron' || true)
+          if [ -n "$TALALAT" ]; then
+            echo "$TALALAT"
+            echo "::error::A régi márkanév szava tilos (védjegyfelszólítás, 2026-09-16): GitJog."
+            exit 1
+          fi
+      - name: A PR címében sem szerepel
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if printf '%s\n' "$PR_TITLE" | grep -iqE 'jogt[aá]r'; then
+            echo "::error::A PR címében a régi márkanév szava szerepel."
+            exit 1
+          fi
+
+  kiemeles:
+    name: Keresési kiemelés STX/ETX (Ne tedd #7)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Az SQL nem ad HTML-t a kiemelésben
+        run: |
+          # a `--` megjegyzéssorok nem számítanak (a 02 kommentje említi a <mark>-ot)
+          TALALAT=$(grep -nHE 'StartSel=<|StopSel=<|<mark|<b>' packages/pipeline/supabase/*.sql \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*--' || true)
+          if [ -n "$TALALAT" ]; then
+            echo "$TALALAT"
+            echo "::error::A ts_headline nem escape-el: a kiemelés STX/ETX (chr(2)/chr(3)), a <mark>-ot a React építi."
+            exit 1
+          fi
+      - name: dangerouslySetInnerHTML csak az engedélyezett fájlokban
+        run: |
+          TALALAT=$(git grep -l "dangerouslySetInnerHTML" -- apps/web \
+            | grep -vxF -e apps/web/app/layout.tsx \
+              -e 'apps/web/app/jogszabaly/[slug]/page.tsx' \
+              -e 'apps/web/app/jogszabaly/[slug]/diff/[tol]/[ig]/page.tsx' \
+              -e 'apps/web/app/jogszabaly/[slug]/idovonal/page.tsx' \
+              -e apps/web/app/adatok/page.tsx \
+              -e apps/web/app/agenteknek/page.tsx \
+              -e apps/web/lib/kereso.ts || true)
+          if [ -n "$TALALAT" ]; then
+            echo "$TALALAT"
+            echo "::error::dangerouslySetInnerHTML új fájlban: a találatokat a React építi, HTML tilos."
+            exit 1
+          fi
+      - name: A keresésben soha (kommentben említhető)
+        run: |
+          TALALAT=$(git grep -n "dangerouslySetInnerHTML" -- apps/web/app/kereses apps/web/lib/kereso.ts \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*//' || true)
+          if [ -n "$TALALAT" ]; then
+            echo "$TALALAT"
+            echo "::error::A keresési találat soha nem megy dangerouslySetInnerHTML-be (XSS)."
+            exit 1
+          fi
+
+  napi-delta-masolat:
+    name: napi-delta.yml két példánya byte-azonos (Ne tedd #3)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Az élő példány letöltése és összevetése
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/napi-delta-elo.yml" \
+            "https://raw.githubusercontent.com/godavid/magyar-jog/main/.github/workflows/napi-delta.yml"
+          if ! cmp "$RUNNER_TEMP/napi-delta-elo.yml" packages/pipeline/adatrepo/napi-delta.yml; then
+            echo "::error::A napi-delta.yml két példánya eltér: packages/pipeline/adatrepo/napi-delta.yml ↔ godavid/magyar-jog/.github/workflows/napi-delta.yml."
+            exit 1
+          fi
+
+  kapuk:
+    name: kapuk
+    if: always()
+    needs: [import-hatar, marka, kiemeles, napi-delta-masolat]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Összesítés
+        env:
+          EREDMENYEK: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$EREDMENYEK"
+          # a napi-delta-masolat PR-en és push-on kihagyott — az rendben van
+          if echo "$EREDMENYEK" | grep -qE '"(failure|cancelled)"'; then
+            echo "::error::Legalább egy kapu elbukott."
+            exit 1
+          fi
