@@ -21,6 +21,10 @@ export interface Elteres {
   indoklas: string;
 }
 
+const ERVENYES_SLUG = /^[a-z0-9-]+$/;
+/** teljes SHA-1 (40) vagy SHA-256 (64) hex commit-azonosító */
+const ERVENYES_SHA = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
+
 function szovegUt(slug: string): string {
   return `jogszabalyok/${slug}/szoveg.md`;
 }
@@ -109,13 +113,22 @@ export function headBlobEllenorzes(
   indexAllapotok: Record<string, AllapotBejegyzes[]>,
 ): Elteres[] {
   const utolsok = new Map<string, AllapotBejegyzes>();
+  // A slug és a sha az adat-repo indexéből jön, és soronként a `git cat-file`
+  // stdin-jére megy: egy sortörés vagy más karakter elcsúsztatná a sorpárosítást.
+  // Az érvénytelen tételt nem kérdezzük le, hanem eltérésként jelentjük.
+  const ervenytelen: Elteres[] = [];
   for (const [slug, bejegyzesek] of Object.entries(indexAllapotok)) {
     const utolso = utolsoAllapot(bejegyzesek);
-    if (utolso !== undefined) utolsok.set(slug, utolso);
+    if (utolso === undefined) continue;
+    if (!ERVENYES_SLUG.test(slug) || (utolso.sha && !ERVENYES_SHA.test(utolso.sha))) {
+      ervenytelen.push({ slug: JSON.stringify(slug), indoklas: "érvénytelen slug vagy index-sha" });
+      continue;
+    }
+    utolsok.set(slug, utolso);
   }
   const slugok = [...utolsok.keys()].sort();
   const sorok = batchCheckSorok(slugok, utolsok);
-  if (sorok.length === 0) return [];
+  if (sorok.length === 0) return ervenytelen;
 
   const futas = spawnSync("git", ["-C", repoDir, "cat-file", "--batch-check"], {
     input: sorok.join("\n") + "\n",
@@ -136,5 +149,5 @@ export function headBlobEllenorzes(
     headBlobok.set(slug, terkep.get(`HEAD:${szovegUt(slug)}`) ?? null);
     allapotBlobok.set(slug, terkep.get(`${utolso.sha}:${szovegUt(slug)}`) ?? null);
   }
-  return headBlobElteresek(headBlobok, allapotBlobok);
+  return [...ervenytelen, ...headBlobElteresek(headBlobok, allapotBlobok)];
 }

@@ -310,6 +310,12 @@ async function fut(): Promise<void> {
     if (!utolso.sha) {
       throw new Error(`HEAD-helyreállítás sikertelen: ${js.slug} ${utolso.datum} állapotához az indexben nincs sha`);
     }
+    // Az sha az adat-repo indexéből jön, és a `git show` argumentuma lesz: csak
+    // teljes hex commit-azonosítót engedünk, különben egy `-`-kezdetű érték
+    // opcióként (pl. `--output=…`) futna.
+    if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(utolso.sha)) {
+      throw new Error(`HEAD-helyreállítás sikertelen: ${js.slug} ${utolso.datum} index-sha-ja érvénytelen`);
+    }
     const szoveg = await git(["show", `${utolso.sha}:jogszabalyok/${js.slug}/szoveg.md`]);
     await fajlIras(`jogszabalyok/${js.slug}/szoveg.md`, szoveg);
     const nev = js.rovidites ?? js.megjeloles;
