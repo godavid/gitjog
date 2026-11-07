@@ -2,7 +2,17 @@
 // Route handler, nem statikus fájl, hogy a számok ne avuljanak el.
 
 import { ADAT_REPO, evOf, getAllomanyStatisztika, getJogszabalyok } from "@/lib/adat";
-import { MCP_KLIENSEK, MCP_REGISTRY_NEV, MCP_URL, githubAtom } from "@/lib/csatornak";
+import {
+  FRISSITES_UTAN,
+  MCP_KLIENSEK,
+  MCP_REGISTRY_NEV,
+  MCP_URL,
+  OPENAPI_URL,
+  REST_PELDAK,
+  RSS_URL,
+  githubAtom,
+  torvenyRss,
+} from "@/lib/csatornak";
 import { OLDAL_URL } from "@/lib/sitemap";
 
 export const dynamic = "force-static";
@@ -21,6 +31,8 @@ export async function GET() {
   const bekotes = MCP_KLIENSEK.map(
     (k) => `- ${k.nev} — ${k.hol}:\n\n  \`\`\`\n  ${k.kod.replace(/\n/g, "\n  ")}\n  \`\`\``,
   ).join("\n\n");
+  // a REST-példák műveletenként, a csatornak.ts egyetlen forrásából
+  const pelda = Object.fromEntries(REST_PELDAK.map((p) => [p.muvelet, p.url]));
 
   const szoveg = `# GitJog
 
@@ -28,15 +40,19 @@ export async function GET() {
 > ${elsoEv} óta, ${allapotSzam} időállapottal, naponta frissítve. Minden módosításnál elérhető a
 > pontos szövegváltozás. Nem hiteles jogforrás — tájékozódási és kutatási célra.
 
-Az adat egy publikus git repóban él: minden törvény egy Markdown-fájl, minden commit egy
-időállapot (a commit dátuma a hatálybalépés napja), a diff maga a törvénymódosítás.
+Az adat egy publikus git repóban él: minden törvény egy Markdown-fájl, minden időállapot egy
+commit, a commit dátuma a hatálybalépés napja, a diff maga a törvénymódosítás. Egy commit több
+jogszabály azonos napú állapotát hordozhatja. A history nem dátumrendezett: egy jogszabály
+időállapotainak SHA-it a \`jogszabalyok/{slug}/allapotok.json\` adja, és a \`git log\`-hoz
+mindig adj útvonal-szűrőt (\`git log -- jogszabalyok/{slug}/szoveg.md\`).
 
 ## Oldalak
 
 - [Hatályos szöveg](${OLDAL_URL}/jogszabaly/{slug})
 - [Időállapotok](${OLDAL_URL}/jogszabaly/{slug}/idovonal)
-- [Két állapot különbsége](${OLDAL_URL}/jogszabaly/{slug}/diff/{tol}/{ig}) — a dátumok YYYY-MM-DD alakban
-- [Legutóbbi változások](${OLDAL_URL}/valtozasok) — RSS: ${OLDAL_URL}/valtozasok.xml
+- [Két állapot különbsége](${OLDAL_URL}/jogszabaly/{slug}/diff/{tol}/{ig}) — a dátumok YYYY-MM-DD alakban;
+  {tol} és {ig} a jogszabály két létező időállapotának napja, {tol} a korábbi, különben 404
+- [Legutóbbi változások](${OLDAL_URL}/valtozasok) — RSS: ${RSS_URL}
 - [Egy hónap összes módosítása](${OLDAL_URL}/valtozasok/{ev}-{ho}) — pl. /valtozasok/2026-01
 - [Az adatokról](${OLDAL_URL}/adatok)
 - [MCP-szerver, API és értesítés](${OLDAL_URL}/agenteknek) — ez a leírás emberi olvasásra, bekötési példákkal
@@ -46,7 +62,7 @@ időállapot (a commit dátuma a hatálybalépés napja), a diff maga a törvén
 Ne olvass be egész törvényt (0,1–1,4 MB): a §-szintű végpontok adják, ami kell.
 
 - MCP (streamable HTTP, auth nélkül): ${MCP_URL} — registry: ${MCP_REGISTRY_NEV}
-- REST, OpenAPI-leírással: ${OLDAL_URL}/api/v1/openapi.json
+- REST, OpenAPI-leírással: ${OPENAPI_URL}
 
 Bekötés MCP-kliensbe:
 
@@ -56,26 +72,30 @@ Négy művelet, REST-en és MCP-toolként ugyanúgy:
 
 - kereses — „melyik § szabályozza X-et?”, vagy hivatkozás feloldása („Ptk. 6:272. §”, „2013. évi CXXII. törvény 18. §”).
   A találat a § teljes szövegét és URL-jét hozza: egy körben citálható.
-  ${OLDAL_URL}/api/v1/kereses?q=termőföld+elővásárlási+jog
+  ${pelda.kereses}
 - szakasz — egy § egy adott napon hatályos szövege; § nélkül a jogszabály időállapotai és tartalomjegyzéke.
-  ${OLDAL_URL}/api/v1/szakasz?slug=2013-evi-cxxii-torveny-foldforgalmi&paragrafus=18.+§&datum=2024-01-01
+  ${pelda.szakasz}
 - valtozasok — mi változott: cursorral (felveve_utan) vagy since/until/slugs szűrővel; az érintett §-ok régi/új szövegével.
-  ${OLDAL_URL}/api/v1/valtozasok?since=2026-01-01&q=termőföld|földek forgalm|Földalap
+  ${pelda.valtozasok}
 - diff — két időállapot teljes §-szintű összevetése.
-  ${OLDAL_URL}/api/v1/diff?slug=2013-evi-cxxii-torveny-foldforgalmi&tol=2023-01-01&ig=2024-01-01
+  ${pelda.diff}
 
 ### Változásfigyelés (recept ütemezett agentnek)
 
-1. Első futásnál hívd: /api/v1/valtozasok?felveve_utan=<mostani időbélyeg>&q=termőföld|földek forgalm|Földalap (vagy slugs=…).
-2. Tárold el a válasz kovetkezo_felveve_utan mezőjét — ez a cursor.
-3. Naponta (a frissítés 03:30 UTC után) hívd újra a tárolt cursorral. Üres tetelek = nincs újdonság.
+1. Első futásnál hívd: /api/v1/valtozasok?felveve_utan=<mostani ISO időbélyeg>&q=termőföld|földek+forgalm|Földalap (vagy slugs=…).
+2. Tárold el a válasz kovetkezo_felveve_utan mezőjét változtatás nélkül: ez a cursor (átlátszatlan szöveg,
+   alakja <időbélyeg>_<slug>_<dátum>, pl. 2026-10-06T17:43:08Z_2013-evi-v-torveny-ptk_2026-10-01).
+3. Naponta (a frissítés ${FRISSITES_UTAN} után) hívd újra a tárolt cursorral, amíg a tetelek üres nem lesz.
+   Üres tetelek = nincs újdonság.
 4. Ha van tétel: az erintett_szakaszok régi/új szövegéből írj összefoglalót, a diff_url a teljes különbség.
-A cursor a repóba kerülés ideje, nem a hatálybalépés: a késve felvett, régi dátumú állapotot is jelzi.
+A lapok felvételi sorrendben jönnek (a legrégebbi elöl), kihagyás és ismétlés nélkül. Első cursorként egy
+sima ISO időbélyeg is elfogadott. A cursor a repóba kerülés idejét követi, nem a hatálybalépést: a késve
+felvett, régi dátumú állapotot is jelzi.
 
 ## Értesítés (ember és gép)
 
-- Az összes friss módosítás RSS-feedje: ${OLDAL_URL}/valtozasok.xml
-- Egy jogszabály változásainak RSS-feedje: ${OLDAL_URL}/jogszabaly/{slug}/valtozasok.xml
+- Az összes friss módosítás RSS-feedje: ${RSS_URL}
+- Egy jogszabály változásainak RSS-feedje: ${torvenyRss("{slug}")}
 - Az adat-repó commit-feedje (Atom): ${githubAtom()} — egy jogszabályé: ${githubAtom("{slug}")}
 - Ütemezett agent: a fenti cursoros recept (MCP-n a \`valtozasok\` tool, ugyanezekkel a paraméterekkel)
 
@@ -88,7 +108,7 @@ A cursor a repóba kerülés ideje, nem a hatálybalépés: a késve felvett, r�
 - Repó: https://github.com/${ADAT_REPO}
 - Nyers szöveg (Markdown): ${RAW}/jogszabalyok/{slug}/szoveg.md
 - Jogszabály-index: ${RAW}/index/jogszabalyok.json — [{slug, documentId, megjeloles, cim, rovidites}]
-- Időállapot-térkép: ${RAW}/index/allapotok.json — slugonként [{datum, verzio, sha}] (4+ MB; egy törvényhez: ${RAW}/jogszabalyok/{slug}/allapotok.json)
+- Időállapot-térkép: ${RAW}/index/allapotok.json — slugonként [{datum, verzio, sha}] (3+ MB; egy törvényhez: ${RAW}/jogszabalyok/{slug}/allapotok.json)
 - Felvételi napló: ${RAW}/index/felvetel/{ÉÉÉÉ-HH}.jsonl — soronként {felveve, slug, datum, sha}: mikor került be egy időállapot
 - Agent-útmutató a klónozott repóhoz: https://github.com/${ADAT_REPO}/blob/main/AGENTS.md
 - Egy múltbeli állapot szövege: https://raw.githubusercontent.com/${ADAT_REPO}/{sha}/jogszabalyok/{slug}/szoveg.md
