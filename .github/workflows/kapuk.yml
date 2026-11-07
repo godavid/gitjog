@@ -31,25 +31,25 @@ jobs:
           persist-credentials: false
       - name: A web és a szoveg nem importál a pipeline-ból
         run: |
-          if git grep -nE "from ['\"](@gitjog/pipeline|[./]*packages/pipeline)" -- apps/web packages/szoveg; then
+          if git grep -nE "(from|import ?\(?|require ?\() *['\"](@gitjog/pipeline|[./]*packages/pipeline)" -- apps/web packages/szoveg; then
             echo "::error::apps/web és packages/szoveg nem importálhat a packages/pipeline-ból (a változása nem deployol)."
             exit 1
           fi
       - name: A szoveg tiszta marad (nincs next, react, supabase, node, postgres, cheerio)
         run: |
-          if git grep -nE "from ['\"](next|react|@supabase/|node:|postgres|cheerio)(['\"/]|$)" -- packages/szoveg/src; then
+          if git grep -nE "(from|import ?\(?|require ?\() *['\"]((next|react|postgres|cheerio)(['\"/]|$)|@supabase/|node:)" -- packages/szoveg/src; then
             echo "::error::packages/szoveg/src I/O nélküli, tiszta szövegmodul: tilos a next, react, @supabase/, node:, postgres, cheerio import."
             exit 1
           fi
       - name: A csomagok forrása nem importál az apps/ alól
         run: |
-          if git grep -nE "from ['\"].*apps/" -- 'packages/*/src'; then
+          if git grep -nE "(from|import ?\(?|require ?\() *['\"].*apps/" -- 'packages/*/src/**'; then
             echo "::error::packages/*/src nem importálhat az apps/ alól."
             exit 1
           fi
       - name: A szoveg tesztje csak az apps/web/lib/md.js-t importálhatja
         run: |
-          TALALAT=$(git grep -nE "from ['\"].*apps/web" -- packages/szoveg/test | grep -v "apps/web/lib/md.js" || true)
+          TALALAT=$(git grep -nE "(from|import ?\(?|require ?\() *['\"].*apps/web" -- packages/szoveg/test | grep -v "apps/web/lib/md.js" || true)
           if [ -n "$TALALAT" ]; then
             echo "$TALALAT"
             echo "::error::packages/szoveg/test csak az apps/web/lib/md.js-t importálhatja (horgony-egyezés teszt)."
