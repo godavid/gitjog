@@ -7,6 +7,7 @@ import { z } from "zod";
 import { diffApi } from "@/lib/api/diff";
 import { keresesApi } from "@/lib/api/kereses";
 import { ApiHiba, KORLAT } from "@/lib/api/kozos";
+import { legacyClaimNelkul } from "@/lib/api/mcp-boritek";
 import { MCP } from "@/lib/api/semak";
 import { szakaszApi } from "@/lib/api/szakasz";
 import { valtozasokApi } from "@/lib/api/valtozasok";
@@ -148,4 +149,21 @@ const handler = createMcpHandler(
   },
 );
 
-export { handler as GET, handler as POST, handler as DELETE };
+// A 2026 előtti `_meta` protokoll-claimet az SDK hibásan a modern ágra küldi
+// (400): kivesszük, mielőtt a handler látja (lib/api/mcp-boritek.ts).
+async function kezelo(req: Request): Promise<Response> {
+  if (req.method !== "POST" || !(req.headers.get("content-type") ?? "").includes("application/json")) return handler(req);
+  let torzs: unknown;
+  try {
+    torzs = await req.clone().json();
+  } catch {
+    return handler(req);
+  }
+  const javitott = legacyClaimNelkul(torzs);
+  if (javitott === torzs) return handler(req);
+  const fejlecek = new Headers(req.headers);
+  fejlecek.delete("content-length");
+  return handler(new Request(req.url, { method: "POST", headers: fejlecek, body: JSON.stringify(javitott), signal: req.signal }));
+}
+
+export { kezelo as GET, kezelo as POST, kezelo as DELETE };
