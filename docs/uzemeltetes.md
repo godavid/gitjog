@@ -53,7 +53,7 @@
 - **A Search Console / Bing tokenje környezeti változóból jön**:
   `GOOGLE_SITE_VERIFICATION`, illetve `BING_SITE_VERIFICATION` (Vercel env, Production).
   Ha nincs beállítva, a meta kimarad — a bekötés tehát nem igényel kódmódosítást.
-- **Cache-csapda**: az `index/allapotok.json` 4,4 MB, nem fér a Next adat-cache 2 MB-os
+- **Cache-csapda**: az `index/allapotok.json` ~3,4 MB (2026-11-07; 2026-08-10-én 4,4 MB), nem fér a Next adat-cache 2 MB-os
   limitjébe. Ezért `cache: "no-store"`-ral jön, és a belőle számolt rövid eredményt
   `unstable_cache` tartja el. Ha ezt valaki visszaállítja `revalidate`-re, egy régi,
   kisebb válasz beragadhat és némán hetekig elavult adatot szolgál ki (2026-08-10-én
@@ -101,7 +101,9 @@
     (index-commitos) push rebase-elt, ellenőrzi, hogy minden naplózott SHA a HEAD őse —
     ha nem, hibával leáll. Így egy rebase nem hagyhat árva index-SHA-t. Ára: a két push
     között elbukó futás után az adat-repóban index nélküli állapot-commitok maradnak (a
-    webes index addig nem mutatja őket, az `Index-integritás` lépés jelez). A következő
+    webes index addig nem mutatja őket). Az elbukó futásban az `Index-integritás` lépés
+    nem fut le (a hibás lépés után a job többi lépése kimarad, `if:` nincs rajta); a
+    következő sikeres futásé jelez, ha a HEAD-blob addig sem igazodott. A következő
     futás, amelyben a jogszabály esedékes, újként látja őket: egyetlen állapotnál a
     változatlan szöveg nem ad új commitot, és az index a már pusholt commitokból épül;
     több mai állapotnál a régebbi szövege újra commitolódik a HEAD fölé, majd a legújabb
@@ -112,7 +114,8 @@
     egy 1930-as állapot a 2017-es után került commitra. A delta ezért a régi állapot
     után a legutóbbi ismert állapot szövegét a saját commitjából (`git show <sha>:…`)
     visszaírja és a saját dátumával újra commitolja („… (HEAD-helyreállítás)” üzenettel).
-    Ha az indexben nincs `sha` az utolsó állapothoz, a delta hibával leáll, még az első
+    Ha az indexben nincs `sha` az utolsó állapothoz, vagy az nem teljes hex
+    commit-azonosító (`ERVENYES_SHA`, `index-ellenorzes-lib.ts`), a delta hibával leáll, még az első
     push előtt: semmi nem kerül az adat-repóba, kézi javítás kell (index-újraépítés).
   - **`index/kihagyottak.json` tisztítása.** A backfill kihagyási listájából a delta
     kiveszi az azóta bekerült jogszabályokat (`kihagyottak.ts`); csak akkor ír, ha
@@ -415,19 +418,21 @@ titok, mindkettő `pull_request` (nem `pull_request_target`) és `push` a main-r
   jobban a web `next build` (a Supabase env ártalmatlan helykitöltő, a build nem
   használja). Összesítő check: `teszt`. A ruleset ma csak a `biztonsag`-ot és a
   CodeQL-t követeli; a `teszt` kötelezővé tétele (ruleset 23985520) owner-lépés az első
-  zöld futás után.
+  zöld futás után (ugyanez áll a `kapuk`-ra).
 - **`.github/workflows/kapuk.yml`** (`Kapuk`): `import-hatar` (a web és a szoveg nem
   importál a pipeline-ból; a szoveg nem importál `next`, `react`, `postgres`,
   `cheerio`, `@supabase/`, `node:` modult; `packages/*/src` nem importál az `apps/` alól;
   a szoveg tesztje az `apps/web` alól csak a `lib/md.js`-t; nincs `NEXT_PUBLIC_SUPABASE`),
   `marka` (a régi márkanév szava a fában és a PR címében; kivétel az AGENTS.md, a
   PRODUCT.md, ez a fájl, a `docs/superpowers/`, a `next.config.ts`, a `03-szinkron-szerep.sql`,
-  a lockfile és a megtartott azonosítók), `kiemeles` (az SQL-ekben nincs HTML a
+  a lockfile, maga a `kapuk.yml` és a megtartott azonosítók; a commit-üzenetet nem nézi,
+  csak a squash-commit címét adó PR-címet), `kiemeles` (az SQL-ekben nincs HTML a
   `ts_headline` kiemelésében; `dangerouslySetInnerHTML` csak a felsorolt fájlokban, a
   keresésben soha), hetente és kézi indításra `napi-delta-masolat` (`cmp` az élő
   példánnyal). Összesítő check: `kapuk`. Új őrszabály ide kerül, nem prózába.
-- **pnpm 12** minden workflow-ban: a `pnpm/action-setup` lépés `version: 12`-t kap
-  (a `napi-delta.yml` másolatában is); a gyökér `package.json`-ban szándékosan nincs
+- **pnpm 12** minden pnpm-et használó workflow-ban (`teszt.yml`, `biztonsag.yml`,
+  `release-production.yml`, a `napi-delta.yml` mindkét példánya; a `kapuk.yml` nem telepít
+  pnpm-et): a `pnpm/action-setup` lépés `version: 12`-t kap; a gyökér `package.json`-ban szándékosan nincs
   `packageManager` mező, mert az lockfile-változást kényszerítene, és az action a kettő
   együttes megadására hibát ad.
 
@@ -472,7 +477,7 @@ művelet, kulcs nélkül, ugyanabban a Next appban:
   olyan futáskor kiírja, amely új időállapotot vesz fel (az index-utócommitba kerül) —
   új időállapot nélküli futás nem frissíti. Kézzel ne szerkeszd az adat-repóban — a
   következő ilyen futás visszaírja. A `sablonok.ts` többi magja (`README_MD`,
-  `DISCLAIMER_MD`, `LICENSE_TXT`, `LICENSE_HU_MD`) fordítva működik: az igazság az
+  `DISCLAIMER_MD`, `LICENSE_TXT`, `LICENSE_HU_MD`, `GITATTRIBUTES`) fordítva működik: az igazság az
   adat-repo élő fájlja, a magot csak egy friss backfill „váz” lépése írja ki, a delta
   nem nyúl hozzá; ha az élő fájl változik, a magot kézzel kell szinkronban tartani
   (`packages/pipeline/test/sablonok.test.ts` a tartalmi állításokat őrzi).

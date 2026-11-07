@@ -27,13 +27,15 @@ Ellenőrizve a kóddal: 2026-11-07.
   check és a CodeQL. Az admin megkerülheti, de az csak vészhelyzetre van.
 - A `Teszt` workflow ([`teszt.yml`](.github/workflows/teszt.yml)) minden PR-en futtatja a
   `pnpm -r test`-et, a `szoveg` és a `pipeline` csomag `tsc`-jét és a web `next build`-jét;
-  az összesítő check neve `teszt`. Kötelezővé tétele a ruleset-ben (23985520) owner-lépés
-  az első zöld futás után; addig a merge előtt nézd meg, hogy zöld-e. A `Kapuk` workflow
+  az összesítő check neve `teszt`. A `Kapuk` workflow
   ([`kapuk.yml`](.github/workflows/kapuk.yml)) grep-pel kényszeríti ki az importhatárt
-  (Kódterületek), a márkaszó-tilalmat (Ne tedd #10, a PR címére is) és a keresési
+  (Kódterületek), a márkaszó-tilalmat (Ne tedd #10, a PR címére is; a kivett fájlok
+  listája: [docs/uzemeltetes.md](docs/uzemeltetes.md) CI-szakasz) és a keresési
   kiemelés STX/ETX-szabályát (Ne tedd #7), hetente pedig `cmp`-vel a `napi-delta.yml`
   két példányának byte-azonosságát (Ne tedd #3); összesítő check: `kapuk`. Egyik
-  workflow-nak sem kell titok.
+  workflow-nak sem kell titok. Ma egyik check sem kötelező: a ruleset (23985520) csak a
+  `biztonsag`-ot és a CodeQL-t követeli; a `teszt` és a `kapuk` kötelezővé tétele
+  owner-lépés az első zöld futás után. Addig a merge előtt nézd meg, hogy zöldek-e.
 - A napi delta (03:30 UTC) a `godavid/gitjog` main ágát futtatja írási joggal az
   adat-repóban: ami a main-re kerül, az ott kódként fut.
 - A prod deploy CSAK a
@@ -68,9 +70,10 @@ Ellenőrizve a kóddal: 2026-11-07.
 
 Node >= 24, pnpm 12; a repo gyökeréből, ha nincs más jelölve. A pnpm verzióját a
 workflow-k rögzítik: minden `pnpm/action-setup` lépésen `version: 12` (a `teszt.yml`,
-a `kapuk.yml`, a `biztonsag.yml`, a `release-production.yml` és a `napi-delta.yml`
-másolata). A gyökér `package.json`-ban szándékosan NINCS `packageManager` mező: az
-lockfile-változást kényszerítene, és az action a kettő együttes megadására hibát ad.
+a `biztonsag.yml`, a `release-production.yml` és a `napi-delta.yml` másolata; a
+`kapuk.yml` nem telepít pnpm-et). A gyökér `package.json`-ban szándékosan NINCS
+`packageManager` mező: az lockfile-változást kényszerítene, és az action a kettő
+együttes megadására hibát ad.
 
 - Telepítés: `pnpm install --frozen-lockfile`
 - Teszt csomagonként: `pnpm --filter @gitjog/szoveg test`, `pnpm --filter @gitjog/pipeline test`
@@ -104,7 +107,7 @@ lockfile-változást kényszerítene, és az action a kettő együttes megadás�
 | A diff szerver oldalon renderel | `apps/web/components/DiffNezet.tsx` | csak a kódkomment |
 | A `napi-delta.yml` két példánya byte-azonos | `packages/pipeline/adatrepo/napi-delta.yml` ↔ `godavid/magyar-jog` | `kapuk.yml` `napi-delta-masolat` job (heti `cmp` az élő példánnyal; PR-en nem fut) |
 | A SHA-térkép csak állapot-commitot tartalmaz: az `allapotok.json` útvonala kizárva, a dátum nélküli üzenetű commit (Index frissítés, Enumerálás-térkép) kimarad | `packages/pipeline/src/commit.ts` `allapotShaTerkep()`, `shaTerkepParse()` | `packages/pipeline/test/commit.test.ts` |
-| Az index SHA-i pusholt commitok: az állapot-commitok pusha az index előtt megy, és egy rebase után minden naplózott SHA a HEAD őse | `delta.ts` (a `pushRebase()` két hívása) | csak a kód (a rebase-ág teszteletlen) |
+| Az index SHA-i pusholt commitok: az állapot-commitok pusha az index előtt megy, és egy rebase után minden naplózott SHA a HEAD őse | `delta.ts` (a `pushRebase()` hívása az állapot-commitok és az index-commit után) | csak a kód (a rebase-ág teszteletlen) |
 | A HEAD `szoveg.md`-je a legutolsó időállapot blobja; a késve bekerülő régebbi állapot után HEAD-helyreállítás jön | `packages/pipeline/src/index-ellenorzes-lib.ts`, `delta.ts`, `health.ts` `regebbiAllapot()` | `packages/pipeline/test/index-ellenorzes.test.ts`, `health.test.ts`; élesben a napi delta `Index-integritás` lépése (`napi-delta.yml`) |
 | A `valtozasok` cursora veszteségmentes: `(felveve, slug, datum)` keyset, legrégebbi elöl, rés és duplikátum nélkül | `apps/web/lib/api/kurzor.ts`, `valtozasok.ts` | `apps/web/lib/api/kurzor.test.ts` |
 | `KIEMELT_SLUGOK` = a `JOGSZABALYOK` kiemelt slugjai | `packages/pipeline/src/torvenylista-generalas.ts`, `config.ts` | `packages/pipeline/test/kiemelt-slugok.test.ts` |

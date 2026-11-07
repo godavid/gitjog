@@ -73,7 +73,8 @@ index/enumeralas.json                # documentId → aktiv (hatályos vagy jöv
                                      #   lezart (hatályát vesztette) | nincs-szoveg (nincs a repóban);
                                      #   a napi futás ütemezése is
 index/kihagyottak.json               # a backfill kihagyási listája okkal: [{documentId, slug, ok}];
-                                     #   a napi futás nem frissíti, elavulhat (a friss lista: nincs-szoveg)
+                                     #   a napi futás csak a közben bekerülteket veszi ki belőle, újat
+                                     #   nem vesz fel (a friss lista: nincs-szoveg)
 AGENTS.md                            # agent-útmutató; új időállapot felvételekor a gitjog sablonja felülírja
 CLAUDE.md                            # szimlink az AGENTS.md-re (ne szerkeszd, lásd AGENTS.md)
 .github/workflows/napi-delta.yml     # a napi futás; a gitjog packages/pipeline/adatrepo/napi-delta.yml másolata
@@ -120,9 +121,9 @@ címkés issue-t nyit ebben a repóban. A feldolgozó kód nyílt:
   dátum szerint rendezett.
 - A napi futás alatt ne pusholj és ne olvassz be semmit a \`main\`-re (a cron 03:30 UTC, de a
   GitHub jellemzően csak 08:00 és 11:00 UTC között indítja, és kb. 25 percig fut; ellenőrzés:
-  \`gh run list -R godavid/magyar-jog -w napi-delta.yml -L 1\`). A futás a push előtt írja be a
-  commit-SHA-kat az indexbe; ha közben a \`main\` elmozdul, a \`git pull --rebase\` után ezek a
-  SHA-k a \`main\`-ről nem érhetők el.
+  \`gh run list -R godavid/magyar-jog -w napi-delta.yml -L 1\`). A futás előbb az állapot-commitokat
+  pusholja, és csak utána építi az indexet a pusholt SHA-kból; ha közben a \`main\` elmozdul, a
+  futás \`git pull --rebase\`-t csinál, ütköző változásnál pedig leáll.
 - Üzemeltetés, riasztások, hibaelhárítás:
   [gitjog docs/uzemeltetes.md](https://github.com/godavid/gitjog/blob/main/docs/uzemeltetes.md).
 
@@ -489,7 +490,8 @@ do not build the anchor yourself.
 - The \`main\` history is never rewritten (no rebase, force-push or \`git filter-repo\`) and never
   reordered: the indexes and the ingestion log reference commit SHAs.
 - Do not push to \`main\` while the daily run is active (03:30 UTC cron, usually started 08:00–11:00
-  UTC, about 25 minutes): the run writes the new SHAs into the index before it pushes.
+  UTC, about 25 minutes): the run pushes its version commits first and then builds the index from
+  the pushed SHAs; a concurrent push makes it rebase, and a conflicting change stops the run.
 - Operations runbook: https://github.com/godavid/gitjog/blob/main/docs/uzemeltetes.md. Human
   overview and licence: [README.md](README.md), [LICENSE](LICENSE), [LICENSE-HU.md](LICENSE-HU.md).
 `;

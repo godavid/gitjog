@@ -157,7 +157,8 @@ export default async function AgenteknekOldal() {
             <dt>GitHub commit-feed (Atom)</dt>
             <dd>
               <p>
-                Az adat-repó commitjai: minden commit egy hatályba lépett időállapot. Egy törvényre
+                Az adat-repó commitjai: az állapot-commitok hatályba lépett időállapotokat hordoznak (az
+                Index frissítés és az Enumerálás-térkép frissítés commit nem időállapot). Egy törvényre
                 szűkítve a könyvtárának feedje kell.
               </p>
               <KodSor kod={githubAtom()} mit="a teljes commit-feed címe" />
@@ -177,8 +178,9 @@ export default async function AgenteknekOldal() {
                   A válasz <code>kovetkezo_felveve_utan</code> mezőjét tárold el változtatás nélkül: ez a cursor (átlátszatlan szöveg, ne értelmezd).
                 </li>
                 <li>
-                  Naponta, {FRISSITES_UTAN} után hívd újra a tárolt cursorral. Üres <code>tetelek</code>{" "}
-                  = nincs újdonság.
+                  Naponta, {FRISSITES_UTAN} után hívd újra a tárolt cursorral. Minden lap után tárold el
+                  az új cursort, és kérd a következő lapot, amíg a <code>tetelek</code> üres nem lesz. Üres{" "}
+                  <code>tetelek</code> = nincs újdonság.
                 </li>
                 <li>
                   Ha van tétel: az <code>erintett_szakaszok</code> régi és új szövege elég egy

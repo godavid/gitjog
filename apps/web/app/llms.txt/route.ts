@@ -59,7 +59,7 @@ mindig adj útvonal-szűrőt (\`git log -- jogszabalyok/{slug}/szoveg.md\`).
 
 ## MCP-szerver és API (ezt használd — §-szintű, pár KB-os válaszok)
 
-Ne olvass be egész törvényt (0,1–1,4 MB): a §-szintű végpontok adják, ami kell.
+Ne olvass be egész törvényt (a legnagyobb 2,3 MB): a §-szintű végpontok adják, ami kell.
 
 - MCP (streamable HTTP, auth nélkül): ${MCP_URL} — registry: ${MCP_REGISTRY_NEV}
 - REST, OpenAPI-leírással: ${OPENAPI_URL}
