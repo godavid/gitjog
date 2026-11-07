@@ -7,7 +7,8 @@
 -- lekérdezéssel, és igazítsa ide, ha eltér.
 -- Idempotens, újrafuttatható (mint 01-05); keresési függvényt nem érint, ezért a
 -- 02 és 04 fájlokat NEM kell (és nem is szabad önállóan) újrafuttatni.
--- Futtatás: psql "$NYILT_DB_URL" -f 06-anon-idokorlat.sql
+-- Futtatás a superuser pooler-stringgel:
+--   psql "<superuser pooler-string>" -v ON_ERROR_STOP=1 -f 06-anon-idokorlat.sql
 
 alter role anon set statement_timeout = '8s';
 notify pgrst, 'reload config';

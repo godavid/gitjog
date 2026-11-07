@@ -490,9 +490,9 @@ művelet, kulcs nélkül, ugyanabban a Next appban:
   04 újrafuttatása NEM kell és nem is szabad). A `8s` érték az élő DB-n eddig csak kézi
   beállítás volt <!-- INFERRED: verify -->, ellenőrzés:
   `select rolconfig from pg_roles where rolname = 'anon';` — ha eltér, a fájlt igazítsd.
-  Futtatás a **superuser** pooler-stringgel (a fájl saját kommentje `NYILT_DB_URL`-t
-  mond, de az a `jogtar_szinkron` szerepé, amely az `anon` role-t nem módosíthatja; lásd
-  Keresés → Séma és lekérdezés); **2026-09-16-án a 5432-es
+  Futtatás a **superuser** pooler-stringgel (a `NYILT_DB_URL` a `jogtar_szinkron`
+  szerepé, amely az `anon` role-t nem módosíthatja; lásd Keresés → Séma és
+  lekérdezés); **2026-09-16-án a 5432-es
   session pooler helyben nem fogadott kapcsolatot, a 6543-as (transaction) igen** —
   psql-hez az is jó.
 - **Registry:** `server.json` a repo gyökerében (`io.github.godavid/gitjog`), 2026-09-16-án

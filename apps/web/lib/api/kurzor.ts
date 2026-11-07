@@ -54,7 +54,12 @@ export function kurzorKiir(sor: KurzorSor): string {
 }
 
 function hasonlit(a: KurzorSor, b: KurzorSor): number {
-  return a.felveve.localeCompare(b.felveve) || a.slug.localeCompare(b.slug) || a.datum.localeCompare(b.datum);
+  const kulcsok = ["felveve", "slug", "datum"] as const;
+  for (const kulcs of kulcsok) {
+    if (a[kulcs] < b[kulcs]) return -1;
+    if (a[kulcs] > b[kulcs]) return 1;
+  }
+  return 0;
 }
 
 /** Szigorúan a cursor után van-e a sor (puszta időbélyegnél csak a felveve számít). */

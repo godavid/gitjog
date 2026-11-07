@@ -21,7 +21,7 @@ export const README_MD = `# GitJog — a magyar jogrendszer git-natív verziók�
 Ez a repó a magyar törvények **konszolidált szövegét** tartalmazza Markdown
 formátumban, úgy, hogy **a git history maga a jogtörténet**:
 
-- **minden időállapot egy commit** — a commit dátuma a hatálybalépés napja (1970 előtti
+- **minden időállapotot állapot-commit rögzít** — a commit dátuma a hatálybalépés napja (1970 előtti
   állapotnál 1970-01-01; a valódi dátum a commit-üzenetben és a \`meta.json\`-ban áll).
   Egy commit több jogszabály azonos napú állapotát is hordozhatja. Az \`Index frissítés\`
   és az \`Enumerálás-térkép frissítés\` commit nem időállapot, és egy jogszabály git
@@ -74,7 +74,7 @@ index/enumeralas.json                # documentId → aktiv (hatályos vagy jöv
                                      #   a napi futás ütemezése is
 index/kihagyottak.json               # a backfill kihagyási listája okkal: [{documentId, slug, ok}];
                                      #   a napi futás nem frissíti, elavulhat (a friss lista: nincs-szoveg)
-AGENTS.md                            # agent-útmutató; a gitjog sablonjából minden futás felülírja
+AGENTS.md                            # agent-útmutató; új időállapot felvételekor a gitjog sablonja felülírja
 CLAUDE.md                            # szimlink az AGENTS.md-re (ne szerkeszd, lásd AGENTS.md)
 .github/workflows/napi-delta.yml     # a napi futás; a gitjog packages/pipeline/adatrepo/napi-delta.yml másolata
 \`\`\`
@@ -109,7 +109,7 @@ címkés issue-t nyit ebben a repóban. A feldolgozó kód nyílt:
 - A \`jogszabalyok/\`, az \`index/\` és az \`AGENTS.md\` a gitjog pipeline kimenete: kézzel ne
   szerkeszd, a hibát a [godavid/gitjog](https://github.com/godavid/gitjog) forrásában javítsd.
   Az \`index/allapotok.json\` és az \`index/enumeralas.json\` a napi futás állapota is. Az
-  \`AGENTS.md\`-t minden futás felülírja a gitjog \`packages/pipeline/src/sablonok.ts\`
+  \`AGENTS.md\`-t új időállapot felvételekor felülírja a gitjog \`packages/pipeline/src/sablonok.ts\`
   \`AGENTS_MD\` sablonjából.
 - A \`.github/workflows/napi-delta.yml\` a gitjog \`packages/pipeline/adatrepo/napi-delta.yml\`
   másolata: a kettőt mindig együtt módosítsd.
@@ -326,7 +326,7 @@ export const GITATTRIBUTES = `* text=auto eol=lf
 // az „új időállapot nélküli” ág korábban visszatér), így az index-utócommitba kerül, ha
 // változott. Az adat-repóban kézzel szerkesztve a módosítás a következő ilyen futáson elvész.
 export const AGENTS_MD = `# AGENTS.md — how to use this repository as an AI agent
-<!-- GENERATED FILE. Source: godavid/gitjog packages/pipeline/src/sablonok.ts (AGENTS_MD). Do not edit here: the daily run overwrites it. -->
+<!-- GENERATED FILE. Source: godavid/gitjog packages/pipeline/src/sablonok.ts (AGENTS_MD). Do not edit here: a daily run that adds a version overwrites it. -->
 
 This repository is the **full text and full amendment history of Hungarian acts of
 Parliament** (4,300+ acts, 1827–today), maintained as a git repository:
@@ -355,16 +355,17 @@ HEAD of \`jogszabalyok/<slug>/szoveg.md\` is the last version the pipeline inges
 (the last SHA in its \`allapotok.json\`). It is **not necessarily the law in force today**:
 
 - a repealed act (\`lezart\` layer) keeps its last text at HEAD;
-- a version with a future entry-into-force date is ingested as soon as njt publishes it, so HEAD
-  may be a text that is not yet in force;
 - a version that entered into force recently may not be in the repo yet (see Caveats: lag).
+
+The daily run does not ingest a version before its entry-into-force date.
 
 To get the text in force on a given day, pick from \`allapotok.json\` the entry with the largest
 \`datum\` that is \`<=\` that day, and read it with \`git show <sha>:jogszabalyok/<slug>/szoveg.md\`.
 
 ## How commits work
 
-- **One commit per entry-into-force day**, carrying every act that changed on that day. The commit
+- **One state commit per entry-into-force day in each run**, carrying every act ingested for that day
+  in that run. A later run may add another commit for the same day. The commit
   date (author and committer) is the **date of entry into force**, not the time the version was
   added (the ingestion log has that). Dates before 1970 are clamped to 1970-01-01 in git metadata;
   the real date is in the commit message and in \`meta.json\`/\`allapotok.json\`.

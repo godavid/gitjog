@@ -85,7 +85,8 @@ Négy művelet, REST-en és MCP-toolként ugyanúgy:
 1. Első futásnál hívd: /api/v1/valtozasok?felveve_utan=<mostani ISO időbélyeg>&q=termőföld|földek+forgalm|Földalap (vagy slugs=…).
 2. Tárold el a válasz kovetkezo_felveve_utan mezőjét változtatás nélkül: ez a cursor (átlátszatlan szöveg,
    alakja <időbélyeg>_<slug>_<dátum>, pl. 2026-10-06T17:43:08Z_2013-evi-v-torveny-ptk_2026-10-01).
-3. Naponta (a frissítés ${FRISSITES_UTAN} után) hívd újra a tárolt cursorral, amíg a tetelek üres nem lesz.
+3. Naponta (a frissítés ${FRISSITES_UTAN} után) hívd újra a tárolt cursorral. Minden lap után tárold el
+   az új kovetkezo_felveve_utan értéket a következő hívás előtt. Ismételd, amíg a tetelek üres nem lesz.
    Üres tetelek = nincs újdonság.
 4. Ha van tétel: az erintett_szakaszok régi/új szövegéből írj összefoglalót, a diff_url a teljes különbség.
 A lapok felvételi sorrendben jönnek (a legrégebbi elöl), kihagyás és ismétlés nélkül. Első cursorként egy

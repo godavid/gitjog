@@ -308,8 +308,7 @@ async function fut(): Promise<void> {
       .reduce<string>((m, e) => (e.allapot.hatalyba > m ? e.allapot.hatalyba : m), "");
     if (!maiLegujabb || maiLegujabb >= utolso.datum) continue; // a HEAD már a legújabbat mutatja
     if (!utolso.sha) {
-      console.warn(`[HEAD-helyreállítás kimaradt] ${js.slug}: az indexben nincs sha a ${utolso.datum} állapothoz`);
-      continue;
+      throw new Error(`HEAD-helyreállítás sikertelen: ${js.slug} ${utolso.datum} állapotához az indexben nincs sha`);
     }
     const szoveg = await git(["show", `${utolso.sha}:jogszabalyok/${js.slug}/szoveg.md`]);
     await fajlIras(`jogszabalyok/${js.slug}/szoveg.md`, szoveg);

@@ -1,9 +1,8 @@
 # Tesztek, típusellenőrzés és web build minden PR-en. A `biztonsag` csak a
 # biztonsági scant bizonyítja; ez a workflow adja a kódhelyességet. Titok nem
 # kell hozzá, és szándékosan `pull_request` (nem `pull_request_target`).
-# A pnpm verzióját a gyökér package.json `packageManager` mezője adja, ezért a
-# pnpm/action-setup `version:` bemenete szándékosan hiányzik (a kettő együtt
-# hibát ad).
+# A pnpm 12-es verzióját a pnpm/action-setup `version:` bemenete rögzíti.
+# A gyökér package.json szándékosan nem tartalmaz `packageManager` mezőt.
 name: Teszt
 
 on:
