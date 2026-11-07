@@ -41,10 +41,14 @@ const ELLENSEGES_MD = [
   "| javascript:alert(1) | <td onerror=1> |",
 ].join("\n");
 
-/** A kimenet tag-jei (nyitó és záró) és a tag-ek nélküli szövegmaradék. */
+/**
+ * A kimenet tag-jei (nyitó és záró) és a tag-ek közti szövegdarabok összefűzve.
+ * Nem tisztító: a tesztállítások vizsgálják mindkét részt, a tag-eket külön.
+ */
 function szetszed(html: string): { tagek: string[]; szoveg: string } {
   const tagek = html.match(/<[^>]*>/g) ?? [];
-  return { tagek, szoveg: html.replace(/<[^>]*>/g, "") };
+  const szovegdarabok = html.split(/<[^>]*>/);
+  return { tagek, szoveg: szovegdarabok.join("") };
 }
 
 describe("mdRender XSS-invariáns", () => {

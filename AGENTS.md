@@ -118,8 +118,8 @@ együttes megadására hibát ad.
 
 | Terület | Cél | Importálhat | Nem importálhat | Import-stílus |
 |---|---|---|---|---|
-| `packages/szoveg/src` | tiszta, I/O nélküli szövegmodul (§-bontás, horgony, hivatkozás, §-diff); a pipeline és a web közös forrása | `diff`, saját fájlok | `node:*` I/O, `next`, `react`, pipeline, `apps/web` | relatív, `.js` kiterjesztéssel (a pipeline NodeNext-feloldása miatt) |
-| `packages/pipeline/src` | njt-crawler, parser, normalizáló, commit-pipeline, delta/backfill, keresőindex-szinkron | `@gitjog/szoveg`, `cheerio`, `domhandler` (csak típus), `postgres`, `node:*` | `apps/web`, `next`, `@supabase/supabase-js` | relatív import `.js`-sel (NodeNext) |
+| `packages/szoveg/src` | tiszta, I/O nélküli szövegmodul (§-bontás, horgony, hivatkozás, §-diff); a pipeline és a web közös forrása | `diff`, saját fájlok | `node:*` I/O, `next`, `react`, pipeline, `apps/web` | relatív, kiterjesztés nélkül (Bundler) |
+| `packages/pipeline/src` | njt-crawler, parser, normalizáló, commit-pipeline, delta/backfill, keresőindex-szinkron | `@gitjog/szoveg`, `cheerio`, `domhandler` (csak típus), `postgres`, `node:*` | `apps/web`, `next`, `@supabase/supabase-js` | relatív import `.js`-sel; tsconfig: Bundler-feloldás (a szoveg kiterjesztés nélküli importjai miatt) |
 | `packages/pipeline/supabase` | a keresőindex SQL-je: kézzel, `psql`-lel futtatott, újrafuttatható szkriptek, nem migrációk | – | – | – |
 | `packages/pipeline/adatrepo` | az élő adat-repo `napi-delta.yml`-jének forrása | – | – | byte-azonos az élővel |
 | `apps/web` | Next 16 oldal; a `lib/api/*` a szolgáltatásréteg, az `app/api/v1/*` és az `app/api/mcp` csak ezt hívja | `@gitjog/szoveg`, `next`, `react`, `zod`, `mcp-handler`, `@vercel/analytics`, `@supabase/supabase-js` és `node:*` (csak szerveren) | `packages/pipeline/**` (a változása nem deployolna), `NEXT_PUBLIC_` titok | `@/` alias, kiterjesztés nélkül |
