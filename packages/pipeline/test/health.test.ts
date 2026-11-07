@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   modositoBlokkValtozas,
   modositoTorveny,
+  regebbiAllapot,
   szetcsuszasGyanu,
   TerjedelemAnomalia,
   terjedelemEllenorzes,
@@ -153,5 +154,27 @@ describe("szetcsuszasGyanu (napi delta szétcsúszás-őre)", () => {
       { datum: "2019-01-01", vanElozmeny: true },
     ];
     expect(szetcsuszasGyanu(ujak, ma)).toBe(2);
+  });
+});
+
+describe("regebbiAllapot (régebbi-állapot-őr, HEAD-helyreállítás)", () => {
+  // valós eset: 1930-evi-xxxvii-torveny — az indexben csak a 2017-es állapot
+  // volt, a késve bekerülő 1930-as a HEAD-et a régi szövegre állította
+  const ismert = [
+    { datum: "2017-01-01", verzio: 2, sha: "sha2017" },
+    { datum: "1970-01-01", verzio: 1, sha: "sha1970" },
+  ];
+  it("régebbi új állapotnál a legutóbb ismert állapotot adja", () => {
+    expect(regebbiAllapot(ismert, "1930-11-08")).toEqual(ismert[0]);
+  });
+  it("a sorrendtől függetlenül a legnagyobb dátumút választja", () => {
+    expect(regebbiAllapot([...ismert].reverse(), "1930-11-08")?.sha).toBe("sha2017");
+  });
+  it("újabb vagy azonos napú állapotnál nem szól", () => {
+    expect(regebbiAllapot(ismert, "2026-11-05")).toBeUndefined();
+    expect(regebbiAllapot(ismert, "2017-01-01")).toBeUndefined();
+  });
+  it("ismert állapot nélkül (vadonatúj jogszabály) nem szól", () => {
+    expect(regebbiAllapot([], "1930-11-08")).toBeUndefined();
   });
 });

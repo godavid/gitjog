@@ -1,5 +1,12 @@
 # Agent-felület — kivitelezési terv
 
+> **Állapot (2026-11-07): KÉSZ — archivált történeti rekord, nem utasítás.** Leszállítva a
+> #10 (REST API + MCP-szerver + felvételi napló) és a #17 (/agenteknek, főoldali sáv,
+> figyelés) PR-ben; a nyitott checkboxok nem nyitott munkát jelentenek. A deploy CSAK a
+> `.github/workflows/release-production.yml`-ből megy, a main-re csak PR-en át (squash)
+> kerül kód; a benne lévő `vercel --prod`- és push-lépések érvénytelenek. Az aktuális
+> állapot: [docs/uzemeltetes.md](../../uzemeltetes.md).
+
 Spec: `docs/superpowers/specs/2026-09-16-agent-felulet-design.md`. Ág: `agent-felulet`.
 Minden lépés végén: tesztek zöldek (`dev-budget run --kind heavy -- pnpm -r test`), a
 web `next build` átmegy. A deploy CLI-ből (`cd apps/web && vercel --prod --yes`), utána

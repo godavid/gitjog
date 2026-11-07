@@ -1,5 +1,13 @@
 # Agent-felület: REST API + MCP-szerver + felvételi napló — terv
 
+> **Állapot (2026-11-07): KÉSZ — archivált történeti rekord, nem utasítás.** Leszállítva a
+> #10 (REST API + MCP-szerver + felvételi napló) és a #17 (/agenteknek, főoldali sáv,
+> figyelés) PR-ben. A deploy CSAK a `.github/workflows/release-production.yml`-ből megy,
+> a main-re csak PR-en át (squash) kerül kód; a benne lévő deploy- és push-lépések
+> érvénytelenek. A `valtozasok` cursora 2026-11-07 óta veszteségmentes keyset-cursor
+> (#26), nem a tervben leírt puszta időbélyeg. Az aktuális állapot:
+> [docs/uzemeltetes.md](../../uzemeltetes.md).
+
 Dátum: 2026-09-16. Állapot: jóváhagyott (a felhasználó a brainstorming végén a teljes
 kivitelezést kérte; a nyitva maradt részdöntéseket ez a dokumentum rögzíti).
 

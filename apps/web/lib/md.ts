@@ -6,6 +6,8 @@
 // és az egyetlen generált attribútum-érték (horgony-id) [a-z0-9-]-re szűrt —
 // ellenséges markdown-bemenet sem tud tag-et vagy attribútumot injektálni.
 // Ezt az invariánst minden módosításnál tartsd fenn.
+// INVARIANT: a packages/szoveg/test/md-xss.test.ts őrzi (ellenséges bemenet,
+// horgony-id karakterkészlet, kibocsátott tag-készlet).
 
 import { horgonyId } from "@gitjog/szoveg";
 

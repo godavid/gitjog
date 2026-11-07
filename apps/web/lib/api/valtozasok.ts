@@ -27,6 +27,7 @@ import {
   normalizal,
 } from "./kozos";
 import { ervenyesDatum } from "./datum";
+import { kurzorParse, lapoz, type Kurzor } from "./kurzor";
 
 export interface ValtozasokParam {
   felveve_utan?: string;
@@ -66,7 +67,10 @@ export interface ValtozasTetel {
 export interface ValtozasokValasz {
   mod: "naplo" | "hatalybalepes";
   tetelek: ValtozasTetel[];
-  /** ezt tárold el cursorként a következő híváshoz (napló-ágon) */
+  /**
+   * ezt tárold el cursorként a következő híváshoz (napló-ágon): átlátszatlan
+   * szöveg, `<felveve>_<slug>_<datum>` alakú; üres lapon a bemeneti cursor
+   */
   kovetkezo_felveve_utan: string | null;
   megjegyzes: string;
 }
@@ -119,10 +123,11 @@ function honapok(tol: string): string[] {
   return lista;
 }
 
-async function naploAg(felveveUtan: string): Promise<{ sorok: FelvetelSor[]; vanNaplo: boolean }> {
-  const fajlok = await Promise.all(honapok(felveveUtan).map((h) => getFelvetelNaplo(h)));
+/** A cursor hónapjától máig minden naplósor; a cursor utáni szűrést a `lapoz` végzi. */
+async function naploAg(kurzor: Kurzor): Promise<{ sorok: FelvetelSor[]; vanNaplo: boolean }> {
+  const fajlok = await Promise.all(honapok(kurzor.felveve).map((h) => getFelvetelNaplo(h)));
   const vanNaplo = fajlok.some((f) => f !== null);
-  const sorok = fajlok.flatMap((f) => f ?? []).filter((s) => s.felveve > felveveUtan);
+  const sorok = fajlok.flatMap((f) => f ?? []).filter((s) => s.felveve >= kurzor.felveve);
   return { sorok, vanNaplo };
 }
 
@@ -191,43 +196,39 @@ export async function valtozasokApi(p: ValtozasokParam): Promise<ValtozasokValas
     if (ertek && !ervenyesDatum(ertek))
       throw new ApiHiba(400, `A \`${mezo}\` alakja YYYY-MM-DD (valódi naptári dátum)`, mezo);
   }
-  if (p.felveve_utan && Number.isNaN(Date.parse(p.felveve_utan))) {
-    throw new ApiHiba(400, "A `felveve_utan` ISO-8601 időbélyeg (pl. 2026-09-15T00:00:00Z)", "felveve_utan");
+  const kurzor = p.felveve_utan ? kurzorParse(p.felveve_utan) : null;
+  if (p.felveve_utan && !kurzor) {
+    throw new ApiHiba(
+      400,
+      "A `felveve_utan` ISO-8601 időbélyeg (pl. 2026-09-15T00:00:00Z) vagy a válasz `kovetkezo_felveve_utan` értéke változtatás nélkül",
+      "felveve_utan",
+    );
   }
   const darab = Math.min(Math.max(p.limit ?? KORLAT.valtozasokAlap, 1), KORLAT.valtozasokMax);
   const terkep = await jogszabalyTerkep();
   const szur = szurok(p, terkep);
 
-  let mod: ValtozasokValasz["mod"] = "hatalybalepes";
-  let nyers: Nyers[];
-  if (p.felveve_utan) {
-    const cursor = new Date(p.felveve_utan).toISOString().replace(/\.\d{3}Z$/, "Z");
-    const { sorok, vanNaplo } = await naploAg(cursor);
+  if (kurzor) {
+    const { sorok, vanNaplo } = await naploAg(kurzor);
     if (vanNaplo) {
-      mod = "naplo";
-      nyers = sorok.map((s) => ({ slug: s.slug, datum: s.datum, felveve: s.felveve }));
-    } else {
-      // még nincs napló (a cursor a bevezetés előtti) — hatálybalépés szerint esünk vissza
-      nyers = await hatalybalepesAg({ ...p, since: p.since ?? cursor.slice(0, 10) });
+      // Veszteségmentes keyset-lapozás (#26): a szűrt sorok közül a cursor utáni
+      // legrégebbi `darab` sor, a cursor a lap utolsó sora. Üres lapon a cursor
+      // nem változik.
+      const { lap, kovetkezo } = lapoz(sorok.filter(szur), kurzor, darab);
+      const tetelek = await korlatozottParhuzam(lap, 4, (n) => tetelKifejt(n, terkep.get(n.slug)!));
+      return { mod: "naplo", tetelek, kovetkezo_felveve_utan: kovetkezo, megjegyzes: MEGJEGYZES };
     }
-  } else {
-    nyers = await hatalybalepesAg(p);
   }
 
+  // Hatálybalépés szerint, legújabb elöl; cursor nélkül vagy ha a cursor a napló
+  // bevezetése előtti (még nincs naplófájl): ekkor a cursor napjától.
+  const nyers = await hatalybalepesAg(
+    kurzor ? { ...p, since: p.since ?? kurzor.felveve.slice(0, 10) } : p,
+  );
   const kivalasztott = nyers
     .filter(szur)
-    .sort((a, b) => (b.felveve ?? "").localeCompare(a.felveve ?? "") || b.datum.localeCompare(a.datum))
+    .sort((a, b) => b.datum.localeCompare(a.datum))
     .slice(0, darab);
-
   const tetelek = await korlatozottParhuzam(kivalasztott, 4, (n) => tetelKifejt(n, terkep.get(n.slug)!));
-  const legfrissebb = kivalasztott.reduce<string | null>(
-    (max, n) => (n.felveve && (!max || n.felveve > max) ? n.felveve : max),
-    null,
-  );
-  return {
-    mod,
-    tetelek,
-    kovetkezo_felveve_utan: legfrissebb ?? (mod === "naplo" ? p.felveve_utan ?? null : null),
-    megjegyzes: MEGJEGYZES,
-  };
+  return { mod: "hatalybalepes", tetelek, kovetkezo_felveve_utan: null, megjegyzes: MEGJEGYZES };
 }

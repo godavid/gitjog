@@ -4,7 +4,9 @@
 // mdRender()-ével (ismétlődő címek -2, -3 utótagos ütközésfeloldásával
 // együtt), különben a találat mélylinkje rossz §-ra visz. Ezt az invariánst
 // a test/szakaszok.test.ts őrzi: mindkét implementációt ugyanarra a
-// bemenetre futtatja és összeveti.
+// bemenetre futtatja és összeveti. Ehhez a teszt a csomaghatáron át
+// importálja az apps/web/lib/md.ts-t; ez az AGENTS.md „Kódterületek és
+// importszabályok” szakaszában felsorolt kivétel.
 
 export interface Szakasz {
   /** sorrend a törvényen belül, 1-től */

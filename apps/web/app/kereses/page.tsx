@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { keres, type Talalat } from "@/lib/kereso";
 
 export async function generateMetadata({
@@ -104,9 +103,10 @@ export default async function KeresesOldal({
       {talalatok.map((t, i) => (
         <div className="talalat" key={i}>
           <h2>
-            <Link href={`/jogszabaly/${t.slug}${t.horgony ? `#${t.horgony}` : ""}`}>
+            {/* horgonyos belső link: sima <a>, mert a :target kliens-navigáció után nem frissül (DESIGN.md) */}
+            <a href={`/jogszabaly/${t.slug}${t.horgony ? `#${t.horgony}` : ""}`}>
               {t.szakasz || t.jogszabaly}
-            </Link>
+            </a>
           </h2>
           <p className="forras">
             {t.jogszabaly}

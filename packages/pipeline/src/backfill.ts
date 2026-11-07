@@ -34,12 +34,12 @@ import {
   repoInit,
   type AllapotBejegyzes,
 } from "./commit.js";
-import { DISCLAIMER_MD, GITATTRIBUTES, LICENSE_TXT, README_MD } from "./sablonok.js";
+import { DISCLAIMER_MD, GITATTRIBUTES, LICENSE_HU_MD, LICENSE_TXT, README_MD } from "./sablonok.js";
 
 const push = process.argv.includes("--push");
 const folytat = process.argv.includes("--folytat");
 const ma = maiNapBudapest();
-/** ennyi feldolgozott jogszabályonként közbenső push (append-módban) */
+/** ennyi commitonként közbenső push (append-módban) */
 const KOTEG_MERET = 500;
 
 const teljesLista = await teljesJogszabalyLista();
@@ -73,6 +73,7 @@ if (folytat) {
   await fajlIras("README.md", README_MD);
   await fajlIras("DISCLAIMER.md", DISCLAIMER_MD);
   await fajlIras("LICENSE", LICENSE_TXT);
+  await fajlIras("LICENSE-HU.md", LICENSE_HU_MD);
   await fajlIras(".gitattributes", GITATTRIBUTES);
   await commit("Adat-repo váz: README, DISCLAIMER, LICENSE");
   console.log("Váz commitolva.");

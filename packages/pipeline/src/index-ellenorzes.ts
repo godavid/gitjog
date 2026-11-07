@@ -1,7 +1,9 @@
 // Konzisztencia-ellenőrző: összeveti az adat-repo index-fájljait
 // (index/jogszabalyok.json, index/allapotok.json) a per-jogszabály fájlokkal
 // (jogszabalyok/<slug>/meta.json, allapotok.json), és jelenti az eltéréseket.
-// Csak olvas: nem ír fájlt, nem hív gitet, nem megy hálózatra.
+// A HEAD-blob ellenőrzés (index-ellenorzes-lib.ts) emellett egy csak olvasó
+// `git cat-file --batch-check` folyamattal összeveti a HEAD szoveg.md-jét az index
+// szerinti utolsó időállapot blobjával. Nem ír fájlt, nem megy hálózatra, titok nem kell.
 // Futtatás: pnpm index-ellenorzes
 //   (vagy: NYILT_ADAT_REPO_DIR=<adat-repo> pnpm exec tsx src/index-ellenorzes.ts)
 
@@ -9,6 +11,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ADAT_REPO_DIR } from "./commit.js";
+import { type AllapotBejegyzes, type Elteres, headBlobEllenorzes } from "./index-ellenorzes-lib.js";
 
 /** egy sor az index/jogszabalyok.json tömbből */
 interface IndexJogszabaly {
@@ -17,13 +20,6 @@ interface IndexJogszabaly {
   megjeloles: string;
   cim: string;
   rovidites: string | null;
-}
-
-/** egy állapot-bejegyzés az index/allapotok.json-ban és a per-jogszabály fájlban */
-interface AllapotBejegyzes {
-  datum: string;
-  verzio: number;
-  sha?: string;
 }
 
 /** a per-jogszabály meta.json szerkezete */
@@ -36,12 +32,6 @@ interface MetaJson {
   forras: string;
   megjegyzes: string;
   allapotok: { datum: string; verzio: number }[];
-}
-
-/** egy jelentett eltérés: slug + rövid magyar indoklás */
-interface Elteres {
-  slug: string;
-  indoklas: string;
 }
 
 const MAX_PELDA = 20;
@@ -156,12 +146,16 @@ for (const slug of slugok) {
   }
 }
 
+// HEAD-blob eltérés: a HEAD szoveg.md-je nem az index szerinti utolsó állapot blobja
+const headBlobElteres = headBlobEllenorzes(ADAT_REPO_DIR, indexAllapotok);
+
 const kategoriak: [string, Elteres[]][] = [
   ["hiányzó index-bejegyzés", hianyzoIndex],
   ["hiányzó állapot az indexből", hianyzoAllapot],
   ["üres SHA", uresSha],
   ["eltérő per-törvény állapotfájl", elteroFajl],
   ["olvashatatlan meta.json", olvashatatlan],
+  ["HEAD-blob eltérés", headBlobElteres],
 ];
 
 console.log(`Ellenőrzött jogszabály: ${slugok.length}`);
@@ -180,9 +174,16 @@ for (const [nev, lista] of kategoriak) {
 const osszesElteres = kategoriak.reduce((n, [, lista]) => n + lista.length, 0);
 console.log();
 if (osszesElteres > 0) {
-  console.log(
-    `HIBA: ${osszesElteres} eltérés — az index újraépítése kell (pnpm exec tsx src/index-ujraepites.ts).`,
-  );
+  console.log(`HIBA: ${osszesElteres} eltérés.`);
+  if (osszesElteres > headBlobElteres.length) {
+    console.log("  Index-eltérésnél az index újraépítése kell (pnpm exec tsx src/index-ujraepites.ts).");
+  }
+  if (headBlobElteres.length > 0) {
+    console.log(
+      "  HEAD-blob eltérésnél NEM az index újraépítése a javítás: az utolsó időállapotot a pipeline-on" +
+        " át újra kell commitolni (a delta HEAD-helyreállítása a jövőbeli futásokra ezt megteszi).",
+    );
+  }
   process.exitCode = 1;
 } else {
   console.log("RENDBEN: az index konzisztens.");

@@ -32,11 +32,14 @@ import { naploIras, type FelvetelTetel } from "./felvetel.js";
 import {
   modositoBlokkValtozas,
   modositoTorveny,
+  regebbiAllapot,
   riaszt,
   szetcsuszasGyanu,
   TerjedelemAnomalia,
   terjedelemEllenorzes,
 } from "./health.js";
+import { ERVENYES_SHA, type AllapotBejegyzes as IndexAllapot } from "./index-ellenorzes-lib.js";
+import { kihagyottakSzuro, type KihagyottTetel } from "./kihagyottak.js";
 import { AGENTS_MD } from "./sablonok.js";
 import type { IndexTetel } from "./kereso-index.js";
 import {
@@ -47,7 +50,6 @@ import {
   git,
   metaJson,
   pushRebase,
-  type AllapotBejegyzes,
 } from "./commit.js";
 
 const push = !process.argv.includes("--no-push");
@@ -86,6 +88,15 @@ interface UjEsemeny {
   allapot: Idoallapot;
 }
 
+/**
+ * HEAD-helyreállításra váró jogszabály: ma egy, a legutóbb ismert állapotánál
+ * RÉGEBBI állapota kerül be, ami a HEAD szövegét a régi szövegre állítaná.
+ */
+interface Helyreallitas {
+  js: Jogszabaly;
+  utolso: IndexAllapot;
+}
+
 async function retegTerkepMentes(terkep: RetegTerkep): Promise<void> {
   await fajlIras(RETEG_FAJL, retegTerkepJson(terkep));
 }
@@ -106,7 +117,7 @@ async function fut(): Promise<void> {
   }
   const ismertNyers = JSON.parse(
     await readFile(join(ADAT_REPO_DIR, "index", "allapotok.json"), "utf8"),
-  ) as Record<string, AllapotBejegyzes[]>;
+  ) as Record<string, IndexAllapot[]>;
 
   // 1. friss verziólisták + új állapotok kigyűjtése — csak a ma esedékes
   // jogszabályokra (réteges enumerálás, lásd enumeralas.ts)
@@ -122,9 +133,11 @@ async function fut(): Promise<void> {
   );
 
   const ujak: UjEsemeny[] = [];
+  const helyreallitasok = new Map<string, Helyreallitas>();
   let halozatiHiba = 0;
   for (const js of maiak) {
-    const ismertek = new Set((ismertNyers[js.slug] ?? []).map((a) => a.datum));
+    const ismertAllapotok = ismertNyers[js.slug] ?? [];
+    const ismertek = new Set(ismertAllapotok.map((a) => a.datum));
     let mind;
     try {
       mind = await getIdoallapotok(js.documentId, { fresh: true });
@@ -142,7 +155,17 @@ async function fut(): Promise<void> {
     retegTerkep[js.documentId] = retegBesorolas(mind, ma);
     // ugyanaz a napi-győztes logika, mint a backfillben (0 napot élt állapot veszít)
     for (const a of napiGyoztesek(mind.filter((x) => x.hatalyba <= ma))) {
-      if (!ismertek.has(a.hatalyba)) ujak.push({ js, allapot: a });
+      if (ismertek.has(a.hatalyba)) continue;
+      ujak.push({ js, allapot: a });
+      // régebbi-állapot-őr: a késve bekerülő régi állapot a HEAD-et is
+      // visszaállítaná (így tört el a 1930-evi-xxxvii-torveny) — lásd a 2. lépés után
+      const utolso = regebbiAllapot(ismertAllapotok, a.hatalyba);
+      if (utolso) {
+        console.warn(
+          `[régebbi állapot] ${js.slug}: ${a.hatalyba} régebbi a legutóbb ismert ${utolso.datum}-nál — HEAD-helyreállítás jön`,
+        );
+        helyreallitasok.set(js.slug, { js, utolso });
+      }
     }
   }
   if (halozatiHiba > MAX_HALOZATI_HIBA) {
@@ -266,10 +289,43 @@ async function fut(): Promise<void> {
     await commit(`${cim}\n\nForrás (njt):\n${uzenetSorok.map((s) => `- ${s}`).join("\n")}`, datum);
     console.log(`Commit: ${datum} — ${nevek.join(", ")}`);
   }
+  const bekerult = esemenyek.filter((e) => !anomaliak.has(e.js.slug));
+
+  // 2b. HEAD-helyreállítás: ha egy jogszabálynak ma csak a legutóbb ismert
+  // állapotánál régebbi állapota került be, a HEAD szövege a régi szöveg lett.
+  // A legutóbbi állapot szövegét a saját commitjából visszaírjuk és a saját
+  // dátumával újra commitoljuk, így a HEAD soha nem áll vissza régebbi
+  // szövegre. (Ez a git-ág teszteletlen: a regebbiAllapot() döntése tesztelt.)
+  for (const { js, utolso } of helyreallitasok.values()) {
+    if (anomaliak.has(js.slug)) continue; // ma semmi nem került be belőle
+    const maiLegujabb = bekerult
+      .filter((e) => e.js.slug === js.slug)
+      .reduce<string>((m, e) => (e.allapot.hatalyba > m ? e.allapot.hatalyba : m), "");
+    if (!maiLegujabb || maiLegujabb >= utolso.datum) continue; // a HEAD már a legújabbat mutatja
+    if (!utolso.sha) {
+      throw new Error(`HEAD-helyreállítás sikertelen: ${js.slug} ${utolso.datum} állapotához az indexben nincs sha`);
+    }
+    // Az sha az adat-repo indexéből jön, és a `git show` argumentuma lesz: csak
+    // teljes hex commit-azonosítót engedünk, különben egy `-`-kezdetű érték
+    // opcióként (pl. `--output=…`) futna.
+    if (!ERVENYES_SHA.test(utolso.sha)) {
+      throw new Error(`HEAD-helyreállítás sikertelen: ${js.slug} ${utolso.datum} index-sha-ja érvénytelen`);
+    }
+    const szoveg = await git(["show", `${utolso.sha}:jogszabalyok/${js.slug}/szoveg.md`]);
+    await fajlIras(`jogszabalyok/${js.slug}/szoveg.md`, szoveg);
+    const nev = js.rovidites ?? js.megjeloles;
+    if (await commit(`${nev} — időállapot ${utolso.datum} (HEAD-helyreállítás)`, utolso.datum)) {
+      console.log(`Commit: ${utolso.datum} — ${nev} (HEAD-helyreállítás)`);
+    }
+  }
+
+  // Az állapot-commitok pusha MÉG az index előtt: egy elutasított push rebase-e
+  // minden helyi SHA-t átír, az index és a felvételi napló viszont SHA-kra
+  // hivatkozik — ezért azokat csak a végleges (pusholt) commitokból számoljuk.
+  if (push) await pushRebase();
 
   // 3. index frissítése külön utócommitban — CSAK a változott jogszabályokra
   // (5585 jogszabálynál a teljes újraépítés naponta fölösleges git-log-ezrek lenne)
-  const bekerult = esemenyek.filter((e) => !anomaliak.has(e.js.slug));
   const valtozottSlugok = [...new Set(bekerult.map((e) => e.js.slug))];
   const allapotIndex = JSON.parse(
     await readFile(join(ADAT_REPO_DIR, "index", "allapotok.json"), "utf8"),
@@ -311,13 +367,27 @@ async function fut(): Promise<void> {
   listaIndex.sort((a, b) => a.slug.localeCompare(b.slug));
   await fajlIras("index/jogszabalyok.json", JSON.stringify(listaIndex, null, 2) + "\n");
   await fajlIras("index/allapotok.json", JSON.stringify(allapotIndex, null, 2) + "\n");
+  await kihagyottakTisztitas(listaIndex);
   await retegTerkepMentes(retegTerkep);
   await naploIras(new Date(), naploTetelek);
   await fajlIras("AGENTS.md", AGENTS_MD);
   await commit("Index frissítés (allapotok.json, enumeralas.json, felvételi napló)");
 
   if (push) {
-    await pushRebase();
+    const rebaselt = await pushRebase();
+    if (rebaselt) {
+      // Az index-commit saját SHA-jára semmi nem hivatkozik, az állapot-commitok
+      // viszont már pusholva voltak — a rebase-nek érintetlenül kellett hagynia őket.
+      for (const t of naploTetelek) {
+        try {
+          await git(["merge-base", "--is-ancestor", t.sha, "HEAD"]);
+        } catch {
+          throw new Error(
+            `Rebase után a naplózott ${t.slug}@${t.datum} commit (${t.sha}) nem a HEAD őse — az index hivatkozásai érvénytelenek`,
+          );
+        }
+      }
+    }
     console.log("Push KÉSZ.");
   }
 
@@ -335,6 +405,24 @@ async function fut(): Promise<void> {
         `(a kimaradt állapotokat a következő futások addig minden nap újra megpróbálják).`,
     );
   }
+}
+
+/**
+ * A backfill kihagyott-listájából (index/kihagyottak.json) kiveszi az azóta
+ * bekerült jogszabályokat. Csak akkor ír, ha változott — az Index-commit része.
+ */
+async function kihagyottakTisztitas(listaIndex: IndexTetel[]): Promise<void> {
+  const ut = join(ADAT_REPO_DIR, "index", "kihagyottak.json");
+  if (!existsSync(ut)) return;
+  const lista = JSON.parse(await readFile(ut, "utf8")) as KihagyottTetel[];
+  const szurt = kihagyottakSzuro(
+    lista,
+    new Set(listaIndex.map((t) => t.documentId)),
+    new Set(listaIndex.map((t) => t.slug)),
+  );
+  if (szurt.length === lista.length) return;
+  console.log(`kihagyottak.json: ${lista.length - szurt.length} bekerült jogszabály kivéve`);
+  await fajlIras("index/kihagyottak.json", JSON.stringify(szurt, null, 2) + "\n");
 }
 
 /**

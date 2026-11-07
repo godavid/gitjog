@@ -38,6 +38,7 @@ export const metadata: Metadata = {
 /** a példákban szereplő törvény: a legtöbbet módosított kódexek egyike */
 const PELDA_SLUG = "2013-evi-v-torveny-ptk";
 
+/** csak az első hívás ad időbélyeget; utána a `kovetkezo_felveve_utan` megy vissza változtatás nélkül (átlátszatlan cursor) */
 const CURSOR_ELSO = `curl "${OLDAL_URL}/api/v1/valtozasok?felveve_utan=$(date -u +%Y-%m-%dT%H:%M:%SZ)&slugs=${PELDA_SLUG}"`;
 const GIT_PULL = "git pull --ff-only && git log --stat ORIG_HEAD..HEAD -- jogszabalyok/";
 
@@ -156,7 +157,8 @@ export default async function AgenteknekOldal() {
             <dt>GitHub commit-feed (Atom)</dt>
             <dd>
               <p>
-                Az adat-repó commitjai: minden commit egy hatályba lépett időállapot. Egy törvényre
+                Az adat-repó commitjai: az állapot-commitok hatályba lépett időállapotokat hordoznak (az
+                Index frissítés és az Enumerálás-térkép frissítés commit nem időállapot). Egy törvényre
                 szűkítve a könyvtárának feedje kell.
               </p>
               <KodSor kod={githubAtom()} mit="a teljes commit-feed címe" />
@@ -173,11 +175,12 @@ export default async function AgenteknekOldal() {
                   <KodSor kod={CURSOR_ELSO} mit="az első cursoros hívás" />
                 </li>
                 <li>
-                  A válasz <code>kovetkezo_felveve_utan</code> mezőjét tárold el: ez a cursor.
+                  A válasz <code>kovetkezo_felveve_utan</code> mezőjét tárold el változtatás nélkül: ez a cursor (átlátszatlan szöveg, ne értelmezd).
                 </li>
                 <li>
-                  Naponta, {FRISSITES_UTAN} után hívd újra a tárolt cursorral. Üres <code>tetelek</code>{" "}
-                  = nincs újdonság.
+                  Naponta, {FRISSITES_UTAN} után hívd újra a tárolt cursorral. Minden lap után tárold el
+                  az új cursort, és kérd a következő lapot, amíg a <code>tetelek</code> üres nem lesz. Üres{" "}
+                  <code>tetelek</code> = nincs újdonság.
                 </li>
                 <li>
                   Ha van tétel: az <code>erintett_szakaszok</code> régi és új szövege elég egy

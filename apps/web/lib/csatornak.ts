@@ -1,6 +1,8 @@
 // A gépi és értesítési csatornák egyetlen forrása: a főoldal, az /agenteknek
-// oldal és az /llms.txt ugyanezekből a címekből és bekötési receptekből
-// dolgozik, hogy a három felület ne térhessen el egymástól.
+// oldal és az /llms.txt ugyanezekből a címekből, REST-példákból és bekötési
+// receptekből dolgozik, hogy a három felület ne térhessen el egymástól.
+// (A llms.txt a cursoros figyelő-recept URL-jét kézzel írja: annak nincs itt
+// megfelelője.)
 
 import { ADAT_REPO } from "@/lib/adat";
 import { OLDAL_URL } from "@/lib/sitemap";
@@ -46,7 +48,7 @@ export const REST_PELDAK: { muvelet: string; mire: string; url: string }[] = [
   {
     muvelet: "valtozasok",
     mire: "mi változott 2026 óta?",
-    url: `${OLDAL_URL}/api/v1/valtozasok?since=2026-01-01&q=termőföld|földek forgalm|Földalap`,
+    url: `${OLDAL_URL}/api/v1/valtozasok?since=2026-01-01&q=termőföld|földek+forgalm|Földalap`,
   },
   {
     muvelet: "diff",

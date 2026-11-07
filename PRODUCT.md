@@ -92,8 +92,10 @@ adatbázis, hanem adat, amihez a felület csak hozzáférés.
 - **Név: GitJog**, 2026-09-16 óta. Az előző név védjegyfelszólítás miatt szűnt meg;
   a „jogtár” szó a kommunikációban (oldal, doksik, commit-üzenet, közösségi felület)
   nem használható, és versenytárs-összehasonlítást sem teszünk.
-- **Aldomain marad:** `gitjog.remenyfarm.hu`; önálló domain nem cél. A régi cím
-  átirányít (a vállalás szerint 2026-12-31-ig).
+- **Aldomain marad:** `gitjog.remenyfarm.hu`; önálló domain nem cél. A régi aldomain
+  átirányítása 2026-09-16 óta nem él (a DNS-rekord megszűnt); döntés (owner,
+  2026-09-23): a régi címet nem használjuk, a helyreállítását nem javasoljuk, és nem
+  hibajelenség.
 - Magyar nyelvű felület.
 - Hang és karakter: közérdekű átláthatósági infrastruktúra — pontos, nyugodt,
   hivatali komolyság melegséggel; irattár, nem startup. Semmi marketinges

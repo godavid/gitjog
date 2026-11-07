@@ -8,7 +8,7 @@ export interface TorvenyBejegyzes {
 }
 
 /** documentId-k, ahol a slug nem képletből jön, hanem kiemelt érték. */
-const KIEMELT_SLUGOK: Readonly<Record<string, string>> = {
+export const KIEMELT_SLUGOK: Readonly<Record<string, string>> = {
   "2011-4301-02-00": "magyarorszag-alaptorvenye",
   "2013-5-00-00": "2013-evi-v-torveny-ptk",
   "2012-100-00-00": "2012-evi-c-torveny-btk",
