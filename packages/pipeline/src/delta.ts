@@ -38,6 +38,7 @@ import {
   TerjedelemAnomalia,
   terjedelemEllenorzes,
 } from "./health.js";
+import { ERVENYES_SHA, type AllapotBejegyzes as IndexAllapot } from "./index-ellenorzes-lib.js";
 import { kihagyottakSzuro, type KihagyottTetel } from "./kihagyottak.js";
 import { AGENTS_MD } from "./sablonok.js";
 import type { IndexTetel } from "./kereso-index.js";
@@ -49,7 +50,6 @@ import {
   git,
   metaJson,
   pushRebase,
-  type AllapotBejegyzes,
 } from "./commit.js";
 
 const push = !process.argv.includes("--no-push");
@@ -86,11 +86,6 @@ const MAX_HALOZATI_HIBA = 20;
 interface UjEsemeny {
   js: Jogszabaly;
   allapot: Idoallapot;
-}
-
-/** az index/allapotok.json tétele: a meta.json párja + a commit SHA-ja */
-interface IndexAllapot extends AllapotBejegyzes {
-  sha?: string;
 }
 
 /**
@@ -313,7 +308,7 @@ async function fut(): Promise<void> {
     // Az sha az adat-repo indexéből jön, és a `git show` argumentuma lesz: csak
     // teljes hex commit-azonosítót engedünk, különben egy `-`-kezdetű érték
     // opcióként (pl. `--output=…`) futna.
-    if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(utolso.sha)) {
+    if (!ERVENYES_SHA.test(utolso.sha)) {
       throw new Error(`HEAD-helyreállítás sikertelen: ${js.slug} ${utolso.datum} index-sha-ja érvénytelen`);
     }
     const szoveg = await git(["show", `${utolso.sha}:jogszabalyok/${js.slug}/szoveg.md`]);

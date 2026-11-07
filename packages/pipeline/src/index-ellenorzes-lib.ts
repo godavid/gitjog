@@ -23,7 +23,7 @@ export interface Elteres {
 
 const ERVENYES_SLUG = /^[a-z0-9-]+$/;
 /** teljes SHA-1 (40) vagy SHA-256 (64) hex commit-azonosító */
-const ERVENYES_SHA = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
+export const ERVENYES_SHA = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
 
 function szovegUt(slug: string): string {
   return `jogszabalyok/${slug}/szoveg.md`;

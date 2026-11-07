@@ -222,9 +222,9 @@ export async function valtozasokApi(p: ValtozasokParam): Promise<ValtozasokValas
 
   // Hatálybalépés szerint, legújabb elöl; cursor nélkül vagy ha a cursor a napló
   // bevezetése előtti (még nincs naplófájl): ekkor a cursor napjától.
-  const nyers = kurzor
-    ? await hatalybalepesAg({ ...p, since: p.since ?? kurzor.felveve.slice(0, 10) })
-    : await hatalybalepesAg(p);
+  const nyers = await hatalybalepesAg(
+    kurzor ? { ...p, since: p.since ?? kurzor.felveve.slice(0, 10) } : p,
+  );
   const kivalasztott = nyers
     .filter(szur)
     .sort((a, b) => b.datum.localeCompare(a.datum))
