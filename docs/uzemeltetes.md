@@ -99,14 +99,21 @@
     SHA-kra hivatkozik; ezért a delta az állapot-commitokat előbb pusholja
     (`pushRebase()`), az indexet már a végleges SHA-kból építi, és ha a záró
     (index-commitos) push rebase-elt, ellenőrzi, hogy minden naplózott SHA a HEAD őse —
-    ha nem, hibával leáll. Így egy rebase nem hagyhat árva index-SHA-t.
+    ha nem, hibával leáll. Így egy rebase nem hagyhat árva index-SHA-t. Ára: a két push
+    között elbukó futás után az adat-repóban index nélküli állapot-commitok maradnak (a
+    webes index addig nem mutatja őket, az `Index-integritás` lépés jelez). A következő
+    futás, amelyben a jogszabály esedékes, újként látja őket: egyetlen állapotnál a
+    változatlan szöveg nem ad új commitot, és az index a már pusholt commitokból épül;
+    több mai állapotnál a régebbi szövege újra commitolódik a HEAD fölé, majd a legújabb
+    utána, a felvételi naplóba pedig ismét bekerülnek.
   - **HEAD-helyreállítás.** Ha egy jogszabálynak ma csak a legutóbb ismert állapotánál
     RÉGEBBI állapota kerül be (a `health.ts` `regebbiAllapot()`-ja dönti el), a HEAD
     `szoveg.md`-je a régi szöveg lenne — így tört el az `1930-evi-xxxvii-torveny`, ahol
     egy 1930-as állapot a 2017-es után került commitra. A delta ezért a régi állapot
     után a legutóbbi ismert állapot szövegét a saját commitjából (`git show <sha>:…`)
     visszaírja és a saját dátumával újra commitolja („… (HEAD-helyreállítás)” üzenettel).
-    Ha az indexben nincs `sha` az utolsó állapothoz, figyelmeztet és kihagyja.
+    Ha az indexben nincs `sha` az utolsó állapothoz, a delta hibával leáll, még az első
+    push előtt: semmi nem kerül az adat-repóba, kézi javítás kell (index-újraépítés).
   - **`index/kihagyottak.json` tisztítása.** A backfill kihagyási listájából a delta
     kiveszi az azóta bekerült jogszabályokat (`kihagyottak.ts`); csak akkor ír, ha
     változott, az index-commit része.

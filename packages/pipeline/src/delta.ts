@@ -407,13 +407,6 @@ async function fut(): Promise<void> {
 }
 
 /**
- * Keresőindex-szinkron a változott jogszabályokra. KÜLÖN hibaágon fut: az
- * index származtatott adat, a hibája nem ronthatja el a delta kilépési
- * kódját — az adat-repo integritása előbbre való. Riasztunk a pótló
- * paranccsal: a következő futás csak a SAJÁT változásait szinkronizálja,
- * az itt kimaradt jogszabályokat magától nem pótolja.
- */
-/**
  * A backfill kihagyott-listájából (index/kihagyottak.json) kiveszi az azóta
  * bekerült jogszabályokat. Csak akkor ír, ha változott — az Index-commit része.
  */
@@ -431,6 +424,13 @@ async function kihagyottakTisztitas(listaIndex: IndexTetel[]): Promise<void> {
   await fajlIras("index/kihagyottak.json", JSON.stringify(szurt, null, 2) + "\n");
 }
 
+/**
+ * Keresőindex-szinkron a változott jogszabályokra. KÜLÖN hibaágon fut: az
+ * index származtatott adat, a hibája nem ronthatja el a delta kilépési
+ * kódját — az adat-repo integritása előbbre való. Riasztunk a pótló
+ * paranccsal: a következő futás csak a SAJÁT változásait szinkronizálja,
+ * az itt kimaradt jogszabályokat magától nem pótolja.
+ */
 async function keresoIndexSzinkron(
   valtozottSlugok: string[],
   listaIndex: IndexTetel[],
