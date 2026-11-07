@@ -10,11 +10,11 @@ const L = {
   hatalyos: "Csak hatályos szöveg (alap: true). false: a már nem hatályos jogszabályok szövege is.",
   keresesLimit: `Találatok száma (alap ${KORLAT.keresesAlap}, max ${KORLAT.keresesMax}).`,
   slug: "A jogszabály slugja, pl. „2013-evi-cxxii-torveny-foldforgalmi” (a `kereses` adja).",
-  horgony: "A § horgonya, pl. „18-sz-elovasarlasi-jog” (a `kereses` vagy a tartalomjegyzék adja).",
+  horgony: "A § horgonya, pl. „6-272-sz-megbizasi-szerzodes” (a `kereses` vagy a tartalomjegyzék adja).",
   paragrafus: "A § száma horgony helyett: „18. §”, „6:272. §”, „18/A. §”.",
   datum: "Időállapot napja (YYYY-MM-DD): az ezen a napon hatályos szöveg. Alap: a legutolsó.",
   felveve_utan:
-    "Cursor: ISO-8601 időbélyeg; csak az ezután a repóba került időállapotok. A válasz `kovetkezo_felveve_utan` mezőjét add vissza a következő hívásban.",
+    "Cursor (átlátszatlan szöveg): első hívásnál egy ISO-8601 időbélyeg (csak az ezután a repóba került időállapotok), utána a válasz `kovetkezo_felveve_utan` mezője változtatás nélkül. A napló-ágon a tételek a felvétel sorrendjében (legrégebbi elöl) jönnek, rés és duplikátum nélkül.",
   since: "Hatálybalépés napjától (YYYY-MM-DD).",
   until: "Hatálybalépés napjáig (YYYY-MM-DD).",
   slugs: "Csak ezek a jogszabályok.",
@@ -30,7 +30,7 @@ const L = {
 // FTS-lekérdezés ne kapjon tetszőleges méretű bemenetet.
 const MAX = 200;
 const szoveg = () => z.string().max(MAX);
-const cursor = z.string().max(40);
+const cursor = z.string().max(160);
 
 const datum = z
   .string()

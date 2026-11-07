@@ -38,6 +38,7 @@ export const metadata: Metadata = {
 /** a példákban szereplő törvény: a legtöbbet módosított kódexek egyike */
 const PELDA_SLUG = "2013-evi-v-torveny-ptk";
 
+/** csak az első hívás ad időbélyeget; utána a `kovetkezo_felveve_utan` megy vissza változtatás nélkül (átlátszatlan cursor) */
 const CURSOR_ELSO = `curl "${OLDAL_URL}/api/v1/valtozasok?felveve_utan=$(date -u +%Y-%m-%dT%H:%M:%SZ)&slugs=${PELDA_SLUG}"`;
 const GIT_PULL = "git pull --ff-only && git log --stat ORIG_HEAD..HEAD -- jogszabalyok/";
 
@@ -173,7 +174,7 @@ export default async function AgenteknekOldal() {
                   <KodSor kod={CURSOR_ELSO} mit="az első cursoros hívás" />
                 </li>
                 <li>
-                  A válasz <code>kovetkezo_felveve_utan</code> mezőjét tárold el: ez a cursor.
+                  A válasz <code>kovetkezo_felveve_utan</code> mezőjét tárold el változtatás nélkül: ez a cursor (átlátszatlan szöveg, ne értelmezd).
                 </li>
                 <li>
                   Naponta, {FRISSITES_UTAN} után hívd újra a tárolt cursorral. Üres <code>tetelek</code>{" "}
