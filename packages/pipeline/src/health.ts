@@ -102,6 +102,28 @@ export function szetcsuszasGyanu(
   return ujak.filter((u) => !u.vanElozmeny || u.datum < hatar).length;
 }
 
+/**
+ * Régebbi-állapot-őr: az új állapot `hatalyba` napja régebbi-e a jogszabály
+ * legutóbb ismert állapotánál. Ha igen, a legutóbbi ismert állapotot adja
+ * vissza (a HEAD-nek azt kell mutatnia), különben undefined.
+ *
+ * Egy ilyen késve bekerülő régi állapot a HEAD szövegét is visszaállítja a
+ * régi szövegre: a `1930-evi-xxxvii-torveny` 1930-as állapota (az indexből
+ * hiányzott a 1970 előtti commit) így került a 2017-es szöveg fölé. A delta
+ * ezért a régi állapot után a legutóbbi állapot szövegét újra commitolja
+ * (HEAD-helyreállítás).
+ */
+export function regebbiAllapot<T extends { datum: string }>(
+  ismert: T[],
+  ujDatum: string,
+): T | undefined {
+  let utolso: T | undefined;
+  for (const a of ismert) {
+    if (!utolso || a.datum > utolso.datum) utolso = a;
+  }
+  return utolso && utolso.datum > ujDatum ? utolso : undefined;
+}
+
 /** A terjedelem-őr hibája — a hívó ezt jogszabályonként kezeli, nem futás-szinten. */
 export class TerjedelemAnomalia extends Error {}
 

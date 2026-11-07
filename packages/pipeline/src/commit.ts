@@ -17,23 +17,30 @@ export const ADAT_REPO_DIR = process.env.NYILT_ADAT_REPO_DIR ?? join(GYOKER, "da
 const BOT_NEV = "GitJog";
 const BOT_EMAIL = "info@remenyfarm.hu";
 
-export async function git(args: string[], opts: { datum?: string } = {}): Promise<string> {
-  const env = { ...process.env };
-  if (opts.datum) {
-    // A git nem tud 1970 előtti (negatív epoch) commit-dátumot tárolni, ezért a
-    // történeti (pl. 1902-es) hatálybalépések a korszakhatárra kerülnek — a valós
-    // dátum a commit-üzenetben és a meta.json allapotok-listájában él.
-    const datum = opts.datum < "1970-01-01" ? "1970-01-01" : opts.datum;
-    // dél, magyar idő szerint — így a nap minden időzónában stabil
-    const stamp = `${datum}T12:00:00+01:00`;
-    env.GIT_AUTHOR_DATE = stamp;
-    env.GIT_COMMITTER_DATE = stamp;
-  }
+/**
+ * A commit-dátum env-változói. A git nem tud 1970 előtti (negatív epoch)
+ * commit-dátumot tárolni, ezért a történeti (pl. 1902-es) hatálybalépések a
+ * korszakhatárra kerülnek — a valós dátum a commit-üzenetben és a meta.json
+ * allapotok-listájában él. Dél, magyar idő szerint: így a nap minden
+ * időzónában stabil. Dátum nélkül nem ad dátum-kulcsot (a git az órát veszi).
+ */
+export function datumEnv(datum?: string): Record<string, string> {
+  if (!datum) return {};
+  const clampelt = datum < "1970-01-01" ? "1970-01-01" : datum;
+  const stamp = `${clampelt}T12:00:00+01:00`;
+  return { GIT_AUTHOR_DATE: stamp, GIT_COMMITTER_DATE: stamp };
+}
+
+export async function git(
+  args: string[],
+  opts: { datum?: string; cwd?: string } = {},
+): Promise<string> {
+  const env = { ...process.env, ...datumEnv(opts.datum) };
   env.GIT_AUTHOR_NAME = BOT_NEV;
   env.GIT_AUTHOR_EMAIL = BOT_EMAIL;
   env.GIT_COMMITTER_NAME = BOT_NEV;
   env.GIT_COMMITTER_EMAIL = BOT_EMAIL;
-  const { stdout } = await execFileP("git", ["-C", ADAT_REPO_DIR, ...args], {
+  const { stdout } = await execFileP("git", ["-C", opts.cwd ?? ADAT_REPO_DIR, ...args], {
     env,
     maxBuffer: 64 * 1024 * 1024,
   });
@@ -66,26 +73,32 @@ export async function commit(uzenet: string, datum?: string): Promise<boolean> {
 }
 
 /**
- * Push a main-re, elutasításnál rebase és újrapróbálás.
+ * Push a main-re, elutasításnál rebase és újrapróbálás. Igazat ad, ha rebase
+ * történt.
  *
  * A remote előrébb járhat: átfedő Actions-futás (az ütemezett és egy kézi
  * indítás beleérhet egymás ablakába) vagy kézi push. Ilyenkor a napi delta nem
  * hasalhat el — 2026-08-08-án pontosan ez történt, non-fast-forward hibával és
  * riasztó issue-val, pedig az adat rendben volt.
  *
- * A rebase biztonságos: az AUTHOR-dátum (a hatálybalépés napja) megmarad, és az
- * index SHA-térképe a commit ÜZENETÉBŐL olvassa a dátumot, nem a committer-
- * dátumból (lásd shaTerkepParse), így az átírt committer-dátum nem zavar.
+ * A rebase NEM átlátszó az indexnek: a `pull --rebase` MINDEN helyi commit
+ * SHA-ját átírja (az author-dátum és az üzenet megmarad). Ezért a SHA-térképet
+ * és a felvételi naplót csak már pusholt (végleges) állapot-commitokból szabad
+ * számolni: a delta.ts előbb pusholja az állapot-commitokat, utána építi az
+ * indexet, és ha a záró push rebase-elt, ellenőrzi, hogy minden naplózott SHA
+ * a HEAD őse.
  */
-export async function pushRebase(probak = 3): Promise<void> {
+export async function pushRebase(probak = 3): Promise<boolean> {
+  let rebaselt = false;
   for (let proba = 1; ; proba++) {
     try {
       await git(["push", "origin", "main"]);
-      return;
+      return rebaselt;
     } catch (e) {
       if (proba >= probak) throw e;
       console.log(`Push elutasítva (${proba}. próba) — rebase és újrapróbálás.`);
       await git(["pull", "--rebase", "origin", "main"]);
+      rebaselt = true;
     }
   }
 }
@@ -162,19 +175,35 @@ export async function indexEpites(jogszabalyok: Jogszabaly[]): Promise<void> {
  * szöveg nem változik (csak lábjegyzet, amit kiszűrünk) — ilyenkor csak a
  * meta.json módosul, de az állapotnak akkor is szerepelnie kell az indexben,
  * különben a napi delta örökké "újként" látná (fantom-állapot hurok).
+ *
+ * A könyvtár allapotok.json-ját KIZÁRJUK: azt az Index-commit írja, és egy
+ * aznapi hatálybalépésnél az Index-commit ugyanarra a napra esne, mint az
+ * állapot-commit — 2026-11-ig 127 indexhivatkozás mutatott Index-commitra.
+ * A `repoDir` csak teszthez (ideiglenes repo); alapból az adat-repo.
  */
-export async function allapotShaTerkep(slug: string): Promise<Map<string, string>> {
-  const ki = await git(["log", "--reverse", "--format=%H|%cs|%s", "--", `jogszabalyok/${slug}/`]);
+export async function allapotShaTerkep(slug: string, repoDir?: string): Promise<Map<string, string>> {
+  const ki = await git(
+    [
+      "log",
+      "--reverse",
+      "--format=%H|%cs|%s",
+      "--",
+      `jogszabalyok/${slug}/`,
+      `:(exclude)jogszabalyok/${slug}/allapotok.json`,
+    ],
+    { cwd: repoDir },
+  );
   return shaTerkepParse(ki);
 }
 
 /**
  * A `%H|%cs|%s` sorok feldolgozása. A kulcs NEM a commit dátuma lehet, mert az
- * 1970 előtti hatálybalépéseket a git() az epoch-határra csúsztatja (lásd ott) —
- * egy 1902-es időállapot commit-dátuma 1970-01-01, így a dátum szerinti
+ * 1970 előtti hatálybalépéseket a datumEnv() az epoch-határra csúsztatja (lásd
+ * ott) — egy 1902-es időállapot commit-dátuma 1970-01-01, így a dátum szerinti
  * párosítás elvesztené. Az üzenet első sorában viszont MINDIG a valódi nap áll
  * ("… — időállapot 1902-09-21" / "Időállapotok 1902-09-21: …"), ezért az a
- * mérvadó; dátum nélküli üzenetnél (index-commitok) marad a commit dátuma.
+ * mérvadó. Dátum nélküli üzenet (Index frissítés, Index újraépítés,
+ * Enumerálás-térkép) nem állapot-commit: kimarad, nincs commit-dátum fallback.
  */
 export function shaTerkepParse(gitLogKimenet: string): Map<string, string> {
   const terkep = new Map<string, string>();
@@ -183,7 +212,8 @@ export function shaTerkepParse(gitLogKimenet: string): Map<string, string> {
     const [sha, commitDatum, ...uzenetReszek] = sor.split("|");
     if (!sha || !commitDatum) continue;
     const uzenetDatum = uzenetReszek.join("|").match(/\d{4}-\d{2}-\d{2}/)?.[0];
-    terkep.set(uzenetDatum ?? commitDatum, sha); // azonos napra az utolsó commit győz
+    if (!uzenetDatum) continue;
+    terkep.set(uzenetDatum, sha); // azonos napra az utolsó állapot-commit győz
   }
   return terkep;
 }
