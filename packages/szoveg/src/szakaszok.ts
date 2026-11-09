@@ -26,7 +26,9 @@ export function horgonyId(cim: string): string {
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    // Az előző lépés minden nem alfanumerikus sorozatot egyetlen "-"-re von össze,
+    // így legfeljebb egy kötőjel állhat az elején és a végén (CodeQL js/polynomial-redos).
+    .replace(/^-|-$/g, "")
     .slice(0, 80);
 }
 

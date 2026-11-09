@@ -9,6 +9,16 @@ describe("horgonyId", () => {
   it("80 karakterre vág", () => {
     expect(horgonyId("a".repeat(200)).length).toBe(80);
   });
+  it("szélső esetek: csak kötőjel, többszörös kötőjel a végeken", () => {
+    expect(horgonyId("-")).toBe("");
+    expect(horgonyId("--a--b--")).toBe("a-b");
+    expect(horgonyId("§ 6:272. [Megbízás]")).toBe("sz-6-272-megbizas");
+  });
+  it("sok vezető kötőjelet lineáris időben levág", () => {
+    const kezdet = Date.now();
+    expect(horgonyId("-".repeat(10000) + "a")).toBe("a");
+    expect(Date.now() - kezdet).toBeLessThan(1000);
+  });
 });
 
 describe("szakaszokraBont", () => {
