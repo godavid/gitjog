@@ -3,7 +3,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { kurzorKiir, kurzorParse, lapoz, type KurzorSor } from "./kurzor.ts";
+import { honapok, kurzorKiir, kurzorParse, lapoz, NAPLO_KEZDET, type KurzorSor } from "./kurzor.ts";
 
 const FELVEVE = "2026-10-06T17:43:08Z";
 
@@ -109,4 +109,25 @@ test("üres lap: a bemeneti cursor változatlanul jön vissza", () => {
   const { lap, kovetkezo } = lapoz([{ felveve: FELVEVE, slug: "a", datum: "2026-10-01" }], kurzorParse(nyers)!, 10);
   assert.equal(lap.length, 0);
   assert.equal(kovetkezo, nyers);
+});
+
+test("honapok: régi cursor a napló kezdetétől indul, a jelenlegi hónapig", () => {
+  assert.equal(NAPLO_KEZDET, "2026-09");
+  assert.deepEqual(honapok("2006-01-15T00:00:00Z", new Date("2026-11-09T12:00:00Z")), ["2026-09", "2026-10", "2026-11"]);
+});
+
+test("honapok: a cursor hónapjától a mai hónapig, mindkét végén bezárva", () => {
+  assert.deepEqual(honapok("2026-10-06T17:43:08Z", new Date("2026-11-09T12:00:00Z")), ["2026-10", "2026-11"]);
+});
+
+test("honapok: évhatáron át is folytonos, a hónap első napja UTC szerint számít", () => {
+  assert.deepEqual(honapok("2026-12-31T23:59:59Z", new Date("2027-01-01T00:00:00Z")), ["2026-12", "2027-01"]);
+});
+
+test("honapok: jövőbeli cursornál üres a lista (nincs végtelen ciklus)", () => {
+  assert.deepEqual(honapok("2027-03-01T00:00:00Z", new Date("2026-11-09T12:00:00Z")), []);
+});
+
+test("honapok: a mai hónap cursora egy elemű lista", () => {
+  assert.deepEqual(honapok("2026-11-09T00:00:00Z", new Date("2026-11-09T12:00:00Z")), ["2026-11"]);
 });
