@@ -381,8 +381,8 @@ GitHub-appja csak a Remeny-Farm orgot látja, a `godavid` fiókot nem.
 A repo publikus, és a napi delta a gitjog **main** ágát futtatja írási joggal az
 adat-repóban — ami a main-re kerül, az ott kódként fut. Ezért a main védett:
 
-- **Ruleset (`main`):** csak PR-en át (squash), kötelező a `biztonsag` check
-  és a CodeQL (high vagy súlyosabb riasztás blokkol), force-push és törlés
+- **Ruleset (`main`):** csak PR-en át (squash), kötelező a `biztonsag`, a `teszt`
+  és a `kapuk` check és a CodeQL (high vagy súlyosabb riasztás blokkol), force-push és törlés
   tiltva. A repo-admin megkerülheti — ez vészhelyzetre van, nem napi útnak;
   a közvetlen push után a scan ugyanúgy lefut, és pirosat mutat, ha gond van.
 - **`.github/workflows/biztonsag.yml`:** gitleaks a teljes előzményen,
@@ -416,9 +416,8 @@ titok, mindkettő `pull_request` (nem `pull_request_target`) és `push` a main-r
   test` (szoveg és pipeline vitest, web `node --test`; a 4 golden-hash teszt
   lemez-cache nélkül kimarad), `tsc` a pipeline-ra (`--noEmit`) és a szoveg-re, külön
   jobban a web `next build` (a Supabase env ártalmatlan helykitöltő, a build nem
-  használja). Összesítő check: `teszt`. A ruleset ma csak a `biztonsag`-ot és a
-  CodeQL-t követeli; a `teszt` kötelezővé tétele (ruleset 23985520) owner-lépés az első
-  zöld futás után (ugyanez áll a `kapuk`-ra).
+  használja). Összesítő check: `teszt`. 2026-11-09 óta a ruleset (23985520) ezt a checket is követeli,
+  a `kapuk`-tal együtt.
 - **`.github/workflows/kapuk.yml`** (`Kapuk`): `import-hatar` (a web és a szoveg nem
   importál a pipeline-ból; a szoveg nem importál `next`, `react`, `postgres`,
   `cheerio`, `@supabase/`, `node:` modult; `packages/*/src` nem importál az `apps/` alól;
@@ -465,7 +464,8 @@ művelet, kulcs nélkül, ugyanabban a Next appban:
   napján, a napi delta előtt) üres hónap, nem hatálybalépés-ág: üres lapon a bemeneti
   cursor jön vissza, `kovetkezo_felveve_utan` cursorral soha nem `null`. A
   hatálybalépés-ág (`mod: "hatalybalepes"`, legújabb elöl, `kovetkezo_felveve_utan: null`)
-  csak cursor nélkül fut (`since`/`slugs`/`q`).
+  csak cursor nélkül fut; szűrője a `since` vagy a `slugs` (legalább az egyik kötelező,
+  különben 400), a `q` ezen felül még szűr.
 - **A `valtozasok` cursora** (`apps/web/lib/api/kurzor.ts`, #26, 2026-11-07 óta
   veszteségmentes): keyset `(felveve, slug, datum)` szerint növekvően, a lap a cursor
   utáni legrégebbi N sor, a `kovetkezo_felveve_utan` a lap UTOLSÓ sorának hármasa

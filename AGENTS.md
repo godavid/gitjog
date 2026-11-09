@@ -5,7 +5,7 @@ A magyar törvények szövege és változástörténete git-ben. Ez a kód-repo
 MCP-szerver. Az adat a külön publikus adat-repóban él (`godavid/magyar-jog`).
 Ez a fájl az egyetlen belépési pont; a `CLAUDE.md` erre mutató symlink.
 
-Ellenőrizve a kóddal: 2026-11-07.
+Ellenőrizve a kóddal: 2026-11-09.
 
 ## Olvasási sorrend
 
@@ -23,8 +23,8 @@ Ellenőrizve a kóddal: 2026-11-07.
 
 ## Landolás és deploy
 
-- A `main` védett (GitHub ruleset): csak PR, csak squash; kötelező a `biztonsag`
-  check és a CodeQL. Az admin megkerülheti, de az csak vészhelyzetre van.
+- A `main` védett (GitHub ruleset): csak PR, csak squash; kötelező a `biztonsag`,
+  a `teszt` és a `kapuk` check és a CodeQL. Az admin megkerülheti, de az csak vészhelyzetre van.
 - A `Teszt` workflow ([`teszt.yml`](.github/workflows/teszt.yml)) minden PR-en futtatja a
   `pnpm -r test`-et, a `szoveg` és a `pipeline` csomag `tsc`-jét és a web `next build`-jét;
   az összesítő check neve `teszt`. A `Kapuk` workflow
@@ -33,9 +33,8 @@ Ellenőrizve a kóddal: 2026-11-07.
   listája: [docs/uzemeltetes.md](docs/uzemeltetes.md) CI-szakasz) és a keresési
   kiemelés STX/ETX-szabályát (Ne tedd #7), hetente pedig `cmp`-vel a `napi-delta.yml`
   két példányának byte-azonosságát (Ne tedd #3); összesítő check: `kapuk`. Egyik
-  workflow-nak sem kell titok. Ma egyik check sem kötelező: a ruleset (23985520) csak a
-  `biztonsag`-ot és a CodeQL-t követeli; a `teszt` és a `kapuk` kötelezővé tétele
-  owner-lépés az első zöld futás után. Addig a merge előtt nézd meg, hogy zöldek-e.
+  workflow-nak sem kell titok. 2026-11-09 óta a ruleset (23985520) a `biztonsag`, a `teszt` és a
+  `kapuk` checket és a CodeQL-t követeli; a merge előtt is zöldnek kell lenniük.
 - A napi delta (03:30 UTC) a `godavid/gitjog` main ágát futtatja írási joggal az
   adat-repóban: ami a main-re kerül, az ott kódként fut.
 - A prod deploy CSAK a
@@ -56,7 +55,7 @@ Ellenőrizve a kóddal: 2026-11-07.
 | # | Ne tedd | Miért | Helyette |
 |---|---|---|---|
 | 1 | Helyi prod deploy (`vercel --prod`, `vercel deploy` az `apps/web`-ből) | 2026-10-06 óta tilos; az `apps/web`-ből a `workspace:*` függőség miatt el is hasal | merge a main-re, vagy `gh workflow run release-production.yml -R godavid/gitjog` |
-| 2 | Közvetlen push a main-re `[kapu: ruleset]` | a napi delta a main kódját írási joggal futtatja | PR, squash, zöld `biztonsag` + CodeQL |
+| 2 | Közvetlen push a main-re `[kapu: ruleset]` | a napi delta a main kódját írási joggal futtatja | PR, squash, zöld `biztonsag`, `teszt`, `kapuk` + CodeQL |
 | 3 | A `napi-delta.yml` egyik példányának módosítása `[kapu: heti cmp, kapuk.yml]` | az élő példány a `godavid/magyar-jog/.github/workflows/`-ban fut; a kettő byte-azonos | mindkettőt egy körben; ha az élőhöz nem nyúlhatsz, a PR-ben írd le, hogy frissíteni kell |
 | 4 | A `02-kereses.sql` vagy `04-api-kereses.sql` önálló újrafuttatása | a `05-kereses-gyors.sql` mindkét függvényt (`kereses`, `kereses_api`) felülírja; az újrafuttatás a régi, lassú változatot állítja vissza (2026-09-16-án ez 500-at okozott) | módosítás a `05`-ben vagy új, magasabb sorszámú fájlban; teljes újraépítésnél 01→05 sorrendben (a `03`-hoz `-v szinkron_jelszo=…` kell) |
 | 5 | Mellékes változás a normalizálás kimenetében | a teljes history diffje „ugrik” egyet a következő delta-commitnál | kerüld; ha szándékos, a golden hasheket lemez-cache-es gépen generáld újra, és írd le a PR-ben |

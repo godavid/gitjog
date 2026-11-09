@@ -14,7 +14,7 @@ const L = {
   paragrafus: "A § száma horgony helyett: „18. §”, „6:272. §”, „18/A. §”.",
   datum: "Időállapot napja (YYYY-MM-DD): az ezen a napon hatályos szöveg. Alap: a legutolsó.",
   felveve_utan:
-    "Cursor (átlátszatlan szöveg): első hívásnál egy ISO-8601 időbélyeg (csak az ezután a repóba került időállapotok), utána a válasz `kovetkezo_felveve_utan` mezője változtatás nélkül. A napló-ágon a tételek a felvétel sorrendjében (legrégebbi elöl) jönnek, rés és duplikátum nélkül.",
+    "Cursor (átlátszatlan szöveg): első hívásnál egy ISO-8601 időbélyeg (csak az ezután a repóba került időállapotok), utána a válasz `kovetkezo_felveve_utan` mezője változtatás nélkül. A napló-ágon a tételek a felvétel sorrendjében (legrégebbi elöl) jönnek, rés és duplikátum nélkül. A napló 2026-09-től létezik; ennél régebbi cursor csak 2026-09-től kap tételeket.",
   since: "Hatálybalépés napjától (YYYY-MM-DD).",
   until: "Hatálybalépés napjáig (YYYY-MM-DD).",
   slugs: "Csak ezek a jogszabályok.",

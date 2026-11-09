@@ -66,7 +66,7 @@ export function GET() {
           operationId: "valtozasok",
           summary: "Mi változott? — cursorral vagy dátum/slug szűrővel, az érintett §-ok szövegével",
           description:
-            "Legalább egy szűrő kötelező: felveve_utan, since vagy slugs. Figyeléshez a `felveve_utan` cursort használd: első hívásnál ISO-8601 időbélyeg, utána a válasz `kovetkezo_felveve_utan` értéke változtatás nélkül (átlátszatlan szöveg). A napló-ágon a tételek legrégebbi elöl jönnek, rés és duplikátum nélkül; üres lapon a cursor nem változik.",
+            "Legalább egy szűrő kötelező: felveve_utan, since vagy slugs. Figyeléshez a `felveve_utan` cursort használd: első hívásnál ISO-8601 időbélyeg, utána a válasz `kovetkezo_felveve_utan` értéke változtatás nélkül (átlátszatlan szöveg). A napló-ágon a tételek legrégebbi elöl jönnek, rés és duplikátum nélkül; üres lapon a cursor nem változik. A napló 2026-09-től létezik; ennél régebbi cursor csak 2026-09-től kap tételeket.",
           parameters: [
             q("felveve_utan", L.felveve_utan, { type: "string" }),
             q("since", L.since, datum),
