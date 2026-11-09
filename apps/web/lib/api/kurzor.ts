@@ -80,3 +80,33 @@ export function lapoz<T extends KurzorSor>(sorok: T[], kurzor: Kurzor, darab: nu
   const utolso = lap[lap.length - 1];
   return { lap, kovetkezo: utolso ? kurzorKiir(utolso) : kurzor.nyers };
 }
+
+/**
+ * A felvételi napló első hónapja (`index/felvetel/2026-09.jsonl`): régebbi
+ * hónaphoz nincs napló (a backfill nem ír naplót), ezért a hónaplista innen
+ * indul, hiába régebbi a cursor (#39).
+ */
+export const NAPLO_KEZDET = "2026-09";
+
+/**
+ * UTC-hónapkulcsok (`ÉÉÉÉ-HH`) a `tol` (ISO-időbélyeg vagy hónapkulcs) hónapjától,
+ * de legkorábban a `NAPLO_KEZDET`-től, a `most` UTC-hónapjáig. Jövőbeli cursornál
+ * üres a lista (nincs mit lapozni, a cursor változatlan marad).
+ */
+export function honapok(tol: string, most: Date = new Date()): string[] {
+  const [tolEv, tolHo] = tol.slice(0, 7).split("-").map(Number) as [number, number];
+  const [kezdEv, kezdHo] = NAPLO_KEZDET.split("-").map(Number) as [number, number];
+  const tolHonap = tolEv * 12 + tolHo;
+  const kezdHonap = kezdEv * 12 + kezdHo;
+  let honap = Math.max(tolHonap, kezdHonap);
+  const veg = most.getUTCFullYear() * 12 + most.getUTCMonth() + 1;
+  const lista: string[] = [];
+  // a felső korlát védőháló: a naplóval rendelkező idő így is jóval rövidebb
+  while (honap <= veg && lista.length < 240) {
+    const ev = Math.floor((honap - 1) / 12);
+    const ho = ((honap - 1) % 12) + 1;
+    lista.push(`${ev}-${String(ho).padStart(2, "0")}`);
+    honap++;
+  }
+  return lista;
+}

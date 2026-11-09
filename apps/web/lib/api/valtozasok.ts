@@ -1,9 +1,10 @@
 // `valtozasok`: „mi új azóta, hogy utoljára néztem?” Egy hívás, a válasz
 // önmagában elég egy értesítéshez (érintett §-ok régi/új szövege korlátos
 // méretben). Két ág:
-//  - `felveve_utan` (a megbízható cursor): a felvételi naplóból — akkor is
-//    lát egy késve felvett, régi dátumú állapotot;
-//  - `since`/`slugs` napló nélkül: a hatálybalépés dátuma szerint, a havi
+//  - `felveve_utan` (a megbízható cursor): mindig a felvételi naplóból (legkorábban
+//    2026-09-től) — akkor is lát egy késve felvett, régi dátumú állapotot, és a
+//    cursor soha nem lesz `null`;
+//  - `since`/`slugs` cursor nélkül: a hatálybalépés dátuma szerint, a havi
 //    bontásból (ugyanaz, amit a /valtozasok oldal használ).
 
 import { szakaszDiff, type SzakaszValtozas } from "@gitjog/szoveg";
@@ -27,7 +28,7 @@ import {
   normalizal,
 } from "./kozos";
 import { ervenyesDatum } from "./datum";
-import { kurzorParse, lapoz, type Kurzor } from "./kurzor";
+import { honapok, kurzorParse, lapoz, type Kurzor } from "./kurzor";
 
 export interface ValtozasokParam {
   felveve_utan?: string;
@@ -105,30 +106,14 @@ function szurok(p: ValtozasokParam, terkep: Map<string, JogszabalyTetel>): (n: N
   };
 }
 
-/** UTC-hónapkulcsok a cursor hónapjától a mai hónapig */
-function honapok(tol: string): string[] {
-  const lista: string[] = [];
-  const [ev, ho] = tol.slice(0, 7).split("-").map(Number) as [number, number];
-  const most = new Date();
-  let e = ev;
-  let h = ho;
-  while (e < most.getUTCFullYear() || (e === most.getUTCFullYear() && h <= most.getUTCMonth() + 1)) {
-    lista.push(`${e}-${String(h).padStart(2, "0")}`);
-    if (++h > 12) {
-      h = 1;
-      e++;
-    }
-    if (lista.length > 240) break; // 20 év — a cursor nyilván hibás
-  }
-  return lista;
-}
-
-/** A cursor hónapjától máig minden naplósor; a cursor utáni szűrést a `lapoz` végzi. */
-async function naploAg(kurzor: Kurzor): Promise<{ sorok: FelvetelSor[]; vanNaplo: boolean }> {
+/**
+ * A cursor hónapjától (legkorábban a napló kezdetétől) máig minden naplósor; a
+ * cursor utáni szűrést a `lapoz` végzi. A még nem létező havi fájl (`null`)
+ * üres hónap, nem a napló hiánya.
+ */
+async function naploAg(kurzor: Kurzor): Promise<FelvetelSor[]> {
   const fajlok = await Promise.all(honapok(kurzor.felveve).map((h) => getFelvetelNaplo(h)));
-  const vanNaplo = fajlok.some((f) => f !== null);
-  const sorok = fajlok.flatMap((f) => f ?? []).filter((s) => s.felveve >= kurzor.felveve);
-  return { sorok, vanNaplo };
+  return fajlok.flatMap((f) => f ?? []).filter((s) => s.felveve >= kurzor.felveve);
 }
 
 async function hatalybalepesAg(p: ValtozasokParam): Promise<Nyers[]> {
@@ -209,22 +194,19 @@ export async function valtozasokApi(p: ValtozasokParam): Promise<ValtozasokValas
   const szur = szurok(p, terkep);
 
   if (kurzor) {
-    const { sorok, vanNaplo } = await naploAg(kurzor);
-    if (vanNaplo) {
-      // Veszteségmentes keyset-lapozás (#26): a szűrt sorok közül a cursor utáni
-      // legrégebbi `darab` sor, a cursor a lap utolsó sora. Üres lapon a cursor
-      // nem változik.
-      const { lap, kovetkezo } = lapoz(sorok.filter(szur), kurzor, darab);
-      const tetelek = await korlatozottParhuzam(lap, 4, (n) => tetelKifejt(n, terkep.get(n.slug)!));
-      return { mod: "naplo", tetelek, kovetkezo_felveve_utan: kovetkezo, megjegyzes: MEGJEGYZES };
-    }
+    // Cursorral MINDIG a napló-ág (#37): a hiányzó havi fájl (pl. a hó első
+    // napján, a napi delta előtt) nem jelent hatálybalépés-ágat, különben a
+    // kliens `null` cursort kapna és elveszítené a helyét. Veszteségmentes
+    // keyset-lapozás (#26): a szűrt sorok közül a cursor utáni legrégebbi
+    // `darab` sor, a cursor a lap utolsó sora. Üres lapon a cursor nem változik.
+    const sorok = await naploAg(kurzor);
+    const { lap, kovetkezo } = lapoz(sorok.filter(szur), kurzor, darab);
+    const tetelek = await korlatozottParhuzam(lap, 4, (n) => tetelKifejt(n, terkep.get(n.slug)!));
+    return { mod: "naplo", tetelek, kovetkezo_felveve_utan: kovetkezo, megjegyzes: MEGJEGYZES };
   }
 
-  // Hatálybalépés szerint, legújabb elöl; cursor nélkül vagy ha a cursor a napló
-  // bevezetése előtti (még nincs naplófájl): ekkor a cursor napjától.
-  const nyers = await hatalybalepesAg(
-    kurzor ? { ...p, since: p.since ?? kurzor.felveve.slice(0, 10) } : p,
-  );
+  // Cursor nélkül: hatálybalépés szerint, legújabb elöl.
+  const nyers = await hatalybalepesAg(p);
   const kivalasztott = nyers
     .filter(szur)
     .sort((a, b) => b.datum.localeCompare(a.datum))

@@ -458,10 +458,14 @@ művelet, kulcs nélkül, ugyanabban a Next appban:
 - **Felvételi napló:** a delta minden futás végén `index/felvetel/ÉÉÉÉ-HH.jsonl`-be írja a
   bekerült állapotokat (`felveve, slug, datum, sha`). Ebből lapoz a `valtozasok`
   napló-ága — a commit-dátum a hatálybalépés, NEM a bekerülés ideje, ezért kell külön
-  napló. Backfill nem ír naplót; ha a cursor hónapjától máig EGYETLEN havi naplófájl
-  sincs, a végpont a hatálybalépés-ágra esik vissza (`mod: "hatalybalepes"`, legújabb
-  elöl, `kovetkezo_felveve_utan: null`); ha legalább egy van, a napló-ágon marad, a fájl
-  nélküli hónapok tételei nélkül.
+  napló. Backfill nem ír naplót. A napló
+  2026-09-től létezik (`NAPLO_KEZDET`, `kurzor.ts`): cursorral a végpont MINDIG a
+  napló-ágon marad (#37, #39), a cursor hónapjától (legkorábban 2026-09-től) a
+  jelenlegi UTC-hónapig olvassa a havi fájlokat. A még hiányzó havi fájl (pl. a hó első
+  napján, a napi delta előtt) üres hónap, nem hatálybalépés-ág: üres lapon a bemeneti
+  cursor jön vissza, `kovetkezo_felveve_utan` cursorral soha nem `null`. A
+  hatálybalépés-ág (`mod: "hatalybalepes"`, legújabb elöl, `kovetkezo_felveve_utan: null`)
+  csak cursor nélkül fut (`since`/`slugs`/`q`).
 - **A `valtozasok` cursora** (`apps/web/lib/api/kurzor.ts`, #26, 2026-11-07 óta
   veszteségmentes): keyset `(felveve, slug, datum)` szerint növekvően, a lap a cursor
   utáni legrégebbi N sor, a `kovetkezo_felveve_utan` a lap UTOLSÓ sorának hármasa
