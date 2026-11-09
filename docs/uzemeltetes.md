@@ -196,9 +196,10 @@
 Tünet: piros napi delta futás + `parser-riasztas` issue. Szerkezeti hibánál (cím-,
 hatálydátum-eltérés, ismeretlen osztály, splicing) a delta SEMMIT nem commitol —
 rossz adat nem kerülhet a repóba. A terjedelem-anomália ezzel szemben
-JOGSZABÁLYONKÉNTI: az érintett jogszabályt (és aznapi további állapotait) kihagyja,
-a többit normálisan commitolja, a végén külön issue-val riaszt, és a kihagyott
-állapotokat a következő futások újra megpróbálják. (2026-08-26-tól kilenc napig
+JOGSZABÁLYONKÉNTI: az anomáliás állapotot (és a jogszabály aznapi további állapotait)
+kihagyja, a korábbi mai állapotait és a többi jogszabályt normálisan commitolja és
+indexeli, a végén külön issue-val riaszt, és a kihagyott állapotokat a következő
+futások újra megpróbálják. (2026-08-26-tól kilenc napig
 egyetlen módosító törvény duzzadása miatt 37 más törvény állapota sem került be —
 ez volt a tanulság.)
 

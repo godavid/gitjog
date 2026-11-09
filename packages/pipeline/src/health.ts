@@ -124,6 +124,30 @@ export function regebbiAllapot<T extends { datum: string }>(
   return utolso && utolso.datum > ujDatum ? utolso : undefined;
 }
 
+/**
+ * Bekerült-e a jogszabály egy mai állapota, ha a jogszabály `anomaliaDatum`
+ * napú állapota terjedelem-anomáliára futott (undefined: nem futott).
+ *
+ * A napi delta dátum szerint növekvő sorrendben dolgozik, és az első anomália
+ * után a jogszabály további mai állapotait kihagyja; az anomália ELŐTTI mai
+ * állapotai viszont már commitolódtak. Ezeknek az indexbe, a felvételi naplóba
+ * és a HEAD-helyreállításba is be kell kerülniük (#38) — a jogszabály egészét
+ * kidobni ezért hiba.
+ */
+export function bekerultAllapot(datum: string, anomaliaDatum: string | undefined): boolean {
+  return anomaliaDatum === undefined || datum < anomaliaDatum;
+}
+
+/**
+ * Kell-e HEAD-helyreállítás: a jogszabály ma bekerült állapotai közül a
+ * legújabb is régebbi a legutóbb ismert állapotánál, így a HEAD szövege a régi
+ * szöveg lett. Ha ma semmi nem került be belőle, nincs mit helyreállítani.
+ */
+export function helyreallitasKell(maiDatumok: string[], utolsoDatum: string): boolean {
+  if (maiDatumok.length === 0) return false;
+  return maiDatumok.reduce((m, d) => (d > m ? d : m)) < utolsoDatum;
+}
+
 /** A terjedelem-őr hibája — a hívó ezt jogszabályonként kezeli, nem futás-szinten. */
 export class TerjedelemAnomalia extends Error {}
 
