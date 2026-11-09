@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  bekerultAllapot,
+  helyreallitasKell,
   modositoBlokkValtozas,
   modositoTorveny,
   regebbiAllapot,
@@ -176,5 +178,37 @@ describe("regebbiAllapot (régebbi-állapot-őr, HEAD-helyreállítás)", () => 
   });
   it("ismert állapot nélkül (vadonatúj jogszabály) nem szól", () => {
     expect(regebbiAllapot([], "1930-11-08")).toBeUndefined();
+  });
+});
+
+describe("anomáliás jogszabály mai bekerülése (#38)", () => {
+  // egy jogszabály két mai állapota: d1 átment és commitolódott, d2 anomáliás
+  const d1 = "2026-01-01";
+  const d2 = "2026-03-01";
+  const maiak = [d1, d2];
+  const bekerultek = (anomaliaDatum: string | undefined) =>
+    maiak.filter((d) => bekerultAllapot(d, anomaliaDatum));
+
+  it("az anomália előtti, már commitolt állapot bekerül, az anomáliás nem", () => {
+    expect(bekerultek(d2)).toEqual([d1]);
+  });
+  it("ha az első mai állapot anomáliás, semmi nem kerül be", () => {
+    expect(bekerultek(d1)).toEqual([]);
+  });
+  it("anomália nélkül minden mai állapot bekerül", () => {
+    expect(bekerultek(undefined)).toEqual([d1, d2]);
+  });
+  it("HEAD-helyreállítás kell, ha a bekerült d1 régebbi a legutóbb ismertnél", () => {
+    expect(helyreallitasKell(bekerultek(d2), "2026-02-01")).toBe(true);
+  });
+  it("nincs helyreállítás, ha a bekerült d1 nem régebbi a legutóbb ismertnél", () => {
+    expect(helyreallitasKell(bekerultek(d2), d1)).toBe(false);
+    expect(helyreallitasKell(bekerultek(d2), "2025-12-01")).toBe(false);
+  });
+  it("nincs helyreállítás, ha ma semmi nem került be", () => {
+    expect(helyreallitasKell(bekerultek(d1), "2026-02-01")).toBe(false);
+  });
+  it("több bekerült állapotnál a legújabb dönt", () => {
+    expect(helyreallitasKell(["2026-01-01", "2026-04-01"], "2026-02-01")).toBe(false);
   });
 });

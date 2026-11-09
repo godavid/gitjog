@@ -30,6 +30,8 @@ import { markdownGeneralas } from "./normalize.js";
 import { megjelolesIllesztes, parsolSnapshot } from "./parse.js";
 import { naploIras, type FelvetelTetel } from "./felvetel.js";
 import {
+  bekerultAllapot,
+  helyreallitasKell,
   modositoBlokkValtozas,
   modositoTorveny,
   regebbiAllapot,
@@ -102,14 +104,21 @@ async function retegTerkepMentes(terkep: RetegTerkep): Promise<void> {
 }
 
 /**
- * Terjedelem-anomáliára futott jogszabályok (slug → a hiba üzenete). Ezeket a
- * futás kihagyja — a mai további állapotaikkal együtt, hogy a HEAD ne egy
- * későbbi állapotot mutasson, miközben egy korábbi hiányzik —, a többi
- * jogszabály viszont normálisan bekerül. A végén riasztunk. Egy jogszabály
- * tartalmi anomáliája nem állíthatja le az egész napi frissítést: 2026-08-26-tól
- * kilenc napig egyetlen módosító törvény miatt 37 új időállapot nem került be.
+ * Terjedelem-anomáliára futott jogszabályok (slug → az anomáliás állapot napja
+ * és a hiba üzenete). Az anomáliás állapotot a futás kihagyja — a jogszabály
+ * mai további állapotaival együtt, hogy a HEAD ne egy későbbi állapotot
+ * mutasson, miközben egy korábbi hiányzik. Az anomália előtti mai állapotai
+ * viszont már commitolódtak, ezek bekerülnek (bekerultAllapot()), ahogy a többi
+ * jogszabály is. A végén riasztunk. Egy jogszabály tartalmi anomáliája nem
+ * állíthatja le az egész napi frissítést: 2026-08-26-tól kilenc napig egyetlen
+ * módosító törvény miatt 37 új időállapot nem került be.
  */
-const anomaliak = new Map<string, string>();
+const anomaliak = new Map<string, { datum: string; uzenet: string }>();
+
+/** A mai esemény ténylegesen bekerült-e (commitolódott-e) az adat-repóba. */
+function bekerultEsemeny(e: UjEsemeny): boolean {
+  return bekerultAllapot(e.allapot.hatalyba, anomaliak.get(e.js.slug)?.datum);
+}
 
 async function fut(): Promise<void> {
   if (!existsSync(join(ADAT_REPO_DIR, "index", "allapotok.json"))) {
@@ -257,7 +266,7 @@ async function fut(): Promise<void> {
             });
           } catch (e) {
             if (!(e instanceof TerjedelemAnomalia)) throw e;
-            anomaliak.set(js.slug, e.message);
+            anomaliak.set(js.slug, { datum: allapot.hatalyba, uzenet: e.message });
             console.error(`[kihagyva] ${e.message}`);
             continue;
           }
@@ -279,9 +288,7 @@ async function fut(): Promise<void> {
       );
     }
     if (uzenetSorok.length === 0) continue; // a nap minden tétele kimaradt
-    const nevek = napiak
-      .filter((n) => !anomaliak.has(n.js.slug))
-      .map((n) => n.js.rovidites ?? n.js.megjeloles);
+    const nevek = napiak.filter(bekerultEsemeny).map((n) => n.js.rovidites ?? n.js.megjeloles);
     const cim =
       nevek.length === 1
         ? `${nevek[0]} — időállapot ${datum}`
@@ -289,19 +296,18 @@ async function fut(): Promise<void> {
     await commit(`${cim}\n\nForrás (njt):\n${uzenetSorok.map((s) => `- ${s}`).join("\n")}`, datum);
     console.log(`Commit: ${datum} — ${nevek.join(", ")}`);
   }
-  const bekerult = esemenyek.filter((e) => !anomaliak.has(e.js.slug));
+  const bekerult = esemenyek.filter(bekerultEsemeny);
 
   // 2b. HEAD-helyreállítás: ha egy jogszabálynak ma csak a legutóbb ismert
   // állapotánál régebbi állapota került be, a HEAD szövege a régi szöveg lett.
   // A legutóbbi állapot szövegét a saját commitjából visszaírjuk és a saját
   // dátumával újra commitoljuk, így a HEAD soha nem áll vissza régebbi
-  // szövegre. (Ez a git-ág teszteletlen: a regebbiAllapot() döntése tesztelt.)
+  // szövegre. (Ez a git-ág teszteletlen: a regebbiAllapot() és a
+  // helyreallitasKell() döntése tesztelt.)
   for (const { js, utolso } of helyreallitasok.values()) {
-    if (anomaliak.has(js.slug)) continue; // ma semmi nem került be belőle
-    const maiLegujabb = bekerult
-      .filter((e) => e.js.slug === js.slug)
-      .reduce<string>((m, e) => (e.allapot.hatalyba > m ? e.allapot.hatalyba : m), "");
-    if (!maiLegujabb || maiLegujabb >= utolso.datum) continue; // a HEAD már a legújabbat mutatja
+    // anomáliás jogszabálynál is: az anomália előtti mai állapota már commitolódott
+    const maiDatumok = bekerult.filter((e) => e.js.slug === js.slug).map((e) => e.allapot.hatalyba);
+    if (!helyreallitasKell(maiDatumok, utolso.datum)) continue;
     if (!utolso.sha) {
       throw new Error(`HEAD-helyreállítás sikertelen: ${js.slug} ${utolso.datum} állapotához az indexben nincs sha`);
     }
@@ -394,7 +400,7 @@ async function fut(): Promise<void> {
   await keresoIndexSzinkron(valtozottSlugok, listaIndex, retegTerkep);
 
   if (anomaliak.size > 0) {
-    const sorok = [...anomaliak.values()].map((s) => `- ${s}`).join("\n");
+    const sorok = [...anomaliak.values()].map((a) => `- ${a.uzenet}`).join("\n");
     console.error(`${anomaliak.size} jogszabály terjedelem-anomália miatt kimaradt:\n${sorok}`);
     await riaszt(
       "Terjedelem-anomália — kézi ellenőrzés kell",
