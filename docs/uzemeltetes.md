@@ -445,7 +445,7 @@ művelet, kulcs nélkül, ugyanabban a Next appban:
 |---|---|---|
 | `kereses` | `GET /api/v1/kereses?q=` | hivatkozás-feloldás (index) vagy FTS (`kereses_api` SQL), a § teljes szövegével |
 | `szakasz` | `GET /api/v1/szakasz?slug=&paragrafus=&datum=` | egy § egy időállapotban; § nélkül meta + időállapotok + tartalomjegyzék |
-| `valtozasok` | `GET /api/v1/valtozasok?felveve_utan=&q=` | mi változott — veszteségmentes keyset-cursorral (napló-ág, legrégebbi elöl) vagy since/until/slugs szűrővel (hatálybalépés-ág, legújabb elöl), érintett §-okkal |
+| `valtozasok` | `GET /api/v1/valtozasok?felveve_utan=&q=` | mi változott — veszteségmentes keyset-cursorral (napló-ág, legrégebbi elöl) vagy since/slugs szűrővel (hatálybalépés-ág, legújabb elöl; az until ezek mellé szűkít; felveve_utan, since vagy slugs nélkül 400), érintett §-okkal |
 | `diff` | `GET /api/v1/diff?slug=&tol=&ig=` | két időállapot §-szintű diffje |
 
 - **Rétegek:** `packages/szoveg` (megosztott: §-darabolás, horgony, hivatkozás-parser,
