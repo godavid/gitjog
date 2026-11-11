@@ -74,8 +74,10 @@ const handler = createMcpHandler(
         title: "Mi változott?",
         description:
           "Hatályba lépett módosítások listája az érintett §-ok régi/új szövegével — egy hívás elég egy értesítéshez. " +
-          "Figyeléshez: add meg a `felveve_utan` cursort (első hívásnál egy ISO-8601 időbélyeg, utána a válasz `kovetkezo_felveve_utan` mezője változtatás nélkül: átlátszatlan szöveg; a tételek legrégebbi elöl jönnek, rés nélkül) és szűrj `q`-val (címbeli szókezdet, pl. „termőföld|földek forgalm|Földalap”) vagy `slugs`-szal. " +
-          "Történeti kérdésre (`mi változott a Btk.-ban 2024-ben?`) a `since`/`until`/`slugs` szűrők valók.",
+          "Figyeléshez: add meg a `felveve_utan` cursort (első hívásnál egy ISO-8601 időbélyeg, utána a válasz `kovetkezo_felveve_utan` mezője változtatás nélkül: átlátszatlan szöveg; a tételek legrégebbi elöl jönnek, rés nélkül) és szűrj `slugs`-szal, vagy `q`-val (címbeli szókezdet, pl. „termőföld|földek forgalm|Földalap”; a `q` önmagában nem elég, 400-at ad, de a `felveve_utan`, `since` vagy `slugs` mellett szűr). " +
+          "Cursor nélkül legalább a `since` vagy a `slugs` kell (az `until` önmagában nem elég, 400-at ad). " +
+          "Történeti kérdésre (`mi változott a Btk.-ban 2024-ben?`) a `since`/`until` és a `slugs` valók (legújabb elöl). " +
+          "A `felveve_utan` napló 2026-09-től létezik: ennél régebbi cursor is csak 2026-09-től kap tételeket.",
         inputSchema: MCP.valtozasok,
         annotations: OLVASO,
       },

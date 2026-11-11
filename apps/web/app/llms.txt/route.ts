@@ -75,7 +75,7 @@ Négy művelet, REST-en és MCP-toolként ugyanúgy:
   ${pelda.kereses}
 - szakasz — egy § egy adott napon hatályos szövege; § nélkül a jogszabály időállapotai és tartalomjegyzéke.
   ${pelda.szakasz}
-- valtozasok — mi változott: cursorral (felveve_utan) vagy since/until/slugs szűrővel; az érintett §-ok régi/új szövegével.
+- valtozasok — mi változott: cursorral (felveve_utan, a napló 2026-09-től létezik), vagy since/slugs szűrővel (az until ezek mellé szűkít, önmagában nem elég); felveve_utan, since vagy slugs nélkül 400 jön. A q önmagában nem elég (400), de ezek mellett címre szűr. Az érintett §-ok régi/új szövegével.
   ${pelda.valtozasok}
 - diff — két időállapot teljes §-szintű összevetése.
   ${pelda.diff}
