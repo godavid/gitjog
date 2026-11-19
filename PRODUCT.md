@@ -60,7 +60,7 @@ adatbázis, hanem adat, amihez a felület csak hozzáférés.
   `pnpm-workspace.yaml`) automatikusan deployol, tehát a merge élesít; helyi gépről
   (Vercel CLI) a prod deploy tilos. Szünet: `DEPLOY_HOLD=true` repo-változó
   (`/deploy hold|resume`). Részletek: [docs/uzemeltetes.md](docs/uzemeltetes.md#titkok).
-  Keresés: Supabase Postgres FTS, magyar szótövezéssel.
+  Keresés: Neon Postgres FTS, magyar szótövezéssel.
 - **Találkozási pontok:** keresőtalálat egy „mi változott” kérdésre, RSS-feed,
   `git clone`, illetve AI-asszisztens, amely a domain gépi végpontjait olvassa, vagy az MCP-szerverhez kapcsolódik (Claude, ChatGPT, Cursor).
 - Részletes üzemeltetési leírás: [docs/uzemeltetes.md](docs/uzemeltetes.md).

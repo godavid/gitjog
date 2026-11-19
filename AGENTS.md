@@ -121,10 +121,10 @@ együttes megadására hibát ad.
 | `packages/pipeline/src` | njt-crawler, parser, normalizáló, commit-pipeline, delta/backfill, keresőindex-szinkron | `@gitjog/szoveg`, `cheerio`, `domhandler` (csak típus), `postgres`, `node:*` | `apps/web`, `next`, `@supabase/supabase-js` | relatív import `.js`-sel; tsconfig: Bundler-feloldás (a szoveg kiterjesztés nélküli importjai miatt) |
 | `packages/pipeline/supabase` | a keresőindex SQL-je: kézzel, `psql`-lel futtatott, újrafuttatható szkriptek, nem migrációk | – | – | – |
 | `packages/pipeline/adatrepo` | az élő adat-repo `napi-delta.yml`-jének forrása | – | – | byte-azonos az élővel |
-| `apps/web` | Next 16 oldal; a `lib/api/*` a szolgáltatásréteg, az `app/api/v1/*` és az `app/api/mcp` csak ezt hívja | `@gitjog/szoveg`, `next`, `react`, `zod`, `mcp-handler`, `@vercel/analytics`, `@supabase/supabase-js` és `node:*` (csak szerveren) | `packages/pipeline/**` (a változása nem deployolna), `NEXT_PUBLIC_` titok | `@/` alias, kiterjesztés nélkül |
+| `apps/web` | Next 16 oldal; a `lib/api/*` a szolgáltatásréteg, az `app/api/v1/*` és az `app/api/mcp` csak ezt hívja | `@gitjog/szoveg`, `next`, `react`, `zod`, `mcp-handler`, `@vercel/analytics`, `postgres` és `node:*` (csak szerveren) | `packages/pipeline/**` (a változása nem deployolna), `NEXT_PUBLIC_` titok | `@/` alias, kiterjesztés nélkül |
 
 Kivételek: a `node --test` alatt futó `apps/web/lib/**/*.test.ts` `.ts`-kiterjesztéssel
-importál, és csak import nélküli modult tesztelhet. A `packages/szoveg/test` importálhatja
+importál, és csak olyan modult tesztelhet, amely relatív importot nem használ (csomag-importot, pl. `postgres`, igen: a `kereso.ts` így tesztelhető). A `packages/szoveg/test` importálhatja
 az `apps/web/lib/md.ts`-t (`md.js`-ként; horgony-egyezés és XSS-teszt), mást az `apps/web`
 alól nem (`kapuk.yml`).
 
@@ -145,8 +145,8 @@ Next-útmutató, de ne commitold); az `apps/web/public/` IndexNow-kulcsfájlját
 
 - **kód-repo** = `godavid/gitjog` (ez); **adat-repo** = `godavid/magyar-jog`. Régi neve
   `magyar-jogtar`: a GitHub átirányítja, ezért azon a néven új repót ne hozz létre.
-- Szándékosan megtartott régi azonosítók, NE nevezd át őket: Supabase-projekt
-  `nyilt-jogtar`, DB-szerep `jogtar_szinkron`, env `NYILT_DB_URL`, `NYILT_ADAT_REPO_DIR`,
+- Szándékosan megtartott régi azonosítók, NE nevezd át őket: Neon-projekt
+  `nyilt-jogtar` (2026-11-19 előtt Supabase), DB-szerep `jogtar_szinkron`, env `NYILT_DB_URL`, `NYILT_ADAT_REPO_DIR`,
   `NYILT_CACHE_DIR`, `NYILT_CSAK`. A régi csomag-scope (`@nyilt-jogtar/*`) ma `@gitjog/*`.
 - **időállapot** = egy jogszabály egy hatálybalépési napra érvényes szövege = egy commit.
   A commit dátuma a hatálybalépés napja, nem a bekerülésé; a bekerülést a **felvételi

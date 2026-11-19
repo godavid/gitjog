@@ -288,10 +288,16 @@ generálódik (`torvenylista-generalas.ts` → `data-static/torvenyek.json`, 558
 
 Ami még hátravan: rendeletek, határozatok (a lista jelenleg csak törvény).
 
-## Keresés (Supabase Postgres FTS)
+## Keresés (Neon Postgres FTS)
 
-A weboldal keresője a `nyilt-jogtar` Supabase-projekt Postgres FTS-ét használja
-(régió: eu-central-1, a magyar látogatókhoz és a Vercelhez közel). A korábbi
+A weboldal keresője a `nyilt-jogtar` Neon-projekt Postgres FTS-ét használja
+(Postgres 18, aws-eu-central-1, a Vercel-Marketplace-integrációval a Vercel `remeny-farm`
+csapatában; a projekt azonosítója `delicate-bar-69754179`, az endpoint 0,25–1 CU között
+skáláz, 300 s tétlenség után alvó módba kerül, ezért az első kérés hidegindítású). A web
+`postgres` (postgres.js) klienssel, közvetlenül SQL-lel hívja a `kereses()` és a
+`kereses_api()` függvényt (`apps/web/lib/kereso.ts`). 2026-11-19-ig a keresés a Supabase-projekten
+futott (PostgREST, `anon` kulcs); az a projekt visszaállási tartaléknak megmaradt,
+lásd „Költözés a Neonra". A korábbi
 memóriabeli MiniSearch-index ~200 törvényig bírta, ezért volt a keresés a
 kiemeltekre szűkítve; ez megszűnt.
 
@@ -299,12 +305,15 @@ kiemeltekre szűkítve; ez megszűnt.
   index, RLS), `02-kereses.sql` (`kereses()`), `03-szinkron-szerep.sql`
   (`jogtar_szinkron` szerep + írási policyk), `04-api-kereses.sql` (`kereses_api()`),
   `05-kereses-gyors.sql` (a `kereses()` és a `kereses_api()` ÉLŐ, gyors változata:
-  felülírja a 02-t és a 04-et). Mind újrafuttatható, de csak SORRENDBEN (01→05): a 02
+  felülírja a 02-t és a 04-et), `06-anon-idokorlat.sql` (csak a Supabase `anon` szerepé),
+  `07-neon-szerepek.sql` (a Neon szerepei: a web csak olvasó `gitjog_olvaso` szerepe és a
+  `jogtar_szinkron` jogosultságai; a Neonon nincs `anon`, ezért a 05 `grant ... to anon`
+  sorai ott nem futnak). Mind újrafuttatható, de csak SORRENDBEN (01→05): a 02
   vagy a 04 önálló újrafuttatása visszahozza a lassú kiemelést, és a webes kereső
   500-zal esik el. Függvényt a 05-ben (vagy egy új, magasabb sorszámú fájlban) módosíts.
   Ezek nem migrációk: a commit önmagában semmit nem változtat a prod DB-n, kézzel kell
-  alkalmazni, a **superuser** pooler-stringgel (a `NYILT_DB_URL` a `jogtar_szinkron`
-  szerepé, annak nincs joga a sémához):
+  alkalmazni, a tulajdonos (Neonon `neondb_owner`) stringjével (a `NYILT_DB_URL` a
+  `jogtar_szinkron` szerepé, annak nincs joga a sémához):
   `psql "<superuser pooler-string>" -v ON_ERROR_STOP=1 -f <fájl>` (`ON_ERROR_STOP`
   nélkül a psql hibánál is 0-val lép ki). A 03-hoz `-v szinkron_jelszo="'...'"` is kell —
   új jelszóval újrafuttatva a `NYILT_DB_URL` secretet is cserélni kell (lásd Titkok).
@@ -312,8 +321,8 @@ kiemeltekre szűkítve; ez megszűnt.
   „szerződést" a „szerződés" szóra. A generált oszlop csak a KÉTARGUMENTUMOS
   alakot fogadja el (az egyargumentumos nem immutable).
 - **Az index származtatott adat.** Bármikor eldobható és újraépíthető: a 01–05 SQL
-  sorrendben (lásd fent) + a `06-anon-idokorlat.sql` (az anon `statement_timeout`, lásd
-  Agent-felület → SQL), majd
+  sorrendben (lásd fent) + Neonon a `07-neon-szerepek.sql` (Supabase tartalékon a
+  `06-anon-idokorlat.sql`, az anon `statement_timeout`, lásd Agent-felület → SQL), majd
   `NYILT_DB_URL=... NYILT_ADAT_REPO_DIR=<az adat-repo-klón abszolút útja> pnpm --filter @gitjog/pipeline kereso-feltoltes`
   (~4332 jogszabály, teljes újraépítés kb. háromnegyed óra Frankfurtba; célzott pótlás:
   `-- --slugok=<slug>,<slug>`). `NYILT_ADAT_REPO_DIR` nélkül a
@@ -340,15 +349,34 @@ kiemeltekre szűkítve; ez megszűnt.
   `packages/szoveg/test/szakaszok.test.ts` mindkettőt futtatja és összeveti — ha ez
   elromlik, a találatok mélylinkje rossz §-ra visz. A tesztet ne töröld.
 
+## Költözés a Neonra (2026-11-19)
+
+A keresőindex Supabase-ről (`altrtxymjufyjdfdlgpj`, eu-central-1) Neonra költözött
+(`delicate-bar-69754179`, a Vercel Marketplace-en át létrehozva). Az adat származtatott: a
+költözés `pg_dump -Fc -n public` + `pg_restore --no-owner --no-acl` volt, utána a
+`07-neon-szerepek.sql`. Ellenőrzés: a két tábla sorszáma (`jogszabaly` 4333, `szakasz`
+71679) és hat keresés (`kereses`, `kereses_api`, `mind` igen/nem) teljes eredményének
+md5-je egyezett a két adatbázison. A régi Supabase-projekt érintetlen: a visszaállás
+tartaléka, az owner később törli.
+
+Visszaállás (ha a Neon hibázik):
+
+1. Vercel: `vercel rollback` (vagy a korábbi production deploy promótálása) — a régi
+   deploy a `SUPABASE_URL` és `SUPABASE_ANON_KEY` env-ekkel fut, amelyek megmaradtak.
+2. Az adat-repo `NYILT_DB_URL` secretjét a Supabase session pooler stringjére
+   visszaállítani (`jogtar_szinkron` szerep; ismeretlen jelszónál a `03-szinkron-szerep.sql`
+   új jelszóval, a Supabase superuser stringjével).
+3. A Neonra költözés óta lefutott deltákat a Supabase nem látta: pótlás
+   `kereso-feltoltes`-sel (lásd „Az index származtatott adat").
+
 ## Titkok
 
-Az adat-repóban egy GitHub secret van: **`NYILT_DB_URL`** — a Supabase session
-pooler connection stringje a keresőindex-szinkronhoz. Pooler kell (nem a
-`db.*.supabase.co` közvetlen host), mert a GitHub-runnerek IPv4-esek, a
-közvetlen kapcsolat viszont IPv6. A napi delta ezen kívül a beépített
+Az adat-repóban egy GitHub secret van: **`NYILT_DB_URL`** — a Neon direkt
+(unpooled) connection stringje a keresőindex-szinkronhoz (a Neon hostja IPv4-en is
+elérhető, a GitHub-runnerek is eltalálják). A napi delta ezen kívül a beépített
 `GITHUB_TOKEN`-nel fut (contents+issues write).
 
-A secret NEM a `postgres` superuser stringje, hanem a **`jogtar_szinkron`**
+A secret NEM a tulajdonos (superuser) stringje, hanem a **`jogtar_szinkron`**
 szerepé (`03-szinkron-szerep.sql`), amely kizárólag a `jogszabaly` és `szakasz`
 táblára írhat — sémát módosítani, más adathoz nyúlni nem tud. Ez azért fontos,
 mert a titok jelen van a környezetben, amikor a CI-ben harmadik féltől származó
@@ -356,10 +384,13 @@ npm-csomagok kódja fut: egy kiszivárgás így a keresőindexre korlátozódik,
 amúgy is bármikor újraépíthető. Jelszócserénél futtasd újra a 03-as SQL-t új
 jelszóval, és frissítsd a secretet.
 
-A Vercel oldalon `SUPABASE_URL` és `SUPABASE_ANON_KEY` él (Production). A web
-csak OLVAS: a két táblán RLS engedi a `select`-et, az írás joga a connection
-stringé. A kulcsok szándékosan nem `NEXT_PUBLIC_` előtagúak — a keresés szerver
-oldalon fut, így semmi nem kerül belőlük a kliens bundle-be.
+A Vercel oldalon `KERESO_DB_URL` él (Production): a Neon `gitjog_olvaso` szerepének
+POOLED connection stringje (`-pooler` host, `?sslmode=require` végű: a Neon TLS nélkül nem fogad kapcsolatot; a `channel_binding` paramétert a postgres.js nem érti, ne tedd bele). A web csak OLVAS: a szerep a két táblán
+csak `select`-et és a két keresőfüggvényen `execute`-ot kap, 8 s `statement_timeout`-tal.
+A string szándékosan nem `NEXT_PUBLIC_` előtagú — a keresés szerver oldalon fut, így
+semmi nem kerül belőle a kliens bundle-be. (A korábbi `SUPABASE_URL` és
+`SUPABASE_ANON_KEY` a visszaállás idejére a Vercelben megmarad, a kód már nem olvassa.)
+A `NYILT_DB_URL` a Neon `jogtar_szinkron` szerepének DIREKT (nem pooled) stringje.
 
 A Vercel oldalon él még a `GITHUB_WEBHOOK_SECRET` (Production): az adat-repo
 push-webhookjának HMAC-titka (`/api/revalidate`). Ugyanez a titok a
@@ -416,8 +447,8 @@ titok, mindkettő `pull_request` (nem `pull_request_target`) és `push` a main-r
 - **`.github/workflows/teszt.yml`** (`Teszt`): `pnpm install --frozen-lockfile`, `pnpm -r
   test` (szoveg és pipeline vitest, web `node --test`; a 4 golden-hash teszt
   lemez-cache nélkül kimarad), `tsc` a pipeline-ra (`--noEmit`) és a szoveg-re, külön
-  jobban a web `next build` (a Supabase env ártalmatlan helykitöltő, a build nem
-  használja). Összesítő check: `teszt`. 2026-11-09 óta a ruleset (23985520) ezt a checket is követeli,
+  jobban a web `next build` (a régi Supabase env ártalmatlan helykitöltő, a build nem
+  használja; a `KERESO_DB_URL` build közben nem kell, a kapcsolat lusta). Összesítő check: `teszt`. 2026-11-09 óta a ruleset (23985520) ezt a checket is követeli,
   a `kapuk`-tal együtt.
 - **`.github/workflows/kapuk.yml`** (`Kapuk`): `import-hatar` (a web és a szoveg nem
   importál a pipeline-ból; a szoveg nem importál `next`, `react`, `postgres`,
@@ -498,7 +529,7 @@ művelet, kulcs nélkül, ugyanabban a Next appban:
   `apps/web`, és a build a **monorepo gyökeréből** indul (nem az `apps/web`-ben — onnan
   npm-mel próbálna telepíteni és elhasal): `vercel build`, majd `vercel deploy --prebuilt`
   — ezt futtatja a `release-production.yml`.
-- **SQL:** `04-api-kereses.sql` (`kereses_api`, a § szövegével) és `05-kereses-gyors.sql`
+- **SQL (a Neon-költözés óta az `anon` korlát a Neonon a `gitjog_olvaso` szerep 8 s-os `statement_timeout`-ja, `07-neon-szerepek.sql`; a `06` csak a Supabase tartalékra vonatkozik):** `04-api-kereses.sql` (`kereses_api`, a § szövegével) és `05-kereses-gyors.sql`
   (a `ts_headline` csak a limitált találatokra fut — a „termőföld" 2,8 s → 70 ms; előtte
   az anon 3 s-os statement_timeout-ja miatt a webes kereső rendszeresen 500-zal esett
   el). Az anon `statement_timeout` 8 s-re emelve; 2026-11-07 óta a tartós alakja a
@@ -563,7 +594,7 @@ A Wolters Kluwer Hungary Kft. védjegyfelszólítása („Jogtár", lajstromszá
   átirányítja, amíg nem jön létre ugyanazon a néven új repó — ne jöjjön).
 - Vercel-projekt: `jogtar` → `gitjog`; csomagnevek: `@nyilt-jogtar/*` → `@gitjog/*`
   (a napi-delta.yml mindkét példányában is).
-- NEM változott: a Supabase-projekt neve (`nyilt-jogtar`, csak belső), a
+- NEM változott: a DB-projekt neve (`nyilt-jogtar`, csak belső), a
   `jogtar_szinkron` DB-szerep, a `NYILT_DB_URL` secret. Ezek nem publikusak.
 - A „jogtár" szót a kommunikációban ne használjuk; a WK termékére utaló
   hivatkozás (összehasonlítás) jogszerű, de ne legyen rá szükség.

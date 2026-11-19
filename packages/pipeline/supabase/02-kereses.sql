@@ -100,4 +100,9 @@ as $$
   limit least(talalat_limit, 100);
 $$;
 
-grant execute on function kereses(text, boolean, int) to anon;
+do $$ begin
+  -- Neonon nincs `anon` szerep (a web ott a gitjog_olvaso-t kapja, 07-neon-szerepek.sql)
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    grant execute on function kereses(text, boolean, int) to anon;
+  end if;
+end $$;

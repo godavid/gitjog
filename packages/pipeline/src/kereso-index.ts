@@ -1,4 +1,4 @@
-// A keresőindex (Supabase Postgres) feltöltése és szinkronban tartása.
+// A keresőindex (Neon Postgres) feltöltése és szinkronban tartása.
 // Az index származtatott: hibája sosem állíthatja meg az adat-pipeline-t.
 
 import { readFile } from "node:fs/promises";
