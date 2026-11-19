@@ -3,7 +3,7 @@
 // keresőindexű (kereses/kereses_api függvényes) Postgresre mutat.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { jogszabalyNev, keres, keresTeljes, talalat, teljesTalalat } from "./kereso.ts";
+import { jogszabalyNev, keres, keresTeljes, lezar, talalat, teljesTalalat } from "./kereso.ts";
 
 const SOR = {
   slug: "ptk",
@@ -61,12 +61,19 @@ test("KERESO_DB_URL nélkül a keresés érthető hibával elbukik", async () =>
 const ELO_URL = process.env.KERESO_TESZT_DB_URL;
 
 test("élő DB: a keresés találatot ad, kiemeléssel, a limitet betartva", { skip: !ELO_URL }, async () => {
+  const eredeti = process.env.KERESO_DB_URL;
   process.env.KERESO_DB_URL = ELO_URL;
-  const talalatok = await keres("szerződés", false, 5);
-  assert.ok(talalatok.length > 0 && talalatok.length <= 5);
-  assert.ok(talalatok.every((t) => t.slug && typeof t.hatalyos === "boolean"));
-  assert.ok(talalatok.some((t) => t.reszlet.includes("\u0002")));
-  const teljes = await keresTeljes("szerződés", false, 3);
-  assert.ok(teljes.length > 0 && teljes.length <= 3);
-  assert.ok(teljes.every((t) => t.szoveg.length > 0 || t.szakasz === ""));
+  try {
+    const talalatok = await keres("szerződés", false, 5);
+    assert.ok(talalatok.length > 0 && talalatok.length <= 5);
+    assert.ok(talalatok.every((t) => t.slug && typeof t.hatalyos === "boolean"));
+    assert.ok(talalatok.some((t) => t.reszlet.includes("\u0002")));
+    const teljes = await keresTeljes("szerződés", false, 3);
+    assert.ok(teljes.length > 0 && teljes.length <= 3);
+    assert.ok(teljes.every((t) => t.szoveg.length > 0 || t.szakasz === ""));
+  } finally {
+    if (eredeti === undefined) delete process.env.KERESO_DB_URL;
+    else process.env.KERESO_DB_URL = eredeti;
+    await lezar();
+  }
 });

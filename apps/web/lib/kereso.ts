@@ -44,6 +44,13 @@ function getSql(): Sql {
   return kapcsolat;
 }
 
+/** A kapcsolatkészlet lezárása (tesztekhez; a szerver nem hívja). */
+export async function lezar(): Promise<void> {
+  const k = kapcsolat;
+  kapcsolat = null;
+  await k?.end();
+}
+
 export function jogszabalyNev(sor: Pick<KeresesSor, "megjeloles" | "rovidites">): string {
   return sor.rovidites ? `${sor.rovidites} (${sor.megjeloles})` : sor.megjeloles;
 }
@@ -65,7 +72,7 @@ export async function keres(q: string, mind = false, limit = 40): Promise<Talala
       select * from kereses(${q}::text, ${mind}::boolean, ${limit}::int)`;
     return sorok.map(talalat);
   } catch (hiba) {
-    throw new Error(`Keresési hiba: ${hiba instanceof Error ? hiba.message : String(hiba)}`);
+    throw new Error(`Keresési hiba: ${hiba instanceof Error ? hiba.message : String(hiba)}`, { cause: hiba });
   }
 }
 
@@ -99,6 +106,6 @@ export async function keresTeljes(q: string, mind = false, limit = 10): Promise<
       select * from kereses_api(${q}::text, ${mind}::boolean, ${limit}::int)`;
     return sorok.map(teljesTalalat);
   } catch (hiba) {
-    throw new Error(`Keresési hiba: ${hiba instanceof Error ? hiba.message : String(hiba)}`);
+    throw new Error(`Keresési hiba: ${hiba instanceof Error ? hiba.message : String(hiba)}`, { cause: hiba });
   }
 }

@@ -321,8 +321,8 @@ kiemeltekre szűkítve; ez megszűnt.
   „szerződést" a „szerződés" szóra. A generált oszlop csak a KÉTARGUMENTUMOS
   alakot fogadja el (az egyargumentumos nem immutable).
 - **Az index származtatott adat.** Bármikor eldobható és újraépíthető: a 01–05 SQL
-  sorrendben (lásd fent) + a `06-anon-idokorlat.sql` (az anon `statement_timeout`, lásd
-  Agent-felület → SQL), majd
+  sorrendben (lásd fent) + Neonon a `07-neon-szerepek.sql` (Supabase tartalékon a
+  `06-anon-idokorlat.sql`, az anon `statement_timeout`, lásd Agent-felület → SQL), majd
   `NYILT_DB_URL=... NYILT_ADAT_REPO_DIR=<az adat-repo-klón abszolút útja> pnpm --filter @gitjog/pipeline kereso-feltoltes`
   (~4332 jogszabály, teljes újraépítés kb. háromnegyed óra Frankfurtba; célzott pótlás:
   `-- --slugok=<slug>,<slug>`). `NYILT_ADAT_REPO_DIR` nélkül a
@@ -385,7 +385,7 @@ amúgy is bármikor újraépíthető. Jelszócserénél futtasd újra a 03-as SQ
 jelszóval, és frissítsd a secretet.
 
 A Vercel oldalon `KERESO_DB_URL` él (Production): a Neon `gitjog_olvaso` szerepének
-POOLED connection stringje (`-pooler` host). A web csak OLVAS: a szerep a két táblán
+POOLED connection stringje (`-pooler` host, `?sslmode=require` végű: a Neon TLS nélkül nem fogad kapcsolatot; a `channel_binding` paramétert a postgres.js nem érti, ne tedd bele). A web csak OLVAS: a szerep a két táblán
 csak `select`-et és a két keresőfüggvényen `execute`-ot kap, 8 s `statement_timeout`-tal.
 A string szándékosan nem `NEXT_PUBLIC_` előtagú — a keresés szerver oldalon fut, így
 semmi nem kerül belőle a kliens bundle-be. (A korábbi `SUPABASE_URL` és

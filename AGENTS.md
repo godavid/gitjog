@@ -124,7 +124,7 @@ együttes megadására hibát ad.
 | `apps/web` | Next 16 oldal; a `lib/api/*` a szolgáltatásréteg, az `app/api/v1/*` és az `app/api/mcp` csak ezt hívja | `@gitjog/szoveg`, `next`, `react`, `zod`, `mcp-handler`, `@vercel/analytics`, `postgres` és `node:*` (csak szerveren) | `packages/pipeline/**` (a változása nem deployolna), `NEXT_PUBLIC_` titok | `@/` alias, kiterjesztés nélkül |
 
 Kivételek: a `node --test` alatt futó `apps/web/lib/**/*.test.ts` `.ts`-kiterjesztéssel
-importál, és csak import nélküli modult tesztelhet. A `packages/szoveg/test` importálhatja
+importál, és csak olyan modult tesztelhet, amely relatív importot nem használ (csomag-importot, pl. `postgres`, igen: a `kereso.ts` így tesztelhető). A `packages/szoveg/test` importálhatja
 az `apps/web/lib/md.ts`-t (`md.js`-ként; horgony-egyezés és XSS-teszt), mást az `apps/web`
 alól nem (`kapuk.yml`).
 

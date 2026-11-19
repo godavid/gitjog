@@ -10,5 +10,10 @@
 -- Futtatás a superuser pooler-stringgel:
 --   psql "<superuser pooler-string>" -v ON_ERROR_STOP=1 -f 06-anon-idokorlat.sql
 
-alter role anon set statement_timeout = '8s';
-notify pgrst, 'reload config';
+-- Csak Supabase-en van `anon` szerep; Neonon (07-neon-szerepek.sql) a fájl nem csinál semmit.
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    alter role anon set statement_timeout = '8s';
+    notify pgrst, 'reload config';
+  end if;
+end $$;
