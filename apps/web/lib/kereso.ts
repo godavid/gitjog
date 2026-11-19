@@ -1,12 +1,13 @@
-// Teljes szövegű keresés a Supabase Postgres FTS-én keresztül. Az index
+// Teljes szövegű keresés a Neon Postgres FTS-én keresztül. Az index
 // építése a pipeline dolga (packages/pipeline/src/kereso-index.ts); itt
 // csak lekérdezünk. A magyar szótövezést és a találat-kiemelést a
 // kereses() adatbázisfüggvény adja.
 //
-// A kulcsok szándékosan NEM NEXT_PUBLIC_ előtagúak: a keresés szerver
-// oldalon fut, így a kliens bundle-be semmi nem kerül belőlük.
+// A kapcsolat szerver oldali, csak olvasó szerepé (gitjog_olvaso): a
+// KERESO_DB_URL szándékosan NEM NEXT_PUBLIC_ előtagú, így a kliens
+// bundle-be semmi nem kerül belőle.
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import postgres, { type Sql } from "postgres";
 
 export interface Talalat {
   slug: string;
@@ -20,7 +21,7 @@ export interface Talalat {
   hatalyos: boolean;
 }
 
-interface KeresesSor {
+export interface KeresesSor {
   slug: string;
   megjeloles: string;
   rovidites: string | null;
@@ -31,36 +32,41 @@ interface KeresesSor {
   hatalyos: boolean;
 }
 
-let kliens: SupabaseClient | null = null;
+let kapcsolat: Sql | null = null;
 
-function getKliens(): SupabaseClient {
-  if (kliens) return kliens;
-  const url = process.env.SUPABASE_URL;
-  const kulcs = process.env.SUPABASE_ANON_KEY;
-  if (!url || !kulcs) throw new Error("Hiányzó Supabase-konfiguráció (URL vagy anon kulcs).");
-  kliens = createClient(url, kulcs, { auth: { persistSession: false } });
-  return kliens;
+function getSql(): Sql {
+  if (kapcsolat) return kapcsolat;
+  const url = process.env.KERESO_DB_URL;
+  if (!url) throw new Error("Hiányzó keresődatabázis-konfiguráció (KERESO_DB_URL).");
+  // prepare: false — a Neon pooler (pgbouncer, tranzakciós mód) a megnevezett
+  // prepared statementeket nem viszi át kapcsolatok között.
+  kapcsolat = postgres(url, { max: 5, prepare: false, idle_timeout: 20, connect_timeout: 15 });
+  return kapcsolat;
 }
 
 export function jogszabalyNev(sor: Pick<KeresesSor, "megjeloles" | "rovidites">): string {
   return sor.rovidites ? `${sor.rovidites} (${sor.megjeloles})` : sor.megjeloles;
 }
 
-export async function keres(q: string, mind = false, limit = 40): Promise<Talalat[]> {
-  const { data, error } = await getKliens().rpc("kereses", {
-    q,
-    mind,
-    talalat_limit: limit,
-  });
-  if (error) throw new Error(`Keresési hiba: ${error.message}`);
-  return (data as KeresesSor[]).map((sor) => ({
+export function talalat(sor: KeresesSor): Talalat {
+  return {
     slug: sor.slug,
     jogszabaly: jogszabalyNev(sor),
     szakasz: sor.szakasz_cim,
     horgony: sor.horgony,
     reszlet: sor.reszlet,
     hatalyos: sor.hatalyos,
-  }));
+  };
+}
+
+export async function keres(q: string, mind = false, limit = 40): Promise<Talalat[]> {
+  try {
+    const sorok = await getSql()<KeresesSor[]>`
+      select * from kereses(${q}::text, ${mind}::boolean, ${limit}::int)`;
+    return sorok.map(talalat);
+  } catch (hiba) {
+    throw new Error(`Keresési hiba: ${hiba instanceof Error ? hiba.message : String(hiba)}`);
+  }
 }
 
 export interface TeljesTalalat extends Talalat {
@@ -71,15 +77,8 @@ export interface TeljesTalalat extends Talalat {
   szoveg: string;
 }
 
-/** Az API keresője: ugyanaz a rangsor, de a § teljes szövegével (kereses_api SQL). */
-export async function keresTeljes(q: string, mind = false, limit = 10): Promise<TeljesTalalat[]> {
-  const { data, error } = await getKliens().rpc("kereses_api", {
-    q,
-    mind,
-    talalat_limit: limit,
-  });
-  if (error) throw new Error(`Keresési hiba: ${error.message}`);
-  return (data as (KeresesSor & { szoveg: string })[]).map((sor) => ({
+export function teljesTalalat(sor: KeresesSor & { szoveg: string }): TeljesTalalat {
+  return {
     slug: sor.slug,
     jogszabaly: jogszabalyNev(sor),
     megjeloles: sor.megjeloles,
@@ -90,5 +89,16 @@ export async function keresTeljes(q: string, mind = false, limit = 10): Promise<
     reszlet: sor.reszlet,
     szoveg: sor.szoveg,
     hatalyos: sor.hatalyos,
-  }));
+  };
+}
+
+/** Az API keresője: ugyanaz a rangsor, de a § teljes szövegével (kereses_api SQL). */
+export async function keresTeljes(q: string, mind = false, limit = 10): Promise<TeljesTalalat[]> {
+  try {
+    const sorok = await getSql()<(KeresesSor & { szoveg: string })[]>`
+      select * from kereses_api(${q}::text, ${mind}::boolean, ${limit}::int)`;
+    return sorok.map(teljesTalalat);
+  } catch (hiba) {
+    throw new Error(`Keresési hiba: ${hiba instanceof Error ? hiba.message : String(hiba)}`);
+  }
 }
