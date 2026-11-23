@@ -38,10 +38,19 @@ function getSql(): Sql {
   if (kapcsolat) return kapcsolat;
   const url = process.env.KERESO_DB_URL;
   if (!url) throw new Error("Hiányzó keresődatabázis-konfiguráció (KERESO_DB_URL).");
-  // prepare: false — a Neon pooler (pgbouncer, tranzakciós mód) a megnevezett
-  // prepared statementeket nem viszi át kapcsolatok között.
-  kapcsolat = postgres(url, { max: 5, prepare: false, idle_timeout: 20, connect_timeout: 15 });
+  kapcsolat = keresoKapcsolat(url);
   return kapcsolat;
+}
+
+export function keresoKapcsolat(url: string): Sql {
+  // A Neon pooler tranzakciós módban nem tartja meg a prepared statementeket.
+  return postgres(url, {
+    ssl: { rejectUnauthorized: true },
+    max: 5,
+    prepare: false,
+    idle_timeout: 20,
+    connect_timeout: 15,
+  });
 }
 
 /** A kapcsolatkészlet lezárása (tesztekhez; a szerver nem hívja). */

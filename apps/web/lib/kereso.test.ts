@@ -3,7 +3,7 @@
 // keresőindexű (kereses/kereses_api függvényes) Postgresre mutat.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { jogszabalyNev, keres, keresTeljes, lezar, talalat, teljesTalalat } from "./kereso.ts";
+import { jogszabalyNev, keres, keresoKapcsolat, keresTeljes, lezar, talalat, teljesTalalat } from "./kereso.ts";
 
 const SOR = {
   slug: "ptk",
@@ -55,6 +55,15 @@ test("KERESO_DB_URL nélkül a keresés érthető hibával elbukik", async () =>
     await assert.rejects(keresTeljes("szerződés"), /Keresési hiba: .*KERESO_DB_URL/);
   } finally {
     if (eredeti !== undefined) process.env.KERESO_DB_URL = eredeti;
+  }
+});
+
+test("a korábbi sslmode=require URL-lel is ellenőrzi a Neon tanúsítványát", async () => {
+  const sql = keresoKapcsolat("postgres://olvaso@pelda.invalid/index?sslmode=require");
+  try {
+    assert.deepEqual(sql.options.ssl, { rejectUnauthorized: true });
+  } finally {
+    await sql.end();
   }
 });
 

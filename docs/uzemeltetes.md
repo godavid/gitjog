@@ -385,7 +385,7 @@ amúgy is bármikor újraépíthető. Jelszócserénél futtasd újra a 03-as SQ
 jelszóval, és frissítsd a secretet.
 
 A Vercel oldalon `KERESO_DB_URL` él (Production): a Neon `gitjog_olvaso` szerepének
-POOLED connection stringje (`-pooler` host, `?sslmode=require` végű: a Neon TLS nélkül nem fogad kapcsolatot; a `channel_binding` paramétert a postgres.js nem érti, ne tedd bele). A web csak OLVAS: a szerep a két táblán
+POOLED connection stringje (`-pooler` host, `?sslmode=verify-full` végű: a web ellenőrzi a szerver TLS-tanúsítványát; a `channel_binding` paramétert a postgres.js nem érti, ne tedd bele). A web csak OLVAS: a szerep a két táblán
 csak `select`-et és a két keresőfüggvényen `execute`-ot kap, 8 s `statement_timeout`-tal.
 A string szándékosan nem `NEXT_PUBLIC_` előtagú — a keresés szerver oldalon fut, így
 semmi nem kerül belőle a kliens bundle-be. (A korábbi `SUPABASE_URL` és
