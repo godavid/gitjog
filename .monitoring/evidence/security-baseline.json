@@ -1,0 +1,40 @@
+{
+  "_template": "ci-workflows template monitoring/evidence.example.json v1.1.0 sha256:28d6c63d629a9dd30732659906588628cb5856f19e13a1ab1e62e76c88065e8a",
+  "version": 1,
+  "integration": "security-baseline",
+  "status": "É",
+  "date": "2026-11-25",
+  "sha": "8db3011cc3813117d2afde1342b4134f49ceffa2",
+  "cells": {
+    "a": {
+      "link": "https://github.com/godavid/gitjog/actions/runs/45673182537",
+      "mode": "live",
+      "note": "push to main at 8db3011cc, green (1 reasoned allow entry: actionlint 1.7.12 does not know concurrency.queue)"
+    },
+    "b": {
+      "link": "https://github.com/godavid/gitjog/actions/runs/45674635138",
+      "mode": "live",
+      "note": "draft PR #55: unpinned actions/setup-node@v4 -> unpinned-uses blocking, red"
+    },
+    "c": {
+      "link": "https://github.com/godavid/gitjog/pull/55",
+      "mode": "live",
+      "note": "the red security-baseline check on the PR with the report artifact"
+    },
+    "d": {
+      "link": "https://github.com/godavid/gitjog/actions/runs/45674635138",
+      "mode": "live",
+      "note": "not applicable: a CI check opens no issue to deduplicate"
+    },
+    "e": {
+      "link": "https://github.com/godavid/gitjog/actions/runs/45675107658",
+      "mode": "live",
+      "note": "revert commit on #55, green; #55 closed without merge"
+    },
+    "f": {
+      "link": "https://github.com/godavid/gitjog/actions/runs/45673182537",
+      "mode": "live",
+      "note": "reads the workflow files only; contents: read, no secret, GitHub-hosted runner"
+    }
+  }
+}

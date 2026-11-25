@@ -1,0 +1,40 @@
+{
+  "_template": "ci-workflows template monitoring/evidence.example.json v1.1.0 sha256:28d6c63d629a9dd30732659906588628cb5856f19e13a1ab1e62e76c88065e8a",
+  "version": 1,
+  "integration": "a11y",
+  "status": "P",
+  "date": "2026-11-25",
+  "sha": "8db3011cc3813117d2afde1342b4134f49ceffa2",
+  "cells": {
+    "a": {
+      "link": "https://github.com/godavid/gitjog/actions/runs/45673182379",
+      "mode": "live",
+      "note": "push to main at 8db3011cc, green; local build (P by plan 4.4); 4 pages x mobile and desktop, 0 axe findings, empty baseline"
+    },
+    "b": {
+      "link": "https://github.com/godavid/gitjog/actions/runs/45674634682",
+      "mode": "live",
+      "note": "draft PR #55: an img without alt on /agenteknek -> image-alt (mobile, desktop), red"
+    },
+    "c": {
+      "link": "https://github.com/godavid/gitjog/pull/55",
+      "mode": "live",
+      "note": "the red web-quality check with the report artifact"
+    },
+    "d": {
+      "link": "https://github.com/godavid/gitjog/actions/runs/45674634682",
+      "mode": "live",
+      "note": "not applicable: a CI check opens no issue to deduplicate"
+    },
+    "e": {
+      "link": "https://github.com/godavid/gitjog/actions/runs/45675107387",
+      "mode": "live",
+      "note": "revert commit on #55, green; #55 closed without merge"
+    },
+    "f": {
+      "link": "https://github.com/godavid/gitjog/actions/runs/45673182379",
+      "mode": "live",
+      "note": "local build on 127.0.0.1 (pages read the public data repo), no production request, no secret"
+    }
+  }
+}

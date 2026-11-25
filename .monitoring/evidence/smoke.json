@@ -1,0 +1,40 @@
+{
+  "_template": "ci-workflows template monitoring/evidence.example.json v1.1.0 sha256:28d6c63d629a9dd30732659906588628cb5856f19e13a1ab1e62e76c88065e8a",
+  "version": 1,
+  "integration": "smoke",
+  "status": "É",
+  "date": "2026-11-25",
+  "sha": "8db3011cc3813117d2afde1342b4134f49ceffa2",
+  "cells": {
+    "a": {
+      "link": "https://github.com/godavid/gitjog/actions/runs/45673182419",
+      "mode": "live",
+      "note": "release-production on main (8db3011cc): Build -> Deploy green, then the separate Smoke job green"
+    },
+    "b": {
+      "link": "https://github.com/godavid/gitjog/actions/runs/45673716956",
+      "mode": "live",
+      "note": "monitoring-proof case smoke-failure: smoke against https://monitoring-proof.invalid red (DNS resolution failed), verdict job green"
+    },
+    "c": {
+      "link": "https://github.com/godavid/gitjog/issues/54",
+      "mode": "live",
+      "note": "monitoring-proof case red-issue (run 45673922621): the vendored red-issue opened the proof-only issue (quality, manual, triaged)"
+    },
+    "d": {
+      "link": "https://github.com/godavid/gitjog/issues/54#issuecomment-7170789212",
+      "mode": "live",
+      "note": "second red dispatch (run 45674143034) commented on #54, no second issue"
+    },
+    "e": {
+      "link": "https://github.com/godavid/gitjog/issues/54#issuecomment-7170817604",
+      "mode": "live",
+      "note": "red-issue case against https://gitjog.remenyfarm.hu (run 45674346812): smoke green, #54 closed"
+    },
+    "f": {
+      "link": "https://github.com/godavid/gitjog/actions/runs/45673182419",
+      "mode": "live",
+      "note": "smoke-report of the release run: unabortedWrites 0; the guard aborted 4 requests, all analytics (/_vercel/insights/script.js); GET only; the smoke job holds no secret (VERCEL_TOKEN stays in the release job env)"
+    }
+  }
+}
