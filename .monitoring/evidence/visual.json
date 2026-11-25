@@ -1,0 +1,16 @@
+{
+  "_template": "ci-workflows template monitoring/evidence.example.json v1.1.0 sha256:28d6c63d629a9dd30732659906588628cb5856f19e13a1ab1e62e76c88065e8a",
+  "version": 1,
+  "integration": "visual",
+  "status": "J",
+  "date": "2026-11-25",
+  "sha": "8db3011cc3813117d2afde1342b4134f49ceffa2",
+  "pending_owner": "baseline approval of the 8 actual images (run 45671503872, artifact web-quality-report); MONITORING_VISUAL=off until then; promote-actuals only after the OK, never --update-snapshots",
+  "cells": {
+    "a": {
+      "link": "https://github.com/godavid/gitjog/actions/runs/45671503872",
+      "mode": "live",
+      "note": "first web-quality run (PR #52, attempt 1): visual red as expected without a baseline; artifact web-quality-report holds the 8 *-actual.png (home, agenteknek, adatok, jogszabaly x mobile, desktop)"
+    }
+  }
+}
