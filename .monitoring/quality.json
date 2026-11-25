@@ -1,0 +1,36 @@
+{
+  "_template": "ci-workflows template monitoring/quality.json v1.1.0 sha256:35bd8de220c04a2e4a68fec9c4a7ebb58bb0c336a0824a32326022aba2325778",
+  "version": 1,
+  "pages": [
+    {
+      "id": "home",
+      "path": "/",
+      "mask": [
+        ".alcim-sor",
+        ".friss-lista",
+        ".szekcio-lab"
+      ]
+    },
+    {
+      "id": "agenteknek",
+      "path": "/agenteknek"
+    },
+    {
+      "id": "adatok",
+      "path": "/adatok"
+    },
+    {
+      "id": "jogszabaly",
+      "path": "/jogszabaly/2026-evi-xxvii-torveny"
+    }
+  ],
+  "viewports": [
+    "mobile",
+    "desktop"
+  ],
+  "mask": [],
+  "hide": [],
+  "waitFor": [
+    "main"
+  ]
+}

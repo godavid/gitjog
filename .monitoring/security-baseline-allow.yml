@@ -1,0 +1,17 @@
+# ci-workflows template monitoring/security-baseline-allow.yml v1.1.0 sha256:0a5b57170bd1960658e4344636faa9e42f788d8a4e8048c68199f021ccea4a11
+# Existing, reviewed exceptions of the security-baseline check. Copy to .monitoring/security-baseline-allow.yml.
+# Only new violations block. Every entry needs a non-empty reason; an entry that matches nothing
+# produces a warning (remove it). Entry shape:
+#
+#   allow:
+#     - rule: dangerous-triggers
+#       file: .github/workflows/release-production.yml
+#       reason: "Why this existing use is safe"
+#       match: "pull_request_target"   # optional (v1.1.0): a substring of the finding message, so the
+#                                      # entry covers that finding only; without it the entry covers
+#                                      # the rule in the whole file and the check warns about it.
+allow:
+  - rule: actionlint
+    file: .github/workflows/red-issue.yml
+    reason: "Vendored ci-workflows v1.1.0 red-issue.yml: `queue: max` keeps every queued red/green result (GitHub Actions feature, used in production by chirp); actionlint 1.7.12 does not know the key yet."
+    match: 'unexpected key "queue" for "concurrency" section'

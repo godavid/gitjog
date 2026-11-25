@@ -1,0 +1,5 @@
+{
+  "_template": "ci-workflows template monitoring/a11y-baseline.json v1.1.0 sha256:c40cde1f23bebbaaa1dedd52ae986297db024330b85dcfdf6e5263bae0d120d6",
+  "version": 1,
+  "findings": []
+}

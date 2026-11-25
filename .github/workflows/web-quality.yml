@@ -1,0 +1,64 @@
+# a11y (axe, WCAG 2.1 A és AA) és vizuális snapshot a nyilvános oldalakon, mobil és asztali
+# nézetben, helyi buildre. Vendorolt sablon (`.github/actions/web-quality`, Remeny-Farm/ci-workflows
+# v1.1.0). Nem kötelező check és nem kapuzza a deployt: egy még el nem fogadott baseline a main-en
+# a release-t nem állíthatja meg. Az oldallista: `.monitoring/quality.json`.
+#
+# Titok nélkül, GitHub-hosted runneren (publikus repó). A vizuális rész ezért itt a hosted
+# image-en fut (`visual-runner-prefix: ""`); a baseline is ezen a runneren készül.
+# A build a publikus adat-repóból olvas (raw.githubusercontent.com), adatbázis nem kell;
+# a /kereses ezért nincs a listán.
+#
+# Baseline: soha nem `--update-snapshots`. Az első vizuális futás piros, és az artefaktba írja az
+# `*-actual.png` képeket. A `.monitoring/visual/` alá csak a tulajdonos OK-ja után kerül kép
+# (`scripts/promote-actuals` a sablonból). Kikapcsolás: `MONITORING_A11Y=off`, `MONITORING_VISUAL=off`.
+name: web-quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: web-quality-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  quality:
+    name: web-quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 12
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: Telepítés
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: pnpm --filter @gitjog/web build
+
+      # Az action indítja a szervert, megvárja a ready-url-t, tesztel, és ugyanabban a lépésben leállítja.
+      - name: Web quality (a11y + vizuális)
+        uses: ./.github/actions/web-quality
+        with:
+          start-command: pnpm --filter @gitjog/web exec next start --hostname 127.0.0.1 --port 3000
+          ready-url: http://127.0.0.1:3000/
+          visual-runner-prefix: ""
+          a11y: ${{ vars.MONITORING_A11Y != 'off' }}
+          visual: ${{ vars.MONITORING_VISUAL != 'off' }}

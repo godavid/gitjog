@@ -1,0 +1,33 @@
+# Workflow-higiénia: actionlint + zizmor (rögzített verzió, sha256) a `.github/workflows/**`
+# és a `.github/actions/**` fájlokon. Vendorolt sablon (`.github/actions/security-baseline`,
+# Remeny-Farm/ci-workflows v1.1.0): a publikus repó a belső ci-workflows-t nem hívhatja.
+# Csak új szabálysértés buktat; a meglévő kivételek indoklással a
+# `.monitoring/security-baseline-allow.yml`-ben. Titok nélkül, GitHub-hosted runneren.
+# Nem kötelező check: a `biztonsag` összesítő és a CodeQL marad a ruleset kapuja.
+name: security-baseline
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: security-baseline-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  security-baseline:
+    name: security-baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: scan
+        uses: ./.github/actions/security-baseline

@@ -1,0 +1,115 @@
+# ci-workflows template .github/workflows/post-deploy-smoke.yml v1.1.0 sha256:b7b748fc7fb570b304e6510ec2ff15e9cffc0f7dc4645b1c9460c64f2584b559
+# Vendored from Remeny-Farm/ci-workflows@6419be1744cf60d5f97addac0d6d20d29e0b0625 (v1.1.0): godavid/gitjog is public and cannot call the internal repo. Edit upstream, then re-copy.
+name: Post-deploy smoke
+
+# Reusable workflow around actions/smoke. Docs: docs/components/smoke.md.
+# Caller job permissions: `contents: read` and `issues: write` (GitHub checks the nested
+# red-issue job's permissions statically, so `issues: write` is needed even when
+# `red-issue` is false).
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: >-
+          JSON text of the runs-on value of the secret-free smoke job, e.g.
+          '["self-hosted","linux","ms-s1"]' or '"ubuntu-latest"'. Empty: vars.MONITORING_RUNNER,
+          then "blacksmith-2vcpu-ubuntu-2404".
+        type: string
+        required: false
+        default: ''
+      write-runner:
+        description: JSON text of the runs-on value of the red-issue job (it holds issues write).
+        type: string
+        required: false
+        default: '"ubuntu-latest"'
+      config:
+        description: Path of the smoke config in the caller repository.
+        type: string
+        required: false
+        default: .monitoring/smoke.json
+      base-url:
+        description: >-
+          Optional origin that replaces the config's origin (controlled-failure proof:
+          https://monitoring-proof.invalid).
+        type: string
+        required: false
+        default: ''
+      red-issue:
+        description: Open or comment an issue on a red smoke and close it on the next green one.
+        type: boolean
+        required: false
+        default: false
+      issue-title:
+        description: 'Exact title of the red issue. Empty means "post-deploy smoke: <owner/repo>".'
+        type: string
+        required: false
+        default: ''
+      issue-labels:
+        description: Comma-separated labels of the red issue. They must already exist. Required when red-issue is true.
+        type: string
+        required: false
+        default: ''
+    outputs:
+      result:
+        description: passed, failed or skipped (empty when the job failed before the smoke ran).
+        value: ${{ jobs.smoke.outputs.result }}
+      failures:
+        description: Number of failing checks.
+        value: ${{ jobs.smoke.outputs.failures }}
+
+permissions: {}
+
+jobs:
+  smoke:
+    name: smoke
+    runs-on: ${{ fromJSON(inputs.runner || vars.MONITORING_RUNNER || '"blacksmith-2vcpu-ubuntu-2404"') }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      result: ${{ steps.smoke.outputs.result }}
+      failures: ${{ steps.smoke.outputs.failures }}
+    steps:
+      - name: Check inputs
+        if: inputs.red-issue
+        shell: bash
+        env:
+          ISSUE_LABELS: ${{ inputs.issue-labels }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ISSUE_LABELS//[[:space:],]/}" ]; then
+            echo "::error::issue-labels is required when red-issue is true"
+            exit 1
+          fi
+
+      # Vendored: the checkout always runs, because the local action below lives in the checkout.
+      - name: Check out the caller repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Smoke
+        id: smoke
+        uses: ./.github/actions/smoke
+        with:
+          config: ${{ inputs.config }}
+          base-url: ${{ inputs.base-url }}
+          enabled: ${{ vars.MONITORING_SMOKE != 'off' }}
+
+  red-issue:
+    name: red-issue
+    needs: smoke
+    if: ${{ always() && inputs.red-issue }}
+    permissions:
+      issues: write
+      contents: read
+    # A skipped smoke (kill switch) must neither open nor close an issue.
+    uses: ./.github/workflows/red-issue.yml
+    with:
+      title: "${{ inputs.issue-title || format('post-deploy smoke: {0}', github.repository) }}"
+      labels: ${{ inputs.issue-labels }}
+      result: ${{ needs.smoke.outputs.result == 'skipped' && 'skipped' || needs.smoke.result }}
+      sha: ${{ github.sha }}
+      write-runner: ${{ inputs.write-runner }}
+      body: ${{ format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}

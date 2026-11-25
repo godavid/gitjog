@@ -1,0 +1,69 @@
+# ci-workflows template actions/security-baseline v1.1.0 sha256:50096e5491ec6a0b609e54732d203e7001af35c59a9582903609049bbed631bf
+# Vendored from Remeny-Farm/ci-workflows@6419be1744cf60d5f97addac0d6d20d29e0b0625 (v1.1.0): godavid/gitjog is public and cannot call the internal repo. Edit upstream, then re-copy.
+name: security-baseline
+description: >-
+  Runs pinned actionlint and zizmor on the caller's workflows plus a check for a
+  top-level permissions block, applies the caller's allow-file, and fails on new
+  blocking findings only.
+
+inputs:
+  path:
+    description: Workflow directory (or one workflow file), relative to the workspace. .github/actions/** is scanned too when present.
+    required: false
+    default: .github/workflows
+  allow-file:
+    description: Optional allow-file with reasoned exceptions for existing violations (see docs/components/security-baseline.md).
+    required: false
+    default: .monitoring/security-baseline-allow.yml
+  report-name:
+    description: Name of the uploaded JSON report artifact.
+    required: false
+    default: security-baseline-report
+
+outputs:
+  result:
+    description: passed, failed (new blocking findings) or error (invalid allow-file).
+    value: ${{ steps.scan.outputs.result || 'error' }}
+  blocking:
+    description: Number of blocking findings that no allow entry covers.
+    value: ${{ steps.scan.outputs.blocking || '0' }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install actionlint and zizmor (sha256-verified)
+      id: install
+      shell: bash
+      env:
+        RUNNER_OS_NAME: ${{ runner.os }}
+        RUNNER_ARCH_NAME: ${{ runner.arch }}
+      run: |
+        set -euo pipefail
+        tools="$(mktemp -d "$RUNNER_TEMP/security-baseline-tools.XXXXXX")"
+        # Versions, assets and sha256 live in tools.sha256 only (Linux and macOS, amd64 and arm64).
+        RUNNER_OS="$RUNNER_OS_NAME" RUNNER_ARCH="$RUNNER_ARCH_NAME" bash "$GITHUB_ACTION_PATH/install-tools.sh" "$tools"
+        echo "actionlint=$tools/actionlint" >> "$GITHUB_OUTPUT"
+        echo "zizmor=$tools/zizmor" >> "$GITHUB_OUTPUT"
+
+    - name: Scan workflows
+      id: scan
+      shell: bash
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_ALLOW_FILE: ${{ inputs.allow-file }}
+        ACTIONLINT_BIN: ${{ steps.install.outputs.actionlint }}
+        ZIZMOR_BIN: ${{ steps.install.outputs.zizmor }}
+      run: |
+        set -euo pipefail
+        bash "$GITHUB_ACTION_PATH/run.sh" "$INPUT_PATH" "$INPUT_ALLOW_FILE" "$RUNNER_TEMP/security-baseline-report.json"
+
+    - name: Upload report
+      if: ${{ always() }}
+      continue-on-error: true
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ${{ inputs.report-name }}
+        path: ${{ runner.temp }}/security-baseline-report.json
+        retention-days: 30
+        overwrite: true
+        if-no-files-found: ignore

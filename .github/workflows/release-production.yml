@@ -30,7 +30,7 @@ concurrency:
 
 jobs:
   release:
-    name: Build -> Deploy -> Smoke
+    name: Build -> Deploy
     if: vars.DEPLOY_HOLD != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -91,10 +91,21 @@ jobs:
           url="$(vercel deploy --prebuilt --prod --yes --token "$VERCEL_TOKEN")"
           echo "Deployment: $url"
 
-      - name: Smoke
-        run: |
-          for ut in / /agenteknek /api/v1/openapi.json; do
-            kod="$(curl -sS -o /dev/null -w '%{http_code}' "$PROD_URL$ut")"
-            echo "$ut -> $kod"
-            [ "$kod" = 200 ] || { echo "::error::$PROD_URL$ut: HTTP $kod"; exit 1; }
-          done
+  # A deploy utáni smoke külön jobban fut, titok nélkül: a VERCEL_TOKEN a `release`
+  # job szintű env-je, ide nem jut el. Vendorolt sablon (`post-deploy-smoke.yml`,
+  # `.github/actions/smoke`), GitHub-hosted runneren (publikus repó). Az oldalak és az
+  # elvárások: `.monitoring/smoke.json`. Piros smoke: a futás piros, és a
+  # `post-deploy smoke: godavid/gitjog` issue nyílik vagy kommentet kap; a következő
+  # zöld smoke lezárja. Kikapcsolás: `MONITORING_SMOKE=off` repo-változó.
+  smoke:
+    name: Smoke
+    needs: release
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/post-deploy-smoke.yml
+    with:
+      runner: '"ubuntu-latest"'
+      config: .monitoring/smoke.json
+      red-issue: true
+      issue-labels: prod-incident,sev:high,routine,triaged

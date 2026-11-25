@@ -1,0 +1,166 @@
+# ci-workflows template .github/workflows/red-issue.yml v1.1.0 sha256:b13f40aae33d779c12f0d5e541532346e9295d43725f92eb98713d01e98c891f
+# Vendored from Remeny-Farm/ci-workflows@6419be1744cf60d5f97addac0d6d20d29e0b0625 (v1.1.0): godavid/gitjog is public and cannot call the internal repo. Edit upstream, then re-copy.
+name: red-issue
+
+# Reusable: one GitHub issue per title. A red result opens the issue or adds a
+# comment to the open one; a green result closes it, but only when the green
+# commit contains every failed commit the issue recorded. Generalises the
+# `trunk red` workflow of chirp. Labels must already exist (never created here).
+# See docs/components/red-issue.md.
+on:
+  workflow_call:
+    inputs:
+      title:
+        description: Exact title of the issue. One issue per title.
+        type: string
+        required: true
+      labels:
+        description: >-
+          Comma-separated labels for a new issue. They must already exist in the repository.
+          The first label is also the lookup key for the open issue.
+        type: string
+        required: true
+      result:
+        description: success closes the open issue, failure opens or comments, anything else does nothing.
+        type: string
+        required: true
+      sha:
+        description: Commit the result belongs to (40 lowercase hex characters).
+        type: string
+        required: true
+      write-runner:
+        description: runs-on value as JSON text. The job holds issues write, so it stays on a GitHub-hosted runner.
+        type: string
+        required: false
+        default: '"ubuntu-latest"'
+      body:
+        description: Optional extra line added to the issue body or comment.
+        type: string
+        required: false
+        default: ''
+    outputs:
+      issue:
+        description: Number of the issue that was opened, commented or closed (empty when action is none).
+        value: ${{ jobs.alert.outputs.issue }}
+      action:
+        description: opened, commented, closed or none.
+        value: ${{ jobs.alert.outputs.action }}
+
+permissions: {}
+
+jobs:
+  alert:
+    name: Open, update or close the issue
+    runs-on: ${{ fromJSON(inputs.write-runner || '"ubuntu-latest"') }}
+    timeout-minutes: 5
+    # One writer per issue: concurrent results for one title queue here.
+    # `queue: max` (as chirp uses in production): without it a group keeps one
+    # pending job and a later result replaces it, so a failure could vanish unrecorded.
+    concurrency:
+      group: red-issue-${{ inputs.title }}
+      queue: max
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write # open, comment on and close the issue
+    outputs:
+      issue: ${{ steps.alert.outputs.issue }}
+      action: ${{ steps.alert.outputs.action }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TITLE: ${{ inputs.title }}
+      LABELS: ${{ inputs.labels }}
+      RESULT: ${{ inputs.result }}
+      SHA: ${{ inputs.sha }}
+      BODY_EXTRA: ${{ inputs.body }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Open, update or close the issue
+        id: alert
+        shell: bash
+        run: |
+          set -euo pipefail
+          emit() { # <action> <issue>
+            echo "action=$1" >> "$GITHUB_OUTPUT"
+            echo "issue=$2" >> "$GITHUB_OUTPUT"
+          }
+          if [ "$RESULT" != "success" ] && [ "$RESULT" != "failure" ]; then
+            echo "Result '$RESULT' is neither success nor failure: nothing to do."
+            emit none ""
+            exit 0
+          fi
+          [ -n "$TITLE" ] || { echo "::error::title must not be empty."; exit 1; }
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::sha must be 40 lowercase hex characters."; exit 1; }
+
+          # Labels: comma list, whitespace trimmed, empty items dropped.
+          labels=()
+          IFS=',' read -r -a raw_labels <<< "$LABELS"
+          for label in "${raw_labels[@]}"; do
+            label="${label#"${label%%[![:space:]]*}"}"
+            label="${label%"${label##*[![:space:]]}"}"
+            [ -z "$label" ] || labels+=("$label")
+          done
+
+          # The open issue with this exact title. The title is user text: filter with jq --arg, never splice it into a program.
+          open=""
+          if [ "${#labels[@]}" -gt 0 ]; then
+            open="$(gh issue list --label "${labels[0]}" --state open --limit 200 --json number,title |
+              jq -r --arg t "$TITLE" '[.[] | select(.title == $t)][0].number // empty')"
+          fi
+
+          if [ "$RESULT" = "success" ]; then
+            if [ -z "$open" ]; then emit none ""; exit 0; fi
+            # Results can finish out of order: an older green SHA must not close a newer
+            # failure. Close only when this SHA contains every failed SHA the issue recorded.
+            # Fail closed: an unreadable history keeps the issue open (set -e);
+            # only grep's "no marker" exit is tolerated.
+            history="$(gh issue view "$open" --json body,comments --jq '[.body] + [.comments[].body] | .[]')"
+            failed="$(printf '%s\n' "$history" | { grep -oE 'red-issue-sha:[0-9a-f]{40}' || [ "$?" -eq 1 ]; } |
+              cut -d: -f2 | sort -u)"
+            for f in $failed; do
+              status="$(gh api "repos/$GH_REPO/compare/${f}...${SHA}" --jq .status 2>/dev/null || echo unknown)"
+              case "$status" in
+                ahead|identical) ;;
+                *)
+                  echo "Green at ${SHA:0:12} does not contain failed ${f:0:12} (${status}); issue #${open} stays open."
+                  emit none "$open"
+                  exit 0
+                  ;;
+              esac
+            done
+            gh issue close "$open" --comment "Green again at ${SHA} (${RUN_URL})."
+            emit closed "$open"
+            exit 0
+          fi
+
+          # result = failure
+          body="Red at ${SHA}: ${RUN_URL}"
+          if [ -n "$BODY_EXTRA" ]; then body="${body}"$'\n\n'"${BODY_EXTRA}"; fi
+          body="${body}"$'\n'"<!-- red-issue-sha:${SHA} -->"
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body "$body"
+            emit commented "$open"
+            exit 0
+          fi
+          if [ "${#labels[@]}" -eq 0 ]; then
+            echo "::error::labels must name at least one existing label."
+            exit 1
+          fi
+          # Labels are never created here: a missing one is an error with the fix named.
+          existing="$(gh label list --limit 1000 --json name --jq '.[].name | ascii_downcase')"
+          missing=()
+          for label in "${labels[@]}"; do
+            lower="$(printf '%s' "$label" | tr '[:upper:]' '[:lower:]')"
+            printf '%s\n' "$existing" | grep -Fxq -- "$lower" || missing+=("$label")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Label(s) not found in ${GH_REPO}: $(IFS=,; echo "${missing[*]}"). Labels are never created here; create them from the registry first with: bin/labels.py ensure <name>"
+            exit 1
+          fi
+          args=()
+          for label in "${labels[@]}"; do args+=(--label "$label"); done
+          url="$(gh issue create --title "$TITLE" "${args[@]}" --body "$body")"
+          number="${url##*/}"
+          echo "Opened ${url}"
+          emit opened "$number"

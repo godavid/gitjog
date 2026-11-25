@@ -1,0 +1,150 @@
+# ci-workflows template actions/smoke v1.1.0 sha256:e37159bfccc2938c6f5b859495c78233efd5e60646230777b7c652b461bcac9d
+# Vendored from Remeny-Farm/ci-workflows@6419be1744cf60d5f97addac0d6d20d29e0b0625 (v1.1.0): godavid/gitjog is public and cannot call the internal repo. Edit upstream, then re-copy.
+name: Smoke
+description: >-
+  Playwright smoke of the pages listed in a smoke.json: status or redirect, selector, text,
+  headers and a console error budget, in a mobile and a desktop viewport, behind a built-in
+  prod guard. Uploads report.json and report.html.
+
+inputs:
+  config:
+    description: Path of the smoke config in the caller's workspace (schema version 1).
+    required: false
+    default: .monitoring/smoke.json
+  base-url:
+    description: >-
+      Optional origin (scheme, host, port; no path) that replaces the config's `origin`.
+      Controlled-failure proofs use https://monitoring-proof.invalid.
+    required: false
+    default: ''
+  enabled:
+    description: Anything other than 'true' skips the smoke with a warning, a summary line and a skipped marker (never red).
+    required: false
+    default: 'true'
+  report-name:
+    description: Name of the report directory (inside the workspace) and of the uploaded artifact.
+    required: false
+    default: smoke-report
+
+outputs:
+  result:
+    description: passed, failed or skipped.
+    value: ${{ steps.run.outputs.result || steps.skip.outputs.result }}
+  failures:
+    description: Number of failing checks (0 when passed or skipped).
+    value: ${{ steps.run.outputs.failures || steps.skip.outputs.failures }}
+
+runs:
+  using: composite
+  steps:
+    - name: Validate inputs
+      shell: bash
+      env:
+        REPORT_NAME: ${{ inputs.report-name }}
+      run: |
+        set -euo pipefail
+        if [[ ! "$REPORT_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || [[ "$REPORT_NAME" == *..* ]]; then
+          echo "::error::report-name must match [A-Za-z0-9][A-Za-z0-9._-]* and must not contain '..'"
+          exit 1
+        fi
+
+    - name: Skip (disabled)
+      id: skip
+      if: inputs.enabled != 'true'
+      shell: bash
+      env:
+        MARKER_DIR: ${{ runner.temp }}/monitoring-result-smoke
+      run: |
+        set -euo pipefail
+        echo "::warning::smoke skipped: disabled by the caller (MONITORING_SMOKE=off or enabled input)"
+        echo "### Smoke: skipped" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        echo "Disabled by the caller (\`MONITORING_SMOKE=off\` or the \`enabled\` input). This is not a successful run." >> "$GITHUB_STEP_SUMMARY"
+        mkdir -p "$MARKER_DIR"
+        printf 'skipped\n' > "$MARKER_DIR/result.txt"
+        {
+          echo "result=skipped"
+          echo "failures=0"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Upload skipped marker
+      if: inputs.enabled != 'true'
+      continue-on-error: true
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: monitoring-result.smoke.skipped.${{ github.job }}.${{ github.run_attempt }}.${{ inputs.report-name }}
+        path: ${{ runner.temp }}/monitoring-result-smoke/result.txt
+        retention-days: 30
+        overwrite: true
+        if-no-files-found: error
+
+    - name: Set up Node
+      if: inputs.enabled == 'true'
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: '22'
+
+    - name: Install smoke dependencies
+      if: inputs.enabled == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd "$GITHUB_ACTION_PATH"
+        npm ci --ignore-scripts --no-audit --no-fund
+
+    - name: Cache Playwright browsers
+      if: inputs.enabled == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: pw-chromium-1.65.1-${{ runner.os }}-${{ runner.arch }}
+
+    - name: Install Chromium
+      if: inputs.enabled == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd "$GITHUB_ACTION_PATH"
+        npx playwright install --with-deps chromium
+
+    # smoke.mjs writes the report and the outputs and exits 1 on failures. The step
+    # swallows that exit code so the report upload always runs first; the last step fails.
+    - name: Run smoke
+      id: run
+      if: inputs.enabled == 'true'
+      shell: bash
+      env:
+        SMOKE_CONFIG: ${{ inputs.config }}
+        SMOKE_BASE_URL: ${{ inputs.base-url }}
+        SMOKE_REPORT_NAME: ${{ inputs.report-name }}
+      run: |
+        set -euo pipefail
+        node "$GITHUB_ACTION_PATH/smoke.mjs" || echo "smoke.mjs exited with $?"
+        # A crash before the runner wrote its outputs still has to read as failed.
+        if ! grep -q '^result=' "$GITHUB_OUTPUT"; then
+          {
+            echo "result=failed"
+            echo "failures=1"
+          } >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Upload smoke report
+      if: ${{ !cancelled() && inputs.enabled == 'true' && steps.run.outcome != 'skipped' }}
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ${{ inputs.report-name }}
+        path: ${{ inputs.report-name }}
+        retention-days: 30
+        overwrite: true
+        if-no-files-found: warn
+
+    - name: Fail on smoke failures
+      if: inputs.enabled == 'true' && steps.run.outputs.result != 'passed'
+      shell: bash
+      env:
+        RESULT: ${{ steps.run.outputs.result }}
+        FAILURES: ${{ steps.run.outputs.failures }}
+      run: |
+        set -euo pipefail
+        echo "::error::smoke ${RESULT:-failed} (${FAILURES:-unknown} failing check(s)); see the step summary and the report artifact"
+        exit 1
