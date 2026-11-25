@@ -65,6 +65,8 @@ export default async function AgenteknekOldal() {
   return (
     <main className="lap lap-szukebb agent-lap">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSzoveg(jsonLd) }} />
+      {/* monitoring-proof: szándékos a11y-hiba (alt nélküli kép) */}
+      <img src="/icon.svg" width={1} height={1} />
       <h1>MCP-szerver, API és értesítés</h1>
       <p className="alcim-sor">
         A GitJog embernek és AI-agentnek egyaránt szól. Amit a böngészőben olvasol ({jogszabalySzam.toLocaleString("hu-HU")}{" "}
