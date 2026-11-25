@@ -1,0 +1,13 @@
+{
+  "name": "ci-workflows-smoke",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright smoke runner of the Remeny-Farm/ci-workflows actions/smoke composite action",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "playwright": "1.65.1"
+  }
+}

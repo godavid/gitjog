@@ -408,6 +408,29 @@ szűkített Vercel-token; a Vercel CLI nem tud ilyet
 kiadni (403), a dashboardon kell létrehozni. Git-integráció nincs: a Vercel
 GitHub-appja csak a Remeny-Farm orgot látja, a `godavid` fiókot nem.
 
+**Deploy utáni smoke (2026-11-25).** A `release` job után külön `smoke` job fut, titok
+nélkül (a `VERCEL_TOKEN` a `release` job env-je), GitHub-hosted runneren. Playwright
+nézi a `.monitoring/smoke.json` oldalait (`/`, `/agenteknek`, `/api/v1/openapi.json`)
+mobil és asztali nézetben; a beépített prod-guard minden nem GET/HEAD kérést és az
+analitikát megszakítja. Piros smoke: a release-futás piros, és a `post-deploy smoke:
+godavid/gitjog` issue nyílik (`prod-incident`, `sev:high`, `routine`, `triaged`) vagy
+kommentet kap; a következő zöld smoke lezárja. Kikapcsolás: `MONITORING_SMOKE=off`
+repo-változó.
+
+**Monitoring-sablon.** A `Remeny-Farm/ci-workflows` (v1.1.0) belső repó, a publikus gitjog
+nem hívhatja, ezért vendorolt másolat van: `.github/actions/smoke`, `web-quality`,
+`security-baseline`, és a `post-deploy-smoke.yml`, `red-issue.yml` workflow. Az
+`action.yml` első sora a sablon-fejléc (`ci-workflows template <név> v1.1.0 sha256:…`);
+frissítés: a ci-workflows új kiadásából újramásolni, kézzel nem szerkeszteni. További
+workflow-k: `security-baseline.yml` (actionlint + zizmor, csak új találat buktat; kivétel
+indoklással a `.monitoring/security-baseline-allow.yml`-ben), `web-quality.yml` (a11y és
+vizuális snapshot helyi buildre, `.monitoring/quality.json`; kikapcsolás
+`MONITORING_A11Y=off`, `MONITORING_VISUAL=off`), `monitoring-proof.yml` (kontrollált hiba
+`workflow_dispatch`-csel, a `https://monitoring-proof.invalid` címre). Egyik sem kötelező
+check. A vizuális baseline-t (`.monitoring/visual/`) csak a tulajdonos OK-ja után
+másolja be a `scripts/promote-actuals`; `--update-snapshots` soha. A bizonyítékok:
+`.monitoring/evidence/`.
+
 ## Biztonsági scan (2026-09-25)
 
 A repo publikus, és a napi delta a gitjog **main** ágát futtatja írási joggal az

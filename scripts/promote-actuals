@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# ci-workflows template scripts/promote-actuals v1.1.0 sha256:8c5bc529b216fdbf15226ea17c6aea5e060cb170af2870ef79192ddd44da8cde
+# promote-actuals <report-dir> <snapshots-dir> <name>...
+#
+# Copies the named, owner-approved <name>-actual.png files from a downloaded web-quality report
+# into <snapshots-dir>/<name>.png (the visual baselines).
+#
+# Run this ONLY after the owner has approved the screenshots. The commit message must cite that OK
+# (who approved, where). Never approve a baseline on your own, and never use --update-snapshots.
+# <name> is "<page id>-<viewport>", for example home-mobile.
+set -euo pipefail
+
+usage() { echo "usage: promote-actuals <report-dir> <snapshots-dir> <name>..." >&2; exit 2; }
+
+[ "$#" -ge 3 ] || usage
+report_dir="$1"
+snapshots_dir="$2"
+shift 2
+[ -d "$report_dir" ] || { echo "promote-actuals: report dir not found: $report_dir" >&2; exit 1; }
+
+# Validate every name first, so nothing is copied when one of them is wrong.
+for name in "$@"; do
+  case "$name" in
+    ''|*/*|*..*|*[!A-Za-z0-9._-]*) echo "promote-actuals: invalid name '$name' (use <page id>-<viewport>)" >&2; exit 1 ;;
+  esac
+  found="$(find "$report_dir" -type f -name "${name}-actual.png" | sort)"
+  [ -n "$found" ] || { echo "promote-actuals: no ${name}-actual.png under $report_dir" >&2; exit 1; }
+  [ "$(printf '%s\n' "$found" | wc -l | tr -d ' ')" = 1 ] || { echo "promote-actuals: several ${name}-actual.png under $report_dir:" >&2; printf '%s\n' "$found" >&2; exit 1; }
+done
+
+mkdir -p "$snapshots_dir"
+for name in "$@"; do
+  src="$(find "$report_dir" -type f -name "${name}-actual.png")"
+  cp "$src" "$snapshots_dir/${name}.png"
+  echo "promoted $src -> $snapshots_dir/${name}.png"
+done

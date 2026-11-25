@@ -45,6 +45,9 @@ Ellenőrizve a kóddal: 2026-11-09.
   Kézi indítás: `gh workflow run release-production.yml -R godavid/gitjog`.
 - Szünet: `DEPLOY_HOLD=true` repo-változó
   (`gh variable set DEPLOY_HOLD --body true -R godavid/gitjog`; feloldás: `--body false`).
+- A deploy után külön `smoke` job fut (Playwright, titok nélkül); a piros smoke issue-t
+  nyit. A monitoring-sablon vendorolt másolat (`.github/actions/*`, `.monitoring/`):
+  [docs/uzemeltetes.md](docs/uzemeltetes.md) deploy-szakasz.
 - Adatváltozáshoz nem kell deploy: az adat-repo push-webhookja (`/api/revalidate`)
   frissíti a cache-t.
 

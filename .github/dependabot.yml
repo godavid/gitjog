@@ -14,3 +14,8 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 0
+    # a biztonsági frissítések egy csoportosított PR-ben jönnek (ci-workflows v1.1.0 dependabot.yml)
+    groups:
+      npm-security:
+        applies-to: security-updates
+        patterns: ["*"]

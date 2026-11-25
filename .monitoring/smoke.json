@@ -1,0 +1,35 @@
+{
+  "_template": "ci-workflows template monitoring/smoke.json v1.1.0 sha256:7b1543001a2863a00d516206c06d4586c3a36f141e9328490099a6727aedeb23",
+  "version": 1,
+  "origin": "https://gitjog.remenyfarm.hu",
+  "viewports": [
+    "mobile",
+    "desktop"
+  ],
+  "consoleErrorBudget": 0,
+  "pages": [
+    {
+      "path": "/",
+      "status": 200,
+      "selector": "main",
+      "text": "A magyar törvények szövege és változástörténete"
+    },
+    {
+      "path": "/agenteknek",
+      "status": 200,
+      "selector": "main",
+      "text": "MCP-szerver, API és értesítés"
+    },
+    {
+      "path": "/api/v1/openapi.json",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      }
+    }
+  ],
+  "prodGuard": {
+    "extraOrigins": [],
+    "readOnlyRpc": []
+  }
+}

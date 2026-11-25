@@ -1,0 +1,86 @@
+# ci-workflows template monitoring-proof.yml v1.1.0 (adapted copy: smoke cases only; the Checkly cases are not used here)
+# Kontrollált hibák a monitoring-bizonyítékhoz (a–f), `workflow_dispatch`-csel. Élesre nem ír:
+# csak GET, a hibás esetek a https://monitoring-proof.invalid címre mennek (RFC 2606: a név
+# soha nem oldódik fel). Deployt nem indít. A Checkly-esetek kimaradnak: a gitjogban nincs Checkly.
+#
+# Esetek (`case` input):
+#   smoke-failure  smoke a https://monitoring-proof.invalid címre: a smoke job piros.
+#   smoke-pass     smoke a `base-url` címre (valódi URL kell): a smoke job zöld.
+#   red-issue      smoke + red-issue a `base-url` címre: az .invalid alapérték megnyitja vagy
+#                  kommenteli a `monitoring proof: post-deploy smoke` issue-t, egy valódi URL
+#                  lezárja (b, d, e). Proof-only címkék (quality, manual, triaged), prod-incident
+#                  és sev:high nélkül.
+# A verdikt a `smoke-assert` job, nem a futás színe: egy hibás eset futása piros, a verdikt zöld.
+name: monitoring-proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      case:
+        description: Melyik kontrollált hiba fusson
+        type: choice
+        required: true
+        default: smoke-failure
+        options:
+          - smoke-failure
+          - smoke-pass
+          - red-issue
+      base-url:
+        description: Base URL (az alapérték nem oldódik fel, ezért a hibás esetek szándékosan buknak)
+        type: string
+        required: false
+        default: https://monitoring-proof.invalid
+
+permissions: {}
+
+jobs:
+  smoke:
+    name: smoke (${{ inputs.case }})
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/post-deploy-smoke.yml
+    with:
+      runner: '"ubuntu-latest"'
+      config: .monitoring/smoke.json
+      base-url: ${{ inputs.case == 'smoke-failure' && 'https://monitoring-proof.invalid' || inputs.base-url }}
+      red-issue: ${{ inputs.case == 'red-issue' }}
+      issue-title: "monitoring proof: post-deploy smoke"
+      issue-labels: quality,manual,triaged
+
+  smoke-assert:
+    name: smoke verdict (${{ inputs.case }})
+    needs: smoke
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Assert the case verdict
+        shell: bash
+        env:
+          CASE: ${{ inputs.case }}
+          BASE_URL: ${{ inputs.base-url }}
+          SMOKE_JOB: ${{ needs.smoke.result }}
+          SMOKE_RESULT: ${{ needs.smoke.outputs.result }}
+        run: |
+          set -euo pipefail
+          case "$CASE" in
+            smoke-failure) want_job=failure; want_result=failed ;;
+            smoke-pass) want_job=success; want_result=passed ;;
+            red-issue)
+              case "$BASE_URL" in
+                *.invalid|*.invalid/*) want_job=failure; want_result=failed ;;
+                *) want_job=success; want_result=passed ;;
+              esac ;;
+            *) echo "::error::no expectation for case ${CASE}"; exit 1 ;;
+          esac
+          line="case ${CASE}: smoke job ${SMOKE_JOB} (expected ${want_job}), result '${SMOKE_RESULT}' (expected ${want_result})"
+          if [ "$SMOKE_JOB" = "$want_job" ] && [ "$SMOKE_RESULT" = "$want_result" ]; then
+            echo "VERDICT OK - ${line}" >> "$GITHUB_STEP_SUMMARY"
+            echo "$line"
+          else
+            echo "VERDICT MISMATCH - ${line}" >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::${line}"
+            exit 1
+          fi

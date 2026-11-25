@@ -1,0 +1,14 @@
+{
+  "name": "ci-workflows-web-quality",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Playwright a11y and visual quality checks driven by env (see action.yml)",
+  "scripts": {
+    "test": "node --test a11y-match.test.mjs"
+  },
+  "dependencies": {
+    "@axe-core/playwright": "4.14.1",
+    "@playwright/test": "1.65.1"
+  }
+}

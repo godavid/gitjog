@@ -1,0 +1,35 @@
+{
+  "_template": "ci-workflows template monitoring/conformance.json v1.1.0 sha256:0828f425951fc87ca04942bf4a10a8f390289e9745945a341a69fbbfef65d1c5",
+  "version": 1,
+  "template": "v1.1.0",
+  "integrations": {
+    "codeql": {
+      "mode": "in-house",
+      "reason": "Existing: GitHub default-setup CodeQL, required by the main ruleset 23985520; not built from the template (plan §6.4 S3e)."
+    },
+    "security-baseline": {
+      "mode": "template",
+      "workflow": ".github/workflows/security-baseline.yml",
+      "reason": "vendored copy (.github/actions/security-baseline)"
+    },
+    "smoke": {
+      "mode": "template",
+      "workflow": ".github/workflows/release-production.yml",
+      "reason": "vendored copy (.github/actions/smoke, post-deploy-smoke.yml, red-issue.yml), GitHub-hosted runner"
+    },
+    "a11y": {
+      "mode": "template",
+      "workflow": ".github/workflows/web-quality.yml",
+      "reason": "vendored copy (.github/actions/web-quality)"
+    },
+    "visual": {
+      "mode": "template",
+      "workflow": ".github/workflows/web-quality.yml",
+      "reason": "vendored copy (.github/actions/web-quality), visual on the hosted runner (visual-runner-prefix empty)"
+    },
+    "supabase-advisors": {
+      "mode": "n/a",
+      "reason": "Plan §7: not relevant. The only database is the read-only search index; there is no app data and no RLS."
+    }
+  }
+}

@@ -1,0 +1,214 @@
+# ci-workflows template actions/web-quality v1.1.0 sha256:9c7752b2bbeed5bd18ece4827833619b838f8014b043b1fe551cdf19a005535a
+# Vendored from Remeny-Farm/ci-workflows@6419be1744cf60d5f97addac0d6d20d29e0b0625 (v1.1.0): godavid/gitjog is public and cannot call the internal repo. Edit upstream, then re-copy.
+name: web-quality
+description: >-
+  a11y (axe, WCAG 2.1 A/AA) and visual snapshot checks (Playwright toHaveScreenshot, snapshots are never
+  updated) on the pages listed in the caller's quality config. The action starts and stops the app server itself.
+
+inputs:
+  config:
+    description: Quality config (version 1, with pages, viewports and the optional mask, hide and waitFor lists, global and per page), relative to the caller's workspace.
+    default: .monitoring/quality.json
+  a11y-baseline:
+    description: Accepted a11y findings (version 1 or 2). Only findings missing from this file fail the run.
+    default: .monitoring/a11y-baseline.json
+  snapshots-dir:
+    description: Directory of the approved visual baselines (<page id>-<viewport>.png).
+    default: .monitoring/visual
+  start-command:
+    description: Command that starts the app server in the foreground (required unless base-url is given). It runs in its own process group, which the action kills at the end of the run step.
+    default: ''
+  ready-url:
+    description: URL polled until it answers 2xx or 3xx (required with start-command). Its origin is the test base URL.
+    default: ''
+  ready-timeout-seconds:
+    description: How long to wait for ready-url.
+    default: '120'
+  base-url:
+    description: Test an already running URL instead of starting a server. Do not combine with start-command.
+    default: ''
+  a11y:
+    description: "'true' runs the a11y checks. 'off' or 'false' skips them with a warning (pass vars.MONITORING_A11Y != 'off' or the variable itself)."
+    default: 'true'
+  visual:
+    description: "'true' runs the visual checks. 'off' or 'false' skips them with a warning (pass vars.MONITORING_VISUAL != 'off' or the variable itself)."
+    default: 'true'
+  visual-runner-prefix:
+    description: Visual checks run only when runner.name starts with this prefix, because baselines depend on the runner image. An empty value allows every runner.
+    default: ms-s1-
+  report-name:
+    description: Artifact name of the report (HTML report, test-results with *-actual.png and *-diff.png, a11y-current.json). Letters, digits, '.', '_' and '-' only.
+    default: web-quality-report
+  max-diff-pixel-ratio:
+    description: Allowed share of differing pixels per screenshot (0 to 1).
+    default: '0.01'
+  node-version:
+    description: Node.js version set up only when the caller has no usable Node (no node and npm on PATH, or a major below 20). A Node 20 or newer already on PATH is kept as it is.
+    default: '22'
+
+outputs:
+  result:
+    description: passed, failed or skipped (skipped only when a11y and visual are both skipped).
+    value: ${{ steps.run.outputs.result }}
+  a11y:
+    description: passed, failed or skipped.
+    value: ${{ steps.run.outputs.a11y }}
+  visual:
+    description: passed, failed or skipped.
+    value: ${{ steps.run.outputs.visual }}
+  report-dir:
+    description: Directory of the report on the runner (also uploaded as the artifact report-name).
+    value: ${{ steps.run.outputs.report-dir }}
+  deps:
+    description: How node_modules of the action was provided - installed (npm ci ran), cached (restored from the dependency cache) or reused (already installed and matching, earlier in the same job) - or skipped when a11y and visual are both off.
+    value: ${{ steps.install.outputs.deps || 'skipped' }}
+
+runs:
+  using: composite
+  steps:
+    - name: Restore Playwright browser cache
+      if: ${{ !(contains(fromJSON('["off","false"]'), inputs.a11y) && contains(fromJSON('["off","false"]'), inputs.visual)) }}
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: pw-chromium-1.65.1-${{ runner.os }}-${{ runner.arch }}
+
+    # The caller's Node stays: setup-node runs only when no usable node and npm are on PATH. ms-s1
+    # slots keep Node only in the tool cache, so the default node-version is still set up there.
+    - name: Check the caller's Node.js
+      id: node
+      if: ${{ !(contains(fromJSON('["off","false"]'), inputs.a11y) && contains(fromJSON('["off","false"]'), inputs.visual)) }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        need=true
+        if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+          major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+          if [ "$major" -ge 20 ] 2>/dev/null; then need=false; fi
+          echo "web-quality: found Node $(node --version) on PATH"
+        else
+          echo "web-quality: no node and npm on PATH"
+        fi
+        echo "setup=$need" >>"$GITHUB_OUTPUT"
+
+    - name: Set up Node.js
+      if: ${{ steps.node.outputs.setup == 'true' }}
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    # hashFiles() only sees the workspace; the action's lockfile is outside it, so hash it here.
+    - name: Resolve the dependency state
+      id: deps
+      if: ${{ !(contains(fromJSON('["off","false"]'), inputs.a11y) && contains(fromJSON('["off","false"]'), inputs.visual)) }}
+      shell: bash
+      env:
+        WQ_RUNNER_OS: ${{ runner.os }}
+        WQ_RUNNER_ARCH: ${{ runner.arch }}
+      run: |
+        set -euo pipefail
+        cd "$GITHUB_ACTION_PATH"
+        if command -v sha256sum >/dev/null 2>&1; then lock="$(sha256sum package-lock.json | cut -d' ' -f1)"; else lock="$(shasum -a 256 package-lock.json | cut -d' ' -f1)"; fi
+        major="$(node -p 'process.versions.node.split(".")[0]')"
+        stamp="lock=$lock node=$major os=$WQ_RUNNER_OS arch=$WQ_RUNNER_ARCH"
+        stamp_hash="$(printf '%s' "$stamp" | { sha256sum 2>/dev/null || shasum -a 256; } | cut -c1-16)"
+        state=missing
+        if [ -x node_modules/.bin/playwright ] && [ -f node_modules/.wq-deps-stamp ] && [ "$(cat node_modules/.wq-deps-stamp)" = "$stamp" ] \
+          && [ -f "${RUNNER_TEMP}/wq-deps-ready-${stamp_hash}" ]; then
+          state=reuse
+        fi
+        {
+          echo "state=$state"
+          echo "key=wq-deps-${WQ_RUNNER_OS}-${WQ_RUNNER_ARCH}-node${major}-${lock}"
+          echo "stamp=$stamp"
+          echo "stamp-hash=$stamp_hash"
+        } >>"$GITHUB_OUTPUT"
+
+    - name: Restore the dependency cache
+      if: ${{ steps.deps.outputs.state == 'missing' }}
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ github.action_path }}/node_modules
+        key: ${{ steps.deps.outputs.key }}
+
+    - name: Install dependencies and browser
+      id: install
+      if: ${{ !(contains(fromJSON('["off","false"]'), inputs.a11y) && contains(fromJSON('["off","false"]'), inputs.visual)) }}
+      shell: bash
+      env:
+        WQ_DEPS_STATE: ${{ steps.deps.outputs.state }}
+        WQ_DEPS_STAMP: ${{ steps.deps.outputs.stamp }}
+        WQ_DEPS_STAMP_HASH: ${{ steps.deps.outputs.stamp-hash }}
+      run: |
+        set -euo pipefail
+        cd "$GITHUB_ACTION_PATH"
+        if [ "$WQ_DEPS_STATE" = reuse ]; then
+          deps=reused
+        elif [ -x node_modules/.bin/playwright ] && [ -f node_modules/.wq-deps-stamp ] && [ "$(cat node_modules/.wq-deps-stamp)" = "$WQ_DEPS_STAMP" ]; then
+          deps=cached
+        else
+          npm ci --ignore-scripts --no-audit --no-fund
+          printf '%s' "$WQ_DEPS_STAMP" >node_modules/.wq-deps-stamp
+          deps=installed
+        fi
+        # Written after the stamp: a stamp alone (a restored cache) is "cached", a stamp plus this marker is "reused".
+        : >"${RUNNER_TEMP}/wq-deps-ready-${WQ_DEPS_STAMP_HASH}"
+        echo "web-quality: dependencies $deps"
+        echo "deps=$deps" >>"$GITHUB_OUTPUT"
+        ./node_modules/.bin/playwright install --with-deps chromium
+
+    - name: Run web-quality
+      id: run
+      shell: bash
+      env:
+        WQ_CONFIG: ${{ inputs.config }}
+        WQ_A11Y_BASELINE: ${{ inputs.a11y-baseline }}
+        WQ_SNAPSHOTS_DIR: ${{ inputs.snapshots-dir }}
+        WQ_START_COMMAND: ${{ inputs.start-command }}
+        WQ_READY_URL: ${{ inputs.ready-url }}
+        WQ_READY_TIMEOUT: ${{ inputs.ready-timeout-seconds }}
+        WQ_BASE_URL: ${{ inputs.base-url }}
+        WQ_A11Y: ${{ inputs.a11y }}
+        WQ_VISUAL: ${{ inputs.visual }}
+        WQ_VISUAL_RUNNER_PREFIX: ${{ inputs.visual-runner-prefix }}
+        WQ_REPORT_NAME: ${{ inputs.report-name }}
+        WQ_REPORT_DIR: ${{ runner.temp }}/wq-report/${{ inputs.report-name }}
+        WQ_MARKER_DIR: ${{ runner.temp }}/wq-markers/${{ inputs.report-name }}
+        WQ_MAX_DIFF_PIXEL_RATIO: ${{ inputs.max-diff-pixel-ratio }}
+        RUNNER_NAME: ${{ runner.name }}
+      run: |
+        set -euo pipefail
+        bash "$GITHUB_ACTION_PATH/run.sh"
+
+    - name: Upload web-quality report
+      if: ${{ always() }}
+      continue-on-error: true
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ${{ inputs.report-name }}
+        path: ${{ runner.temp }}/wq-report/${{ inputs.report-name }}
+        retention-days: 14
+        overwrite: true
+        if-no-files-found: ignore
+
+    - name: Upload skipped marker (a11y)
+      if: ${{ always() && steps.run.outputs.a11y == 'skipped' }}
+      continue-on-error: true
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: monitoring-result.web-quality.skipped.${{ github.job }}.${{ github.run_attempt }}.${{ inputs.report-name }}.a11y
+        path: ${{ runner.temp }}/wq-markers/${{ inputs.report-name }}/a11y
+        retention-days: 30
+        overwrite: true
+        if-no-files-found: error
+
+    - name: Upload skipped marker (visual)
+      if: ${{ always() && steps.run.outputs.visual == 'skipped' }}
+      continue-on-error: true
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: monitoring-result.web-quality.skipped.${{ github.job }}.${{ github.run_attempt }}.${{ inputs.report-name }}.visual
+        path: ${{ runner.temp }}/wq-markers/${{ inputs.report-name }}/visual
+        retention-days: 30
+        overwrite: true
+        if-no-files-found: error
