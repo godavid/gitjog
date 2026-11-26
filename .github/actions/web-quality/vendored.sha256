@@ -1,5 +1,5 @@
-# ci-workflows template actions/web-quality/vendored.sha256 v1.2.1 sha256:4af7b510477d66b4fe17b8028d3158541411c5ea414e89912284c20a91ba51ce
-# Vendored from Remeny-Farm/ci-workflows@8e0a535499cf9b1d956b91e38f89aea972083511 (v1.2.1): this repo cannot call the internal repo. Edit upstream, then re-copy.
+# ci-workflows template actions/web-quality/vendored.sha256 v1.2.2 sha256:a1ebe88266edb8dc2cd48767dae87728d4abfaf5ceeb0b8c4443bcc00a3dfc6b
+# Vendored from Remeny-Farm/ci-workflows@b8805fb299c05afbc3032e1f9143c2958d2858a7 (v1.2.2): this repo cannot call the internal repo. Edit upstream, then re-copy.
 c0cceef9d14efa820a2947eb999cc87b50edc4c4930e159c35e78b86606ba945  a11y-match.mjs
 1b880c9345faa742b4042328339a6a909215f2a560b8f60324bdca6e4b91f4b0  package-lock.json
 9b21a0b44cc5c1dd698dd8995ae125565e05cdecc7297e1be4e502bbc988eaf9  package.json

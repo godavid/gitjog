@@ -1,7 +1,7 @@
 {
   "_template": "ci-workflows template monitoring/conformance.json v1.1.0 sha256:0828f425951fc87ca04942bf4a10a8f390289e9745945a341a69fbbfef65d1c5",
   "version": 1,
-  "template": "v1.2.1",
+  "template": "v1.2.2",
   "integrations": {
     "codeql": {
       "mode": "in-house",

@@ -85,8 +85,13 @@ rules:
 YAML
 # Composite actions live next to the workflows directory (.github/actions for the default path).
 inputs=("$path")
-if [ -d "$path" ] && [ "$(basename "$path")" = "workflows" ] && [ -d "$path/../actions" ]; then
-  inputs+=("$path/../actions")
+# The sibling path is built with dirname, never `$path/..`: zizmor reports the path it was given, and the
+# report and the allow entries name `.github/actions/...`, not `.github/workflows/../actions/...`.
+if [ -d "$path" ] && [ "$(basename "$path")" = "workflows" ]; then
+  actions_dir="$(dirname "$path")/actions"
+  if [ -d "$actions_dir" ]; then
+    inputs+=("$actions_dir")
+  fi
 fi
 # Exit codes: 0 = no findings, 10-14 = findings by severity; anything else is a tool failure.
 # --no-ignores: inline `# zizmor: ignore` comments are not an exception path; only the allow-file is.

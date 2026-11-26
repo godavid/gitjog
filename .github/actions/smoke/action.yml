@@ -1,5 +1,5 @@
-# ci-workflows template actions/smoke v1.2.1 sha256:973bcf720ed2826414f00334c7e406f9c71ce2ec9e2ff9ec6f89a8f756900d55
-# Vendored from Remeny-Farm/ci-workflows@8e0a535499cf9b1d956b91e38f89aea972083511 (v1.2.1): this repo cannot call the internal repo. Edit upstream, then re-copy.
+# ci-workflows template actions/smoke v1.2.2 sha256:6cb6bc51f1338681b3f189fe87e560c94f1ffd3ec1a5db4aeecc5cbdf46a279c
+# Vendored from Remeny-Farm/ci-workflows@b8805fb299c05afbc3032e1f9143c2958d2858a7 (v1.2.2): this repo cannot call the internal repo. Edit upstream, then re-copy.
 name: Smoke
 description: >-
   Playwright smoke of the pages listed in a smoke.json: status or redirect, selector, text,
