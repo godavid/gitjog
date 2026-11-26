@@ -2,9 +2,9 @@
   "_template": "ci-workflows template monitoring/evidence.example.json v1.1.0 sha256:28d6c63d629a9dd30732659906588628cb5856f19e13a1ab1e62e76c88065e8a",
   "version": 1,
   "integration": "visual",
-  "status": "I",
+  "status": "P",
   "date": "2026-11-26",
-  "sha": "eeb59f6d1e55ad9cc4432a0fa9063db959dfc89d",
+  "sha": "9372d7a7feb3f7ca1ba70071d5760173e8448bf1",
   "owner_approval": {
     "quote": "Mind a 14 OK",
     "by": "owner (Dávid), godavid/boss owner session",
@@ -14,9 +14,34 @@
   },
   "cells": {
     "a": {
-      "link": "https://github.com/godavid/gitjog/actions/runs/45676257808/attempts/1",
+      "link": "https://github.com/godavid/gitjog/actions/runs/45780937546",
       "mode": "live",
-      "note": "approved run: web-quality workflow_dispatch on main at eeb59f6d1e55 (attempt 1), visual red as expected without a baseline; artifact web-quality-report (15052861103) holds the 8 *-actual.png (home, agenteknek, adatok, jogszabaly x mobile, desktop), now the baseline in .monitoring/visual/. MONITORING_VISUAL stays off until this lands; the live visual runs on main come next"
+      "note": "push to main at 9372d7a7f, green: web-quality result passed (a11y=passed visual=passed), 16 tests; 4 pages x mobile and desktop against the owner-approved baseline in .monitoring/visual/ (approval run 45676257808, artifact 15052861103); local build (P by plan 4.4)"
+    },
+    "b": {
+      "link": "https://github.com/godavid/gitjog/actions/runs/45799604312",
+      "mode": "live",
+      "note": "draft PR #65: h1 margin-bottom 4px -> 48px in apps/web/app/globals.css -> visual failed on agenteknek, adatok, jogszabaly (mobile, desktop; home keeps h1.fo-cim), 6 failed, a11y passed, red"
+    },
+    "c": {
+      "link": "https://github.com/godavid/gitjog/pull/65",
+      "mode": "live",
+      "note": "the red web-quality check on #65 with the report artifact web-quality-report (id 15105928886: *-actual.png and *-diff.png); web-quality has no paths filter, it runs on every PR"
+    },
+    "d": {
+      "link": "https://github.com/godavid/gitjog/actions/runs/45799893543",
+      "mode": "live",
+      "note": "not applicable: a CI check opens no issue to deduplicate; a second push on #65 gave the same single red web-quality check (6 failed, artifact 15107171444), no issue, no other alert"
+    },
+    "e": {
+      "link": "https://github.com/godavid/gitjog/actions/runs/45801026607",
+      "mode": "live",
+      "note": "revert commit on #65, green: result passed (a11y=passed visual=passed), 16 passed; #65 closed without merge, branch deleted"
+    },
+    "f": {
+      "link": "https://github.com/godavid/gitjog/actions/runs/45780937546",
+      "mode": "live",
+      "note": "local build on 127.0.0.1 (pages read the public data repo), no production request, no secret; GITHUB_TOKEN contents: read, metadata: read; baselines and MONITORING_VISUAL unchanged"
     }
   }
 }
