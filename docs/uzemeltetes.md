@@ -417,10 +417,10 @@ godavid/gitjog` issue nyílik (`prod-incident`, `sev:high`, `routine`, `triaged`
 kommentet kap; a következő zöld smoke lezárja. Kikapcsolás: `MONITORING_SMOKE=off`
 repo-változó.
 
-**Monitoring-sablon.** A `Remeny-Farm/ci-workflows` (v1.2.1) belső repó, a publikus gitjog
+**Monitoring-sablon.** A `Remeny-Farm/ci-workflows` (v1.2.2) belső repó, a publikus gitjog
 nem hívhatja, ezért vendorolt másolat van: `.github/actions/smoke`, `web-quality`,
 `security-baseline`, és a `post-deploy-smoke.yml`, `red-issue.yml` workflow. A
-vendorolt fájlok első két sora a kiadott fejléc (`ci-workflows template <név> v1.2.1
+vendorolt fájlok első két sora a kiadott fejléc (`ci-workflows template <név> v1.2.2
 sha256:…` és `Vendored from …@<sha>`), az actionök többi fájlja a `vendored.sha256`-ban.
 Kézzel nem szerkeszthetők; a `kapuk` workflow `vendor-sync check`-je ezt őrzi. Frissítés
 egy ci-workflows kiadásról, annak tiszta checkoutjából:

@@ -1,6 +1,6 @@
-# ci-workflows template actions/security-baseline/vendored.sha256 v1.2.1 sha256:e9d407be251cc73f6d97f1705b4256adeca2269295899c71dbc5f843e501b524
-# Vendored from Remeny-Farm/ci-workflows@8e0a535499cf9b1d956b91e38f89aea972083511 (v1.2.1): this repo cannot call the internal repo. Edit upstream, then re-copy.
-a0b2bc1fdb802d9483ac062e38f3f236e81a934220f2c818f95aa9b4b6a69455  check.py
+# ci-workflows template actions/security-baseline/vendored.sha256 v1.2.2 sha256:57caa5e0de90f937147ad1b80c7c7ef1cfcf00e0abf8caf754962c1bcd101069
+# Vendored from Remeny-Farm/ci-workflows@b8805fb299c05afbc3032e1f9143c2958d2858a7 (v1.2.2): this repo cannot call the internal repo. Edit upstream, then re-copy.
+1a93430d145f8d5a763d302d107358a44f3cead890d32edbc0c6bfeed0bf6501  check.py
 ba6a2d1712c549b4767ceaf0b7e1c7ac7a26e69aa5ea2cf25bbee37eabcdfc5c  install-tools.sh
-d946dbbd60f50a406c9b1fe052dced3ca75235bd98dbc4b0987e25c263d3f817  run.sh
+f32a3524ab8a352713c15b40561956796f48999c32ccc2ae120d35cc2ec3681f  run.sh
 46612d14f35e2b6e099b491adac8b5a1956df63d8fa890f8aada897be66f0e8e  tools.sha256

@@ -1,5 +1,5 @@
-# ci-workflows template .github/workflows/post-deploy-smoke.yml v1.2.1 sha256:865867a908f7b05cc197988dd110847111d375c9941404a7164b16ecc3a5c0e3
-# Vendored from Remeny-Farm/ci-workflows@8e0a535499cf9b1d956b91e38f89aea972083511 (v1.2.1): this repo cannot call the internal repo. Edit upstream, then re-copy.
+# ci-workflows template .github/workflows/post-deploy-smoke.yml v1.2.2 sha256:071426cd1d9fc7577371db3406c6a6656a7f91718456cadf968ca0e2d22953f9
+# Vendored from Remeny-Farm/ci-workflows@b8805fb299c05afbc3032e1f9143c2958d2858a7 (v1.2.2): this repo cannot call the internal repo. Edit upstream, then re-copy.
 name: Post-deploy smoke
 
 # Reusable workflow around actions/smoke. Docs: docs/components/smoke.md.

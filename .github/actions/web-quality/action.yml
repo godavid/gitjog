@@ -1,5 +1,5 @@
-# ci-workflows template actions/web-quality v1.2.1 sha256:cb17fb9c645d658c40656bccf8acce632cb8a377dea646c5f4d641c3d3c16731
-# Vendored from Remeny-Farm/ci-workflows@8e0a535499cf9b1d956b91e38f89aea972083511 (v1.2.1): this repo cannot call the internal repo. Edit upstream, then re-copy.
+# ci-workflows template actions/web-quality v1.2.2 sha256:80fbac37272ed26bebe601993dcd10e5ff6de9a798942c69a8e49ecbb6872129
+# Vendored from Remeny-Farm/ci-workflows@b8805fb299c05afbc3032e1f9143c2958d2858a7 (v1.2.2): this repo cannot call the internal repo. Edit upstream, then re-copy.
 name: web-quality
 description: >-
   a11y (axe, WCAG 2.1 A/AA) and visual snapshot checks (Playwright toHaveScreenshot, snapshots are never

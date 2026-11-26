@@ -26,7 +26,10 @@ Allow-file shape (nothing else is accepted):
 An entry suppresses that rule in that file. The optional key `match` is a
 case-sensitive substring that the finding message must contain, so an entry
 covers one finding and a new finding of the same rule in the same file still
-blocks. An entry without `match` covers the whole file and produces a warning.
+blocks. zizmor's text is the same for every unpinned-uses, secrets-inherit and
+template-injection finding, so their message ends with the distinguishing parts
+`[uses: <ref>]` (unpinned-uses, secrets-inherit), `[expr: <expression>]`
+(template-injection) and `[job: <id>]` (all three, in a workflow). An entry without `match` covers the whole file and produces a warning.
 An entry without a non-empty reason is an error. An entry that matched no
 blocking finding is stale and only produces a warning. File paths are compared from their `.github/` segment
 on (see match_path), so a prefixed scan path still matches.
@@ -35,6 +38,7 @@ on (see match_path), so a prefixed scan path still matches.
 import argparse
 import json
 import os
+import posixpath
 import re
 import sys
 
@@ -68,9 +72,16 @@ KNOWN_TOOL_GAPS = (
     },
 )
 
-# zizmor rules whose Primary location is the `uses:` reference itself: the reference is added
-# to the message, so an allow entry's `match` can single out one reference.
-USES_REFERENCE_RULES = ("unpinned-uses",)
+# zizmor rules whose Primary location is the `uses:` reference itself (the action of unpinned-uses,
+# the called workflow of secrets-inherit): the reference is added to the message as `[uses: <ref>]`,
+# so an allow entry's `match` can single out one reference.
+USES_REFERENCE_RULES = ("unpinned-uses", "secrets-inherit")
+# zizmor rules whose Primary location is the expression inside a `run:` or script: the expression is
+# added as `[expr: <expression>]`.
+EXPRESSION_RULES = ("template-injection",)
+# Rules whose message gets the job id of the Primary location as `[job: <id>]` (workflow files only;
+# a composite action has no job). zizmor's own text of these rules is the same for every finding.
+JOB_RULES = USES_REFERENCE_RULES + EXPRESSION_RULES
 
 
 # --------------------------------------------------------------------------
@@ -220,6 +231,9 @@ def parse_allow(text):
 
 def normalize_path(path, root=None):
     path = path.replace("\\", "/")
+    if ".." in path.split("/"):
+        # zizmor prints the path it was given (`.github/workflows/../actions/x/action.yml`)
+        path = posixpath.normpath(path)
     if root:
         prefix = root.replace("\\", "/").rstrip("/") + "/"
         if path.startswith(prefix):
@@ -288,13 +302,37 @@ def read_actionlint(text, root=None):
     return findings
 
 
-def _zizmor_reference(finding):
-    """The `uses:` reference of the Primary location (concrete.feature), or "" when not a plain one."""
+def _primary(finding):
     for loc in finding.get("locations") or []:
         if (loc.get("symbolic") or {}).get("kind") == "Primary":
-            feature = ((loc.get("concrete") or {}).get("feature") or "").strip()
-            if feature and "\n" not in feature and len(feature) <= 200:
-                return feature
+            return loc
+    return {}
+
+
+def _plain(text):
+    text = (text or "").strip() if isinstance(text, str) else ""
+    return text if text and "\n" not in text and len(text) <= 200 else ""
+
+
+def _zizmor_reference(finding):
+    """The `uses:` reference of the Primary location (concrete.feature), or "" when not a plain one."""
+    return _plain((_primary(finding).get("concrete") or {}).get("feature"))
+
+
+def _zizmor_expression(finding):
+    """The expression of the Primary subfeature (`steps.x.outputs.y`), or "" when there is none."""
+    kind = (_primary(finding).get("symbolic") or {}).get("feature_kind")
+    if not isinstance(kind, dict):
+        return ""
+    fragment = (kind.get("Subfeature") or {}).get("fragment") or {}
+    return _plain(fragment.get("Raw")) if isinstance(fragment, dict) else ""
+
+
+def _zizmor_job(finding):
+    """The job id of the Primary route (`jobs.<id>...`), or "" outside a job."""
+    route = (((_primary(finding).get("symbolic") or {}).get("route") or {}).get("route")) or []
+    if len(route) >= 2 and route[0] == {"Key": "jobs"} and isinstance(route[1], dict):
+        return _plain(route[1].get("Key"))
     return ""
 
 
@@ -328,10 +366,19 @@ def read_zizmor(text, root=None):
         file, line, column, annotation = _zizmor_location(item)
         desc = (item.get("desc") or "").strip()
         message = desc if not annotation else "%s: %s" % (desc, annotation)
-        if item.get("ident") in USES_REFERENCE_RULES:
+        ident = item.get("ident")
+        if ident in USES_REFERENCE_RULES:
             reference = _zizmor_reference(item)
             if reference:
                 message += " [uses: %s]" % reference
+        if ident in EXPRESSION_RULES:
+            expression = _zizmor_expression(item)
+            if expression:
+                message += " [expr: %s]" % expression
+        if ident in JOB_RULES:
+            job = _zizmor_job(item)
+            if job:
+                message += " [job: %s]" % job
         findings.append(make_finding(
             item.get("ident", "zizmor"), "zizmor",
             normalize_path(file, root), line, column,

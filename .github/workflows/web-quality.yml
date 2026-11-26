@@ -1,6 +1,6 @@
 # a11y (axe, WCAG 2.1 A és AA) és vizuális snapshot a nyilvános oldalakon, mobil és asztali
 # nézetben, helyi buildre. Vendorolt sablon (`.github/actions/web-quality`, Remeny-Farm/ci-workflows
-# v1.2.1, `vendor-sync`). Nem kötelező check és nem kapuzza a deployt: egy még el nem fogadott baseline a main-en
+# v1.2.2, `vendor-sync`). Nem kötelező check és nem kapuzza a deployt: egy még el nem fogadott baseline a main-en
 # a release-t nem állíthatja meg. Az oldallista: `.monitoring/quality.json`.
 #
 # Titok nélkül, GitHub-hosted runneren (publikus repó). A vizuális rész ezért itt a hosted
