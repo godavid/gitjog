@@ -1,23 +1,75 @@
-# ci-workflows template monitoring-proof.yml v1.1.0 (adapted copy: smoke cases only; the Checkly cases are not used here)
-# Kontrollált hibák a monitoring-bizonyítékhoz (a–f), `workflow_dispatch`-csel. Élesre nem ír:
-# csak GET, a hibás esetek a https://monitoring-proof.invalid címre mennek (RFC 2606: a név
-# soha nem oldódik fel). Deployt nem indít. A Checkly-esetek kimaradnak: a gitjogban nincs Checkly.
+# ci-workflows template monitoring-proof.yml v1.2.1 sha256:90546aa9d35e9e9b2017bbd136861d58e6a2d9ddff9785589b7fc26d9650488c
+# Controlled-failure workflow for the monitoring evidence (a-f). Copy to .github/workflows/monitoring-proof.yml.
+# It never touches production: GET only, and the failing cases target https://monitoring-proof.invalid
+# (RFC 2606: the name never resolves). Production releases and rollbacks are not started.
 #
-# Esetek (`case` input):
-#   smoke-failure  smoke a https://monitoring-proof.invalid címre: a smoke job piros.
-#   smoke-pass     smoke a `base-url` címre (valódi URL kell): a smoke job zöld.
-#   red-issue      smoke + red-issue a `base-url` címre: az .invalid alapérték megnyitja vagy
-#                  kommenteli a `monitoring proof: post-deploy smoke` issue-t, egy valódi URL
-#                  lezárja (b, d, e). Proof-only címkék (quality, manual, triaged), prod-incident
-#                  és sev:high nélkül.
-# A verdikt a `smoke-assert` job, nem a futás színe: egy hibás eset futása piros, a verdikt zöld.
+# Adapted copy for godavid/gitjog (the header above names the release it was copied from):
+#   - godavid/gitjog is public and cannot call the internal repo: the smoke job uses the vendored
+#     ./.github/workflows/post-deploy-smoke.yml (vendor-sync, same release).
+#   - No Checkly in gitjog: the checkly-* cases and the checkly job are removed.
+#   - GitHub-hosted runner (public repo): runner '"ubuntu-latest"'.
+#   - issue-title: "monitoring proof: post-deploy smoke".
+#
+# Cases (workflow_dispatch input `case`):
+#   smoke-failure          smoke against https://monitoring-proof.invalid: the job must be red.
+#   smoke-pass             smoke against `base-url`: needs the REAL origin, the job must be green.
+#   red-issue              smoke plus the red-issue job against `base-url`: the .invalid default opens or
+#                          comments on the proof issue, a real URL closes it (evidence b, d, e).
+#
+# The verdict is the assert step or job, not the colour of the run. A failure case still leaves the
+# run red: the reusable smoke job cannot be continue-on-error. Each case therefore has an assertion that compares
+# what really happened to what the case expects, writes one step-summary line and fails on a mismatch:
+#   smoke cases     the job `smoke-assert` (`needs: smoke`) reads `needs.smoke.result` and
+#                   `needs.smoke.outputs.result`.
+# Expected values (failure-kinds is the output of the smoke action; issue-action, issue and issue-state are
+# the outputs of the nested red-issue job; the host of base-url is parsed, so a port, userinfo, query,
+# fragment, upper case and a trailing dot do not hide .invalid):
+#   smoke-failure          job failure, result failed, failure-kinds exactly dns, issue-action, issue and
+#                          issue-state empty
+#   smoke-pass             job success, result passed, failure-kinds empty, issue-action, issue and
+#                          issue-state empty. A .invalid base-url fails the assert with an explicit error
+#                          (see "base-url" below)
+#   red-issue              base-url host .invalid: failure and failed, failure-kinds exactly dns (a real
+#                          failure of another kind is not the controlled failure), issue-action opened or
+#                          commented, a non-empty issue number and issue-state open (a broken red-issue job
+#                          leaves issue-action empty, so it can no longer hide behind the red smoke job);
+#                          any other URL: success and passed, failure-kinds empty, and either issue-action
+#                          closed with the issue number and issue-state closed, or issue-action none with an
+#                          EMPTY issue and issue-state (no proof issue was open). none with an issue number
+#                          is a mismatch: red-issue left that issue open because the green commit does not
+#                          contain the recorded failed commit. Dispatch the closing run on a commit that
+#                          contains the failing one.
+#   any smoke case         result tool-error is always a mismatch: an infrastructure step failed (setup-node,
+#                          npm ci, Chromium download or launch). Rerun the case.
+# Read the evidence from the summary line of the assert step or job; a red run with a green assert is the
+# expected picture of a failure case. The smoke summary line also carries the failure kinds, the issue
+# number, the action and the issue state.
+#
+# Revert pitfall (evidence e, the green run after the revert): a pull_request workflow with `paths` or
+# `paths-ignore` filters does not run for a revert commit or revert PR whose net diff is empty, so no PR run
+# exists to show green. Dispatch this workflow (and web-quality.yml) with workflow_dispatch on the revert
+# SHA, for example `gh workflow run monitoring-proof.yml --ref <branch or tag at the revert SHA> -f case=...`,
+# and check that the run's head SHA is the revert SHA.
+#
+# base-url: the input default is https://monitoring-proof.invalid. `-f base-url=` (empty) does NOT clear it:
+# GitHub applies the default, so the run tests .invalid. smoke-pass and the closing red-issue run need the
+# real origin, for example
+#   gh workflow run monitoring-proof.yml -f case=smoke-pass -f base-url=https://www.example.com
+#
+# Concurrency: one group per case (`monitoring-proof-<case>`, queue max, no cancel-in-progress), so a
+# queued dispatch of a case is not dropped. Never use one shared group for the whole workflow or in a
+# caller (GitHub keeps one pending run per group and cancels the older pending one). Different cases run
+# in parallel. The two red-issue runs share the proof issue, so dispatch them one after the other:
+#   1. case red-issue with the default .invalid base-url: opens (or comments on) the proof issue.
+#   2. wait until run 1 has finished, then case red-issue with the real base-url: closes the issue.
+# The same case queues behind itself (queue max), but the order of the two red-issue runs is yours to keep.
 name: monitoring-proof
 
 on:
   workflow_dispatch:
     inputs:
       case:
-        description: Melyik kontrollált hiba fusson
+        description: Which controlled failure to run
         type: choice
         required: true
         default: smoke-failure
@@ -26,32 +78,51 @@ on:
           - smoke-pass
           - red-issue
       base-url:
-        description: Base URL (az alapérték nem oldódik fel, ezért a hibás esetek szándékosan buknak)
+        description: >-
+          Base URL. The default (.invalid) never resolves, so failing cases fail on purpose. smoke-pass and
+          the closing red-issue run need the real origin, e.g. -f base-url=https://www.example.com. An empty
+          value is replaced by the default (.invalid), it does not clear it.
         type: string
         required: false
         default: https://monitoring-proof.invalid
 
 permissions: {}
 
+# One group per case; never a shared group (it would cancel the pending dispatch of another case).
+concurrency:
+  group: monitoring-proof-${{ inputs.case }}
+  cancel-in-progress: false
+  queue: max
+
 jobs:
   smoke:
     name: smoke (${{ inputs.case }})
+    if: ${{ inputs.case == 'smoke-failure' || inputs.case == 'smoke-pass' || inputs.case == 'red-issue' }}
+    # The called workflow's red-issue job needs issues: write; a caller grants at least what the callee uses.
     permissions:
       contents: read
       issues: write
+    # Vendored copy of Remeny-Farm/ci-workflows .github/workflows/post-deploy-smoke.yml v1.2.1
+    # (8e0a535499cf9b1d956b91e38f89aea972083511).
     uses: ./.github/workflows/post-deploy-smoke.yml
     with:
+      # GitHub-hosted runner (public repo).
       runner: '"ubuntu-latest"'
       config: .monitoring/smoke.json
       base-url: ${{ inputs.case == 'smoke-failure' && 'https://monitoring-proof.invalid' || inputs.base-url }}
       red-issue: ${{ inputs.case == 'red-issue' }}
+      # Proof-only title and labels: no prod-incident or sev:high, so the sentinels never treat it
+      # as an incident.
       issue-title: "monitoring proof: post-deploy smoke"
       issue-labels: quality,manual,triaged
 
+  # Verdict of the smoke cases. The smoke job above is red on a failure case; this job is the check
+  # that the result is the expected one.
   smoke-assert:
     name: smoke verdict (${{ inputs.case }})
     needs: smoke
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && (inputs.case == 'smoke-failure' || inputs.case == 'smoke-pass' || inputs.case == 'red-issue') }}
+    # Secret-free, GitHub-hosted runner (public repo).
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
@@ -63,24 +134,83 @@ jobs:
           BASE_URL: ${{ inputs.base-url }}
           SMOKE_JOB: ${{ needs.smoke.result }}
           SMOKE_RESULT: ${{ needs.smoke.outputs.result }}
+          SMOKE_FAILURE_KINDS: ${{ needs.smoke.outputs.failure-kinds }}
+          SMOKE_ISSUE_ACTION: ${{ needs.smoke.outputs.issue-action }}
+          SMOKE_ISSUE: ${{ needs.smoke.outputs.issue }}
+          SMOKE_ISSUE_STATE: ${{ needs.smoke.outputs.issue-state }}
         run: |
           set -euo pipefail
+          mismatch() {
+            echo "VERDICT MISMATCH - $1" >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::$1"
+            exit 1
+          }
+          # An infrastructure failure is never a verdict of the case.
+          if [ "$SMOKE_RESULT" = "tool-error" ]; then
+            mismatch "case ${CASE}: smoke result is tool-error. An infrastructure step failed (setup-node, npm ci, Chromium download or launch), so the case proved nothing. Rerun the case."
+          fi
+          # Host of base-url: strip the scheme, cut at the first / ? #, strip userinfo (up to the last @),
+          # the port and one trailing dot, lower-case. The host is .invalid or ends in .invalid.
+          host="${BASE_URL#*://}"
+          host="${host%%[/?#]*}"
+          host="${host##*@}"
+          host="${host%%:*}"
+          host="${host%.}"
+          host="$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')"
+          invalid=false
+          case "$host" in
+            invalid|*.invalid) invalid=true ;;
+          esac
+          # want_actions: the accepted issue-action values; the dash means "empty output".
+          note=""
           case "$CASE" in
-            smoke-failure) want_job=failure; want_result=failed ;;
-            smoke-pass) want_job=success; want_result=passed ;;
+            smoke-failure) want_job=failure; want_result=failed; want_kinds=dns; want_actions="-" ;;
+            smoke-pass)
+              if [ "$invalid" = true ]; then
+                mismatch "case smoke-pass ran against ${BASE_URL}, which never resolves. Dispatch it with the real origin: gh workflow run monitoring-proof.yml -f case=smoke-pass -f base-url=https://www.example.com (an empty base-url is replaced by the .invalid default)."
+              fi
+              want_job=success; want_result=passed; want_kinds=""; want_actions="-" ;;
             red-issue)
-              case "$BASE_URL" in
-                *.invalid|*.invalid/*) want_job=failure; want_result=failed ;;
-                *) want_job=success; want_result=passed ;;
-              esac ;;
+              if [ "$invalid" = true ]; then
+                want_job=failure; want_result=failed; want_kinds=dns; want_actions="opened commented"
+              else
+                want_job=success; want_result=passed; want_kinds=""; want_actions="closed none"
+              fi ;;
             *) echo "::error::no expectation for case ${CASE}"; exit 1 ;;
           esac
-          line="case ${CASE}: smoke job ${SMOKE_JOB} (expected ${want_job}), result '${SMOKE_RESULT}' (expected ${want_result})"
-          if [ "$SMOKE_JOB" = "$want_job" ] && [ "$SMOKE_RESULT" = "$want_result" ]; then
+          action_ok=false
+          for want in $want_actions; do
+            if [ "$want" = "-" ]; then
+              [ -z "$SMOKE_ISSUE_ACTION" ] && action_ok=true
+            elif [ "$want" = "$SMOKE_ISSUE_ACTION" ]; then
+              action_ok=true
+            fi
+          done
+          # Issue number and end state. opened or commented: a number and state open. closed: a number and
+          # state closed. none: the issue must be EMPTY (no proof issue was open) and so must the state; a
+          # number means red-issue left that issue open. No action: both empty.
+          issue_ok=false
+          want_state=""
+          case "$SMOKE_ISSUE_ACTION" in
+            opened|commented|closed)
+              case "$SMOKE_ISSUE_ACTION" in closed) want_state=closed ;; *) want_state=open ;; esac
+              case "$SMOKE_ISSUE" in ''|*[!0-9]*) ;; *) issue_ok=true ;; esac ;;
+            none)
+              if [ -z "$SMOKE_ISSUE" ]; then
+                issue_ok=true; note=" (no proof issue was open, nothing to close)"
+              else
+                note=" (issue #${SMOKE_ISSUE} stays open: red-issue closes it only on a commit that contains the recorded failing one. Dispatch the closing run on a commit that contains the failing one)"
+              fi ;;
+            *) [ -z "$SMOKE_ISSUE" ] && issue_ok=true ;;
+          esac
+          state_ok=false
+          [ "$SMOKE_ISSUE_STATE" = "$want_state" ] && state_ok=true
+          kinds_ok=false
+          [ "$SMOKE_FAILURE_KINDS" = "$want_kinds" ] && kinds_ok=true
+          line="case ${CASE}: smoke job ${SMOKE_JOB} (expected ${want_job}), result '${SMOKE_RESULT}' (expected ${want_result}), failure-kinds '${SMOKE_FAILURE_KINDS}' (expected '${want_kinds}'), issue-action '${SMOKE_ISSUE_ACTION}' (expected ${want_actions/#-/empty}), issue '${SMOKE_ISSUE}', issue-state '${SMOKE_ISSUE_STATE}' (expected '${want_state}')${note}"
+          if [ "$SMOKE_JOB" = "$want_job" ] && [ "$SMOKE_RESULT" = "$want_result" ] && [ "$kinds_ok" = true ] && [ "$action_ok" = true ] && [ "$issue_ok" = true ] && [ "$state_ok" = true ]; then
             echo "VERDICT OK - ${line}" >> "$GITHUB_STEP_SUMMARY"
             echo "$line"
           else
-            echo "VERDICT MISMATCH - ${line}" >> "$GITHUB_STEP_SUMMARY"
-            echo "::error::${line}"
-            exit 1
+            mismatch "$line"
           fi

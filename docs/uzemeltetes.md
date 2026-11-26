@@ -417,11 +417,18 @@ godavid/gitjog` issue nyílik (`prod-incident`, `sev:high`, `routine`, `triaged`
 kommentet kap; a következő zöld smoke lezárja. Kikapcsolás: `MONITORING_SMOKE=off`
 repo-változó.
 
-**Monitoring-sablon.** A `Remeny-Farm/ci-workflows` (v1.1.0) belső repó, a publikus gitjog
+**Monitoring-sablon.** A `Remeny-Farm/ci-workflows` (v1.2.1) belső repó, a publikus gitjog
 nem hívhatja, ezért vendorolt másolat van: `.github/actions/smoke`, `web-quality`,
-`security-baseline`, és a `post-deploy-smoke.yml`, `red-issue.yml` workflow. Az
-`action.yml` első sora a sablon-fejléc (`ci-workflows template <név> v1.1.0 sha256:…`);
-frissítés: a ci-workflows új kiadásából újramásolni, kézzel nem szerkeszteni. További
+`security-baseline`, és a `post-deploy-smoke.yml`, `red-issue.yml` workflow. A
+vendorolt fájlok első két sora a kiadott fejléc (`ci-workflows template <név> v1.2.1
+sha256:…` és `Vendored from …@<sha>`), az actionök többi fájlja a `vendored.sha256`-ban.
+Kézzel nem szerkeszthetők; a `kapuk` workflow `vendor-sync check`-je ezt őrzi. Frissítés
+egy ci-workflows kiadásról, annak tiszta checkoutjából:
+`python3 .github/scripts/vendor-sync copy --from <checkout> --to .`, majd a
+`.github/scripts/vendor-sync` is a kiadásból. A sablonmásolatok (`monitoring-proof.yml`,
+`.monitoring/*`) a kiadott fejlécet tartják, újraszámolt hash nélkül. A smoke-action
+infrastruktúra-hibája (setup-node, `npm ci`, Chromium) `result=tool-error`: zöld lépés
+figyelmeztetéssel, incidens-issue nélkül. További
 workflow-k: `security-baseline.yml` (actionlint + zizmor, csak új találat buktat; kivétel
 indoklással a `.monitoring/security-baseline-allow.yml`-ben), `web-quality.yml` (a11y és
 vizuális snapshot helyi buildre, `.monitoring/quality.json`; kikapcsolás

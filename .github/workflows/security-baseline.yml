@@ -1,6 +1,6 @@
 # Workflow-higiénia: actionlint + zizmor (rögzített verzió, sha256) a `.github/workflows/**`
 # és a `.github/actions/**` fájlokon. Vendorolt sablon (`.github/actions/security-baseline`,
-# Remeny-Farm/ci-workflows v1.1.0): a publikus repó a belső ci-workflows-t nem hívhatja.
+# Remeny-Farm/ci-workflows v1.2.1, `vendor-sync`): a publikus repó a belső ci-workflows-t nem hívhatja.
 # Csak új szabálysértés buktat; a meglévő kivételek indoklással a
 # `.monitoring/security-baseline-allow.yml`-ben. Titok nélkül, GitHub-hosted runneren.
 # Nem kötelező check: a `biztonsag` összesítő és a CodeQL marad a ruleset kapuja.

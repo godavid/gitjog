@@ -10,8 +10,6 @@
 #       match: "pull_request_target"   # optional (v1.1.0): a substring of the finding message, so the
 #                                      # entry covers that finding only; without it the entry covers
 #                                      # the rule in the whole file and the check warns about it.
-allow:
-  - rule: actionlint
-    file: .github/workflows/red-issue.yml
-    reason: "Vendored ci-workflows v1.1.0 red-issue.yml: `queue: max` keeps every queued red/green result (GitHub Actions feature, used in production by chirp); actionlint 1.7.12 does not know the key yet."
-    match: 'unexpected key "queue" for "concurrency" section'
+# The former `concurrency.queue` entry is gone: since ci-workflows v1.2.0 the check reports
+# `queue: max` as a known actionlint tool gap (a notice, never blocking).
+allow: []

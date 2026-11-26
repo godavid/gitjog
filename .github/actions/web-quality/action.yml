@@ -1,5 +1,5 @@
-# ci-workflows template actions/web-quality v1.1.0 sha256:9c7752b2bbeed5bd18ece4827833619b838f8014b043b1fe551cdf19a005535a
-# Vendored from Remeny-Farm/ci-workflows@6419be1744cf60d5f97addac0d6d20d29e0b0625 (v1.1.0): godavid/gitjog is public and cannot call the internal repo. Edit upstream, then re-copy.
+# ci-workflows template actions/web-quality v1.2.1 sha256:cb17fb9c645d658c40656bccf8acce632cb8a377dea646c5f4d641c3d3c16731
+# Vendored from Remeny-Farm/ci-workflows@8e0a535499cf9b1d956b91e38f89aea972083511 (v1.2.1): this repo cannot call the internal repo. Edit upstream, then re-copy.
 name: web-quality
 description: >-
   a11y (axe, WCAG 2.1 A/AA) and visual snapshot checks (Playwright toHaveScreenshot, snapshots are never
@@ -7,7 +7,7 @@ description: >-
 
 inputs:
   config:
-    description: Quality config (version 1, with pages, viewports and the optional mask, hide and waitFor lists, global and per page), relative to the caller's workspace.
+    description: Quality config (version 1, with pages, viewports and the optional mask, hide, waitFor, waitForHidden and networkIdle keys, global and per page), relative to the caller's workspace.
     default: .monitoring/quality.json
   a11y-baseline:
     description: Accepted a11y findings (version 1 or 2). Only findings missing from this file fail the run.
@@ -19,7 +19,7 @@ inputs:
     description: Command that starts the app server in the foreground (required unless base-url is given). It runs in its own process group, which the action kills at the end of the run step.
     default: ''
   ready-url:
-    description: URL polled until it answers 2xx or 3xx (required with start-command). Its origin is the test base URL.
+    description: URL polled until it answers 2xx (required with start-command). A 3xx answer (a redirect to a setup or login page) is not ready; use the final page that answers 2xx. Its origin is the test base URL.
     default: ''
   ready-timeout-seconds:
     description: How long to wait for ready-url.
@@ -37,7 +37,7 @@ inputs:
     description: Visual checks run only when runner.name starts with this prefix, because baselines depend on the runner image. An empty value allows every runner.
     default: ms-s1-
   report-name:
-    description: Artifact name of the report (HTML report, test-results with *-actual.png and *-diff.png, a11y-current.json). Letters, digits, '.', '_' and '-' only.
+    description: Artifact name of the report (HTML report, test-results with *-actual.png and *-diff.png, a11y-current.json). Letters, digits, '.', '_' and '-' only. A rerun (run attempt 2 or more) uploads it as report-name-attempt-N, so it never overwrites the artifact of an earlier attempt.
     default: web-quality-report
   max-diff-pixel-ratio:
     description: Allowed share of differing pixels per screenshot (0 to 1).
@@ -57,8 +57,11 @@ outputs:
     description: passed, failed or skipped.
     value: ${{ steps.run.outputs.visual }}
   report-dir:
-    description: Directory of the report on the runner (also uploaded as the artifact report-name).
+    description: Directory of the report on the runner (also uploaded as the artifact named by report-artifact).
     value: ${{ steps.run.outputs.report-dir }}
+  report-artifact:
+    description: Name of the uploaded report artifact. It is report-name on attempt 1 and report-name-attempt-N on a rerun (attempt N), so a rerun never overwrites the actual images of an earlier attempt.
+    value: ${{ github.run_attempt == '1' && inputs.report-name || format('{0}-attempt-{1}', inputs.report-name, github.run_attempt) }}
   deps:
     description: How node_modules of the action was provided - installed (npm ci ran), cached (restored from the dependency cache) or reused (already installed and matching, earlier in the same job) - or skipped when a11y and visual are both off.
     value: ${{ steps.install.outputs.deps || 'skipped' }}
@@ -185,7 +188,7 @@ runs:
       continue-on-error: true
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: ${{ inputs.report-name }}
+        name: ${{ github.run_attempt == '1' && inputs.report-name || format('{0}-attempt-{1}', inputs.report-name, github.run_attempt) }}
         path: ${{ runner.temp }}/wq-report/${{ inputs.report-name }}
         retention-days: 14
         overwrite: true

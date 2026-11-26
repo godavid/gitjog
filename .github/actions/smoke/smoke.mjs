@@ -1,24 +1,28 @@
 // actions/smoke runner. Reads the smoke config, checks every page over HTTP
 // (no redirects followed) and in Chromium (mobile and desktop viewport) behind the
 // built-in prod guard, writes <report-dir>/report.json and report.html, sets the
-// `result` and `failures` step outputs and a step summary.
+// `result`, `failures` and `failure-kinds` step outputs and a step summary.
+// The pure parts (config parsing, failure kinds, text matching) live in checks.mjs.
 //
 // Environment (set by action.yml):
 //   SMOKE_CONFIG       path of the smoke config, relative to GITHUB_WORKSPACE
 //   SMOKE_BASE_URL     optional; replaces the config's `origin`
 //   SMOKE_REPORT_NAME  report directory name (inside GITHUB_WORKSPACE) and artifact name
-// Exit code: 0 passed, 1 failed (report and outputs are written first).
+//   SMOKE_MARKER_DIR   optional; a tool-error also writes result.txt there (the action uploads it)
+//   PROD_GUARD_TUNNEL_PATHS  optional; own-origin analytics/Sentry tunnel paths (comma list,
+//                      default "/monitoring,/ingest", empty switches the rule off);
+//                      `prodGuard.tunnelPaths` of the config wins over it
+// Result: passed, failed or tool-error (Chromium could not launch and no check failed: not a
+// verdict on the site). Exit code: 0 passed or tool-error, 1 failed (report and outputs are
+// written first).
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium, request as pwRequest } from 'playwright';
-import { installGuard, makeClassifier, newGuardLog, normalizeOrigin } from './guard.mjs';
+import { VIEWPORTS, classifyError, failureKinds, firstLine, makeDeadline, parseConfig, waitForText } from './checks.mjs';
+import { installGuard, makeClassifier, newGuardLog } from './guard.mjs';
 import { commandSafe, logSafe, mdCell, renderHtml } from './report.mjs';
 
-const VIEWPORTS = {
-  mobile: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true },
-  desktop: { viewport: { width: 1280, height: 800 }, isMobile: false, hasTouch: false },
-};
 const USER_AGENT_TOKEN = 'RemenySmoke/1';
 const HTTP_TIMEOUT_MS = 30_000;
 const NAV_TIMEOUT_MS = 30_000;
@@ -30,100 +34,9 @@ const baseUrlInput = (process.env.SMOKE_BASE_URL || '').trim();
 const reportName = process.env.SMOKE_REPORT_NAME || 'smoke-report';
 const reportDir = path.resolve(workspace, reportName);
 
-// ---------------------------------------------------------------- config
-
-function fail(message) {
-  throw new Error(message);
-}
-
-function isObject(v) {
-  return v !== null && typeof v === 'object' && !Array.isArray(v);
-}
-
-function parseConfig(raw) {
-  if (!isObject(raw)) fail('config must be a JSON object');
-  if (raw.version !== 1) fail(`config.version must be 1 (got ${JSON.stringify(raw.version)})`);
-
-  let origin;
-  if (baseUrlInput) {
-    const u = new URL(normalizeOrigin(baseUrlInput, 'base-url'));
-    const full = new URL(baseUrlInput);
-    if ((full.pathname !== '/' && full.pathname !== '') || full.search || full.hash) {
-      fail(`base-url must be an origin without path, query or fragment: ${JSON.stringify(baseUrlInput)}`);
-    }
-    origin = u.origin;
-  } else if (typeof raw.origin === 'string' && raw.origin) {
-    origin = normalizeOrigin(raw.origin, 'config.origin');
-  } else {
-    fail('config.origin is required when no base-url is given');
-  }
-
-  const viewports = raw.viewports ?? ['mobile', 'desktop'];
-  if (!Array.isArray(viewports) || viewports.length === 0 || !viewports.every((v) => v in VIEWPORTS)) {
-    fail('config.viewports must be a non-empty array of "mobile" and/or "desktop"');
-  }
-
-  const budgetOk = (v) => Number.isInteger(v) && v >= 0;
-  const defaultBudget = raw.consoleErrorBudget ?? 0;
-  if (!budgetOk(defaultBudget)) fail('config.consoleErrorBudget must be an integer >= 0');
-
-  if (!Array.isArray(raw.pages) || raw.pages.length === 0) fail('config.pages must be a non-empty array');
-  const pages = raw.pages.map((p, i) => {
-    const where = `config.pages[${i}]`;
-    if (!isObject(p)) fail(`${where} must be an object`);
-    if (typeof p.path !== 'string' || !p.path.startsWith('/')) fail(`${where}.path must be a string starting with "/"`);
-    const status = Array.isArray(p.status) ? p.status : [p.status ?? 200];
-    if (status.length === 0 || !status.every((s) => Number.isInteger(s) && s >= 100 && s <= 599)) {
-      fail(`${where}.status must be an HTTP status code or a non-empty array of them`);
-    }
-    for (const key of ['location', 'selector', 'text']) {
-      if (p[key] !== undefined && (typeof p[key] !== 'string' || p[key] === '')) fail(`${where}.${key} must be a non-empty string`);
-    }
-    if (p.headers !== undefined) {
-      if (!isObject(p.headers) || !Object.values(p.headers).every((v) => typeof v === 'string')) {
-        fail(`${where}.headers must be an object of strings`);
-      }
-    }
-    if (p.consoleErrorBudget !== undefined && !budgetOk(p.consoleErrorBudget)) {
-      fail(`${where}.consoleErrorBudget must be an integer >= 0`);
-    }
-    return {
-      path: p.path,
-      status,
-      location: p.location,
-      selector: p.selector,
-      text: p.text,
-      headers: p.headers ?? {},
-      consoleErrorBudget: p.consoleErrorBudget ?? defaultBudget,
-    };
-  });
-
-  const pg = raw.prodGuard ?? {};
-  if (!isObject(pg)) fail('config.prodGuard must be an object');
-  const extraOrigins = (pg.extraOrigins ?? []).map((o) => normalizeOrigin(o, 'config.prodGuard.extraOrigins'));
-  const readOnlyRpc = pg.readOnlyRpc ?? [];
-  if (!Array.isArray(readOnlyRpc) || !readOnlyRpc.every((n) => typeof n === 'string' && n)) {
-    fail('config.prodGuard.readOnlyRpc must be an array of RPC names');
-  }
-
-  return { origin, viewports, pages, extraOrigins, readOnlyRpc };
-}
-
 // ---------------------------------------------------------------- helpers
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const firstLine = (s) => String(s).split('\n')[0];
-
-function describeError(error, url) {
-  const message = firstLine(error?.message ?? error);
-  const host = new URL(url).hostname;
-  if (/ENOTFOUND|EAI_AGAIN|ERR_NAME_NOT_RESOLVED|getaddrinfo/i.test(message)) {
-    return `DNS resolution failed for host "${host}": ${message}`;
-  }
-  if (/ECONNREFUSED|ERR_CONNECTION_REFUSED/i.test(message)) return `connection refused by "${host}": ${message}`;
-  if (/ETIMEDOUT|ERR_CONNECTION_TIMED_OUT|Timeout/i.test(message)) return `timeout talking to "${host}": ${message}`;
-  return `request to "${host}" failed: ${message}`;
-}
 
 function sameLocation(expected, actual, pageUrl) {
   if (expected === actual) return true;
@@ -140,6 +53,8 @@ function emptyReport() {
     tool: 'ci-workflows/actions/smoke',
     result: 'failed',
     failures: 0,
+    failureKinds: [],
+    toolError: '',
     checkCount: 0,
     origin: '',
     baseUrlOverride: Boolean(baseUrlInput),
@@ -166,8 +81,8 @@ async function httpCheck(api, page, pageUrl, record) {
     }
   }
   if (!response) {
-    const message = describeError(lastError, pageUrl);
-    record({ scope: 'http', name: 'request', ok: false, message });
+    const { kind, message } = classifyError(lastError, pageUrl);
+    record({ scope: 'http', name: 'request', ok: false, kind, message });
     return { ok: false };
   }
 
@@ -179,6 +94,7 @@ async function httpCheck(api, page, pageUrl, record) {
     scope: 'http',
     name: 'status',
     ok: statusOk,
+    kind: 'http',
     message: statusOk
       ? `${status}`
       : `expected ${page.status.join(' or ')}, got ${status}${location ? ` (Location: ${location})` : ''}`,
@@ -190,6 +106,7 @@ async function httpCheck(api, page, pageUrl, record) {
       scope: 'http',
       name: 'location',
       ok,
+      kind: 'http',
       message: ok ? location : `expected Location ${page.location}, got ${location === undefined ? 'no Location header' : location}`,
     });
   }
@@ -201,6 +118,7 @@ async function httpCheck(api, page, pageUrl, record) {
       scope: 'http',
       name: `header ${name.toLowerCase()}`,
       ok,
+      kind: 'http',
       message: ok ? actual : `expected to contain "${expected}", got ${actual === undefined ? 'no such header' : `"${actual}"`}`,
     });
   }
@@ -232,10 +150,12 @@ async function browserCheck({ browser, classifier, log, page, pageUrl, viewportN
         scope: viewportName,
         name: 'navigation',
         ok: navigated,
+        kind: 'http',
         message: navigated ? `${status}` : `browser got status ${status}`,
       });
     } catch (error) {
-      record({ scope: viewportName, name: 'navigation', ok: false, message: describeError(error, pageUrl) });
+      const { kind, message } = classifyError(error, pageUrl);
+      record({ scope: viewportName, name: 'navigation', ok: false, kind, message });
     }
     if (!navigated) return;
 
@@ -246,18 +166,17 @@ async function browserCheck({ browser, classifier, log, page, pageUrl, viewportN
         await tab.locator(page.selector).first().waitFor({ state: 'visible', timeout: CHECK_TIMEOUT_MS });
         record({ scope: viewportName, name: `selector ${page.selector}`, ok: true, message: 'visible' });
       } catch (error) {
-        record({ scope: viewportName, name: `selector ${page.selector}`, ok: false, message: `not visible: ${firstLine(error.message)}` });
+        record({ scope: viewportName, name: `selector ${page.selector}`, ok: false, kind: 'content', message: `not visible: ${firstLine(error.message)}` });
       }
     }
     if (page.text) {
-      try {
-        await tab.waitForFunction((t) => Boolean(document.body) && document.body.innerText.includes(t), page.text, {
-          timeout: CHECK_TIMEOUT_MS,
-        });
-        record({ scope: viewportName, name: `text "${page.text}"`, ok: true, message: 'present' });
-      } catch (error) {
-        record({ scope: viewportName, name: `text "${page.text}"`, ok: false, message: `text not found: ${firstLine(error.message)}` });
-      }
+      const name = `text "${page.text}"${page.textIgnoreCase ? ' (ignore case)' : ''}`;
+      const found = await waitForText(tab, page.text, page.textIgnoreCase, CHECK_TIMEOUT_MS);
+      record(
+        found
+          ? { scope: viewportName, name, ok: true, message: 'present' }
+          : { scope: viewportName, name, ok: false, kind: 'content', message: `text not found within ${CHECK_TIMEOUT_MS / 1000} s` },
+      );
     }
 
     // Resource errors that the guard itself caused (an aborted request) are not page errors.
@@ -272,6 +191,7 @@ async function browserCheck({ browser, classifier, log, page, pageUrl, viewportN
       scope: viewportName,
       name: 'console errors',
       ok: counted.length <= budget,
+      kind: 'console',
       message: `${counted.length} error(s), budget ${budget}${counted.length ? `: ${logSafe(counted[0].text, 200)}` : ''}`,
     });
   } finally {
@@ -288,14 +208,14 @@ async function run(report) {
     raw = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   } catch (error) {
     const reason = error.code === 'ENOENT' ? 'file not found' : firstLine(error.message);
-    report.checks.push({ name: 'config', ok: false, message: `cannot read ${report.config}: ${reason}` });
+    report.checks.push({ name: 'config', ok: false, kind: 'config', message: `cannot read ${report.config}: ${reason}` });
     return;
   }
   let config;
   try {
-    config = parseConfig(raw);
+    config = parseConfig(raw, { baseUrlInput });
   } catch (error) {
-    report.checks.push({ name: 'config', ok: false, message: `invalid ${report.config}: ${firstLine(error.message)}` });
+    report.checks.push({ name: 'config', ok: false, kind: 'config', message: `invalid ${report.config}: ${firstLine(error.message)}` });
     return;
   }
   report.origin = config.origin;
@@ -306,26 +226,56 @@ async function run(report) {
     origin: config.origin,
     extraOrigins: config.extraOrigins,
     readOnlyRpc: config.readOnlyRpc,
+    tunnelPaths: config.tunnelPaths,
   });
   const api = await pwRequest.newContext({ extraHTTPHeaders: { 'user-agent': `${USER_AGENT_TOKEN} (+ci-workflows smoke)` } });
   let browser;
+  // A site that hangs must end as a failed smoke (kind timeout) before the job's own timeout,
+  // which would leave no verdict and so no incident.
+  const deadline = makeDeadline(process.env.SMOKE_TIME_BUDGET_SECONDS);
+  const overBudget = (scope) => ({
+    scope,
+    name: 'time budget',
+    ok: false,
+    kind: 'timeout',
+    message: `not checked: the smoke time budget of ${deadline.seconds} s was used up (a slow or hanging site)`,
+  });
   try {
     for (const page of config.pages) {
       const pageUrl = new URL(page.path, config.origin).href;
       const entry = { path: page.path, url: pageUrl, checks: [], console: [] };
       report.pages.push(entry);
       const record = (c) => entry.checks.push(c);
+      if (deadline.passed()) {
+        record(overBudget('http'));
+        continue;
+      }
 
       const http = await httpCheck(api, page, pageUrl, record);
       const is2xx = http.ok && http.status >= 200 && http.status < 300;
       if (!is2xx) continue;
 
-      browser ??= await chromium.launch();
+      // A browser that cannot start is the runner's problem (tool-error), not the site's: the HTTP
+      // checks of the other pages still run, the browser checks are skipped.
+      if (!browser && !report.toolError) {
+        try {
+          browser = await chromium.launch();
+        } catch (error) {
+          report.toolError = `chromium.launch() failed: ${firstLine(error?.message ?? error)}`;
+        }
+      }
+      if (!browser) continue;
       for (const viewportName of config.viewports) {
+        if (deadline.passed()) {
+          record(overBudget(viewportName));
+          continue;
+        }
         try {
           await browserCheck({ browser, classifier, log: report.guard, page, pageUrl, viewportName, record, consoleLog: entry.console });
         } catch (error) {
-          record({ scope: viewportName, name: 'browser', ok: false, message: describeError(error, pageUrl) });
+          const { kind, message } = classifyError(error, pageUrl);
+          // A non-network error inside the browser step is the runner's, not the site's.
+          record({ scope: viewportName, name: 'browser', ok: false, kind: kind === 'request' ? 'internal' : kind, message });
         }
       }
     }
@@ -338,6 +288,7 @@ async function run(report) {
   report.checks.push({
     name: 'prod-guard: unaborted writes',
     ok: writes === 0,
+    kind: 'guard',
     message: `${writes} unaborted write(s), ${report.guard.aborted.length} request(s) aborted`,
   });
 }
@@ -356,7 +307,10 @@ function finalize(report) {
   const failed = failedChecks(report);
   report.failures = failed.length;
   report.checkCount = report.checks.length + report.pages.reduce((n, p) => n + p.checks.length, 0);
-  report.result = failed.length === 0 ? 'passed' : 'failed';
+  // A real failure wins over a tool-error: only a run with no failing check and a broken tool is tool-error.
+  if (failed.length > 0) report.result = 'failed';
+  else report.result = report.toolError ? 'tool-error' : 'passed';
+  report.failureKinds = failureKinds(report);
   report.generatedAt = new Date().toISOString();
   return failed;
 }
@@ -366,7 +320,15 @@ function writeOutputs(report) {
   fs.writeFileSync(path.join(reportDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
   fs.writeFileSync(path.join(reportDir, 'report.html'), renderHtml(report));
   if (process.env.GITHUB_OUTPUT) {
-    fs.appendFileSync(process.env.GITHUB_OUTPUT, `result=${report.result}\nfailures=${report.failures}\n`);
+    fs.appendFileSync(
+      process.env.GITHUB_OUTPUT,
+      `result=${report.result}\nfailures=${report.failures}\nfailure-kinds=${report.failureKinds.join(',')}\n`,
+    );
+  }
+  // A tool-error leaves a marker artifact (same shape as the skipped marker) for the conformance checker.
+  if (report.result === 'tool-error' && process.env.SMOKE_MARKER_DIR) {
+    fs.mkdirSync(process.env.SMOKE_MARKER_DIR, { recursive: true });
+    fs.writeFileSync(path.join(process.env.SMOKE_MARKER_DIR, 'result.txt'), 'tool-error\n');
   }
 }
 
@@ -379,6 +341,15 @@ function writeSummary(report, failed) {
       `prod guard: ${report.guard.aborted.length} aborted, ${report.guard.unabortedWrites} unaborted writes.`,
     '',
   ];
+  if (report.failureKinds.length) lines.push(`Failure kinds: ${report.failureKinds.join(', ')}.`, '');
+  if (report.toolError) {
+    lines.push(
+      report.result === 'tool-error'
+        ? `The smoke tool failed, not the site: ${mdCell(report.toolError)}. No incident is opened; this is not a successful run.`
+        : `Browser checks were skipped: ${mdCell(report.toolError)}.`,
+      '',
+    );
+  }
   if (failed.length) {
     lines.push('| Where | Check | Detail |', '|---|---|---|');
     for (const c of failed) lines.push(`| ${mdCell(c.where)}${c.scope ? ` (${mdCell(c.scope)})` : ''} | ${mdCell(c.name)} | ${mdCell(c.message)} |`);
@@ -393,7 +364,7 @@ async function main() {
   try {
     await run(report);
   } catch (error) {
-    report.checks.push({ name: 'run', ok: false, message: `unexpected error: ${firstLine(error?.stack ?? error)}` });
+    report.checks.push({ name: 'run', ok: false, kind: 'internal', message: `unexpected error: ${firstLine(error?.stack ?? error)}` });
   }
   const failed = finalize(report);
   writeOutputs(report);
@@ -402,11 +373,14 @@ async function main() {
   for (const c of failed) {
     process.stdout.write(`::error title=smoke::${commandSafe(`${c.where}: ${c.name}: ${c.message}`)}\n`);
   }
+  if (report.toolError) {
+    process.stdout.write(`::warning title=smoke tool-error::${commandSafe(report.toolError)}\n`);
+  }
   process.stdout.write(
     `smoke ${report.result}: ${report.failures} failure(s) of ${report.checkCount} check(s); ` +
       `guard aborted ${report.guard.aborted.length}, unaborted writes ${report.guard.unabortedWrites}; report ${reportDir}\n`,
   );
-  process.exit(report.result === 'passed' ? 0 : 1);
+  process.exit(report.result === 'failed' ? 1 : 0);
 }
 
 main();

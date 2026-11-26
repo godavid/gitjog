@@ -1,0 +1,456 @@
+#!/usr/bin/env python3
+# ci-workflows template scripts/vendor-sync v1.2.1 sha256:6f465b86b6ee7f698c5acfa99947e093067a33e700139e4878cd02ae14938498
+"""vendor-sync: copy and check vendored ci-workflows components (stdlib only, Python 3.9+).
+
+A public or personal repository cannot call the internal Remeny-Farm/ci-workflows repository, so it
+carries copies of the reusable workflows and composite actions. This script makes the copies
+reproducible and detects drift. Docs: docs/components/vendoring.md in ci-workflows.
+
+  vendor-sync copy --from <ci-workflows checkout> --to <caller repo root> [--component NAME]...
+                   [--version vX.Y.Z --sha <40 hex>] [--allow-dirty]
+  vendor-sync check [--root <caller repo root>]
+
+copy
+  Copies the named components (default: the components the caller repo already vendors; `all` is
+  every component) and the components they call. Components:
+    workflow:post-deploy-smoke  workflow:red-issue  workflow:security-baseline  workflow:codeql
+    action:smoke  action:security-baseline  action:web-quality  action:checkly-run
+  A bare name works when it is unambiguous (`smoke`, `red-issue`; `security-baseline` is both a
+  workflow and an action, so write `workflow:security-baseline` or `action:security-baseline`).
+  - Every `Remeny-Farm/ci-workflows/<path>@<sha> # self` pin becomes the local path
+    (`./.github/actions/<name>` or `./.github/workflows/<file>`).
+  - The workflow file and the `action.yml` of an action start with two header lines:
+      # ci-workflows template <name> <version> sha256:<hex>
+      # Vendored from Remeny-Farm/ci-workflows@<40 hex> (<version>): ...
+    <name> is `.github/workflows/<file>` or `actions/<name>`. <hex> is the sha256 of the file bytes
+    without the first line, the same rule as templates/stamp.py (so `stamp.py verify FILE` agrees).
+  - Every other file of an action (not tests, not node_modules) is copied byte for byte and listed
+    with its sha256 in `vendored.sha256`, which carries the same two header lines.
+  <version> and <sha> come from the source checkout (the tag at HEAD and HEAD), which must be clean;
+  `--version` and `--sha` replace them. The tool never runs git writes.
+
+check
+  Exit 1 with `::error::` lines when a vendored file was edited (hash mismatch), when vendored files
+  name different upstream versions or SHAs, when a header line is missing, or when a workflow uses
+  a local `./.github/actions/<x>` or `./.github/workflows/<f>` that does not exist.
+"""
+import argparse
+import hashlib
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path, PurePosixPath
+
+UPSTREAM = "Remeny-Farm/ci-workflows"
+NOTE = "this repo cannot call the internal repo. Edit upstream, then re-copy."
+HEADER_RE = re.compile(r"ci-workflows template (\S+) (v\d+\.\d+\.\d+) sha256:([0-9a-f]{64})\b")
+VENDORED_RE = re.compile(r"^# Vendored from Remeny-Farm/ci-workflows@([0-9a-f]{40}) \((v\d+\.\d+\.\d+)\)")
+PIN_RE = re.compile(
+    r"Remeny-Farm/ci-workflows/(\.github/workflows/[A-Za-z0-9._-]+\.ya?ml|actions/[A-Za-z0-9._-]+)@[0-9a-f]{40}[ \t]+# self\b"
+)
+UNREWRITTEN_RE = re.compile(r"^\s*(?:-\s+)?uses:\s*['\"]?Remeny-Farm/ci-workflows/", re.M)
+LOCAL_USE_RE = re.compile(r"^\s*(?:-\s+)?uses:\s*['\"]?\./(\.github/(?:actions|workflows)/[^\s'\"#@]+)", re.M)
+VERSION_RE = re.compile(r"v\d+\.\d+\.\d+")
+SHA_RE = re.compile(r"[0-9a-f]{40}")
+MANIFEST = "vendored.sha256"
+
+COMPONENTS = (
+    "workflow:post-deploy-smoke",
+    "workflow:red-issue",
+    "workflow:security-baseline",
+    "workflow:codeql",
+    "action:smoke",
+    "action:security-baseline",
+    "action:web-quality",
+    "action:checkly-run",
+)
+SKIP_DIRS = {"node_modules", "__pycache__", "testdata", ".git"}
+
+
+class Fail(Exception):
+    pass
+
+
+def sha(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def is_test_file(name):
+    return name == "test.sh" or name.startswith("test_") or ".test." in name
+
+
+def iter_files(directory):
+    """Files of an action directory that are vendored (no tests, caches or hidden files)."""
+    found = []
+    for path in sorted(directory.rglob("*")):
+        rel = path.relative_to(directory)
+        if not path.is_file() or any(p in SKIP_DIRS or p.startswith(".") for p in rel.parts) or is_test_file(path.name):
+            continue
+        found.append(rel)
+    return found
+
+
+def split_lines(data):
+    return data.splitlines(keepends=True)
+
+
+# ---------------------------------------------------------------- copy
+
+
+def source_path(src, component):
+    kind, name = component.split(":", 1)
+    return src / (".github/workflows/%s.yml" % name if kind == "workflow" else "actions/%s" % name)
+
+
+def dest_path(dst, component):
+    kind, name = component.split(":", 1)
+    return dst / (".github/workflows/%s.yml" % name if kind == "workflow" else ".github/actions/%s" % name)
+
+
+def header_name(component):
+    kind, name = component.split(":", 1)
+    return ".github/workflows/%s.yml" % name if kind == "workflow" else "actions/%s" % name
+
+
+def pin_component(path):
+    if path.startswith(".github/workflows/"):
+        return "workflow:" + path[len(".github/workflows/"):].rsplit(".", 1)[0]
+    return "action:" + path[len("actions/"):]
+
+
+def resolve_names(names):
+    out = []
+    for name in names:
+        if name == "all":
+            out.extend(COMPONENTS)
+            continue
+        matches = [c for c in COMPONENTS if c == name or c.split(":", 1)[1] == name]
+        if len(matches) != 1:
+            raise Fail(
+                "unknown component %r" % name if not matches
+                else "ambiguous component %r: write one of %s" % (name, ", ".join(matches))
+            )
+        out.append(matches[0])
+    return out
+
+
+def detect_vendored(dst):
+    """Components that the caller repo already vendors (by header)."""
+    found = []
+    for rel, name, _, _, _ in scan_vendored(dst):
+        if name.startswith(".github/workflows/") or (name.startswith("actions/") and name.count("/") == 1):
+            component = pin_component(name)
+            if component in COMPONENTS:
+                found.append(component)
+            else:
+                print("::warning file=%s::%s is not a component of this vendor-sync, skipped" % (rel, name))
+    return sorted(set(found))
+
+
+def git(src, *args):
+    try:
+        return subprocess.run(["git", "-C", str(src), *args], check=True, capture_output=True, text=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError) as error:
+        detail = getattr(error, "stderr", "") or str(error)
+        raise Fail("git %s failed in %s: %s (pass --version and --sha)" % (" ".join(args), src, detail.strip()))
+
+
+def release_info(src, version, sha_value, allow_dirty):
+    both = bool(version and sha_value)
+    if not both and not allow_dirty:
+        dirty = git(src, "status", "--porcelain", "--untracked-files=all", "--", "actions", ".github/workflows")
+        if dirty:
+            raise Fail(
+                "the source checkout has uncommitted changes in actions/ or .github/workflows/, so a "
+                "commit SHA would not name this content:\n%s\n(commit them, or pass --version and --sha)" % dirty
+            )
+    if not sha_value:
+        sha_value = git(src, "rev-parse", "HEAD")
+    if not version:
+        version = git(src, "describe", "--tags", "--exact-match", "HEAD")
+    if not VERSION_RE.fullmatch(version):
+        raise Fail("version %r is not vX.Y.Z" % version)
+    if not SHA_RE.fullmatch(sha_value):
+        raise Fail("sha %r is not 40 lowercase hex characters" % sha_value)
+    return version, sha_value
+
+
+def rewrite(text, label):
+    """Return (rewritten text, set of components the file calls through `# self` pins)."""
+    deps = set()
+
+    def local(match):
+        path = match.group(1)
+        deps.add(pin_component(path))
+        return "./" + path if path.startswith(".github/") else "./.github/" + path
+
+    new = PIN_RE.sub(local, text)
+    left = UNREWRITTEN_RE.search(new)
+    if left:
+        raise Fail("%s still calls Remeny-Farm/ci-workflows without a `# self` pin: %s" % (label, new[left.start():left.start() + 120].strip()))
+    return new, deps
+
+
+def with_header(name, version, sha_value, body):
+    vendored = "# Vendored from %s@%s (%s): %s\n" % (UPSTREAM, sha_value, version, NOTE)
+    digest = sha((vendored + body).encode("utf-8"))
+    return "# ci-workflows template %s %s sha256:%s\n%s%s" % (name, version, digest, vendored, body)
+
+
+def write_text(path, text, mode_from=None):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(text.encode("utf-8"))
+    if mode_from is not None:
+        shutil.copymode(mode_from, path)
+
+
+def copy_component(src, dst, component, version, sha_value):
+    """Copy one component; return the set of components it calls."""
+    source, dest = source_path(src, component), dest_path(dst, component)
+    kind = component.split(":", 1)[0]
+    if kind == "workflow":
+        if not source.is_file():
+            raise Fail("%s does not exist in the source checkout" % source)
+        body, deps = rewrite(source.read_text("utf-8"), str(source))
+        write_text(dest, with_header(header_name(component), version, sha_value, body), source)
+        return deps
+    if not (source / "action.yml").is_file():
+        raise Fail("%s/action.yml does not exist in the source checkout" % source)
+    deps, manifest, wanted = set(), [], set()
+    for rel in iter_files(source):
+        wanted.add(rel)
+        target = dest / rel
+        if rel.as_posix() == "action.yml":
+            body, deps = rewrite((source / rel).read_text("utf-8"), str(source / rel))
+            write_text(target, with_header(header_name(component), version, sha_value, body), source / rel)
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source / rel, target)
+            manifest.append("%s  %s\n" % (sha(target.read_bytes()), rel.as_posix()))
+    body = "".join(sorted(manifest, key=lambda line: line.split("  ", 1)[1]))
+    wanted.add(Path(MANIFEST))
+    write_text(dest / MANIFEST, with_header("%s/%s" % (header_name(component), MANIFEST), version, sha_value, body))
+    if dest.is_dir():
+        for stale in iter_files(dest):
+            if stale not in wanted:
+                (dest / stale).unlink()
+                print("removed stale %s" % (dest / stale))
+    return deps
+
+
+def cmd_copy(args):
+    src, dst = Path(args.src).resolve(), Path(args.dst).resolve()
+    if not (src / "actions").is_dir() or not (src / ".github/workflows").is_dir():
+        raise Fail("%s is not a ci-workflows checkout (no actions/ or .github/workflows/)" % src)
+    if not dst.is_dir():
+        raise Fail("%s is not a directory" % dst)
+    todo = resolve_names(args.component) if args.component else detect_vendored(dst)
+    if not todo:
+        raise Fail("no --component given and %s vendors nothing yet (try --component all)" % dst)
+    version, sha_value = release_info(src, args.version, args.sha, args.allow_dirty)
+    done, queue = set(), sorted(set(todo))
+    while queue:
+        component = queue.pop(0)
+        if component in done:
+            continue
+        done.add(component)
+        if component not in COMPONENTS:
+            raise Fail("%s is called through a `# self` pin but is not a known component" % component)
+        for dep in sorted(copy_component(src, dst, component, version, sha_value)):
+            if dep not in done:
+                queue.append(dep)
+        print("copied %s (%s@%s)" % (component, version, sha_value[:7]))
+    print("Done. Review the diff, commit, and let CI run `vendor-sync check`.")
+    return 0
+
+
+# ---------------------------------------------------------------- check
+
+
+def read_head(path):
+    with open(path, "rb") as handle:
+        return [handle.readline(4096).decode("utf-8", "replace") for _ in range(3)]
+
+
+def scan_vendored(root):
+    """Return (relpath, header name, header version, vendored sha, vendored version) of every file
+    with a vendored header line. A missing part is an empty string; `check` reports it."""
+    github = root / ".github"
+    result = []
+    if not github.is_dir():
+        return result
+    for path in sorted(github.rglob("*")):
+        rel = path.relative_to(root)
+        if not path.is_file() or any(p in SKIP_DIRS for p in rel.parts):
+            continue
+        first, second, third = read_head(path)
+        head = HEADER_RE.search(first) if first.startswith("#") else None
+        vend = VENDORED_RE.match(second)
+        if head and vend:
+            result.append((rel.as_posix(), head.group(1), head.group(2), vend.group(1), vend.group(2)))
+        elif head and (head.group(1).startswith(".github/workflows/") or head.group(1).startswith("actions/")):
+            result.append((rel.as_posix(), head.group(1), head.group(2), "", ""))
+        elif head is None:
+            lone = VENDORED_RE.match(first) or vend or VENDORED_RE.match(third)
+            if lone:
+                result.append((rel.as_posix(), "", "", lone.group(1), ""))
+    return result
+
+
+def expected_name(rel):
+    parts = Path(rel).parts
+    if len(parts) == 3 and parts[:2] == (".github", "workflows"):
+        return rel
+    if len(parts) == 4 and parts[:2] == (".github", "actions") and parts[3] == "action.yml":
+        return "actions/%s" % parts[2]
+    if len(parts) == 4 and parts[:2] == (".github", "actions") and parts[3] == MANIFEST:
+        return "actions/%s/%s" % (parts[2], MANIFEST)
+    return None
+
+
+def local_uses(root):
+    files = []
+    for pattern in (".github/workflows/*.yml", ".github/workflows/*.yaml", ".github/actions/**/action.yml", ".github/actions/**/action.yaml"):
+        files.extend(p for p in sorted(root.glob(pattern)) if "node_modules" not in p.parts)
+    return files
+
+
+def cmd_check(args):
+    root = Path(args.root).resolve()
+    errors = []
+
+    def error(rel, message):
+        errors.append("::error file=%s::%s" % (rel, message))
+
+    vendored = scan_vendored(root)
+    for rel, name, version, up_sha, up_version in vendored:
+        path = root / rel
+        lines = split_lines(path.read_bytes())
+        head = HEADER_RE.search(lines[0].decode("utf-8", "replace")) if lines else None
+        if not name:
+            error(rel, "the first line is not the `# ci-workflows template ...` header; re-copy from upstream with vendor-sync")
+            continue
+        if not up_sha:
+            error(rel, "the second line `# Vendored from %s@<sha> (<version>)` is missing; re-copy from upstream with vendor-sync" % UPSTREAM)
+            continue
+        want = expected_name(rel)
+        if want is not None and name != want:
+            error(rel, "the header names %s, expected %s (file moved or renamed?)" % (name, want))
+        if version != up_version:
+            error(rel, "the header says %s but the Vendored line says %s" % (version, up_version))
+        actual = sha(b"".join(lines[1:]))
+        if head and head.group(3) != actual:
+            error(rel, "edited after the copy: sha256 in the header is %s, the content hashes to %s. Edit upstream and re-copy (vendor-sync copy); do not edit or let Dependabot edit a vendored file" % (head.group(3), actual))
+
+    groups = {}
+    for rel, name, version, up_sha, up_version in vendored:
+        if up_sha and up_version:
+            groups.setdefault((up_version, up_sha), []).append(rel)
+    if len(groups) > 1:
+        main = max(groups, key=lambda key: (len(groups[key]), tuple(int(n) for n in key[0][1:].split(".")), key[1]))
+        summary = "; ".join("%s@%s: %d file(s)" % (v, s[:7], len(f)) for (v, s), f in sorted(groups.items()))
+        for key, files in sorted(groups.items()):
+            if key != main:
+                for rel in files:
+                    error(rel, "vendored from %s@%s but most files are from %s@%s (%s); re-copy everything from one release" % (key[0], key[1][:7], main[0], main[1][:7], summary))
+
+    headered = {rel for rel, name, _, up_sha, _ in vendored if name and up_sha}
+    up_versions = {rel: up_version for rel, _, _, _, up_version in vendored}
+    seen = {rel for rel, _, _, _, _ in vendored}
+    actions_dir = root / ".github" / "actions"
+    action_dirs = set()
+    for rel in seen:
+        parts = Path(rel).parts
+        if len(parts) == 4 and parts[:2] == (".github", "actions") and parts[3] in ("action.yml", MANIFEST):
+            action_dirs.add(parts[2])
+    if actions_dir.is_dir():
+        action_dirs.update(m.parent.name for m in actions_dir.glob("*/" + MANIFEST))
+    for action in sorted(action_dirs):
+        directory = actions_dir / action
+        manifest = directory / MANIFEST
+        action_rel = ".github/actions/%s/action.yml" % action
+        manifest_rel = ".github/actions/%s/%s" % (action, MANIFEST)
+        if not manifest.is_file():
+            if action_rel in headered and up_versions.get(action_rel) == "v1.1.0":
+                # copied by hand before vendor-sync existed (v1.1.0): only action.yml can be verified
+                print("::warning file=%s::no %s (copied before vendor-sync): only action.yml is verified; re-copy to cover the other files" % (action_rel, MANIFEST))
+            elif action_rel in headered:
+                # vendor-sync writes the manifest from v1.2.0 on: a missing one switches the check off
+                error(manifest_rel, "%s is missing next to a %s action.yml; re-copy from upstream with vendor-sync" % (MANIFEST, up_versions.get(action_rel) or "vendored"))
+            continue
+        if action_rel not in seen:
+            what = "has no vendored header lines (removed?)" if (root / action_rel).is_file() else "is missing"
+            error(action_rel, "action.yml %s but %s exists: re-copy from upstream with vendor-sync" % (what, MANIFEST))
+        if manifest_rel not in headered and manifest_rel not in seen:
+            error(manifest_rel, "%s has no vendored header lines (removed or missing); re-copy from upstream with vendor-sync" % MANIFEST)
+        listed = set()
+        for number, line in enumerate(manifest.read_text("utf-8", "replace").splitlines(), 1):
+            if not line.strip() or line.startswith("#"):
+                continue
+            match = re.fullmatch(r"([0-9a-f]{64})  (.+)", line)
+            if not match:
+                error(manifest.relative_to(root).as_posix(), "line %d is not `<sha256>  <path>`" % number)
+                continue
+            digest, name = match.groups()
+            pure = PurePosixPath(name)
+            if pure.is_absolute() or ".." in pure.parts or "\\" in name or not pure.parts:
+                error(manifest_rel, "line %d lists %r: a path must be relative and stay inside the action directory" % (number, name))
+                continue
+            listed.add(name)
+            target = directory / name
+            rel = target.relative_to(root).as_posix()
+            if not target.is_file():
+                error(rel, "listed in %s but missing; re-copy with vendor-sync" % MANIFEST)
+            elif sha(target.read_bytes()) != digest:
+                error(rel, "edited after the copy: sha256 in %s is %s, the content hashes to %s. Edit upstream and re-copy (vendor-sync copy); do not edit or let Dependabot edit a vendored file" % (MANIFEST, digest, sha(target.read_bytes())))
+        for rel in iter_files(directory):
+            if rel.as_posix() not in listed and rel.as_posix() not in ("action.yml", MANIFEST):
+                print("::warning file=.github/actions/%s/%s::not listed in %s; a vendored action directory holds only upstream files" % (action, rel.as_posix(), MANIFEST))
+
+    for path in local_uses(root):
+        rel = path.relative_to(root).as_posix()
+        for match in LOCAL_USE_RE.finditer(path.read_text("utf-8", "replace")):
+            used = match.group(1).rstrip("/")
+            if used.startswith(".github/actions/"):
+                target = root / used
+                ok = (target / "action.yml").is_file() or (target / "action.yaml").is_file()
+            else:
+                ok = (root / used).is_file()
+            if not ok:
+                error(rel, "uses ./%s, which does not exist: vendor it with `vendor-sync copy --component ...`" % used)
+
+    if not vendored:
+        print("vendor-sync check: no vendored files under %s/.github" % root)
+    for line in errors:
+        print(line)
+    if errors:
+        print("vendor-sync check: %d problem(s)" % len(errors))
+        return 1
+    if vendored:
+        print("vendor-sync check: %d vendored file(s) ok (%s)" % (len(vendored), ", ".join("%s@%s" % (v, s[:7]) for (v, s) in sorted(groups))))
+    return 0
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(prog="vendor-sync", description="Copy and check vendored ci-workflows components.")
+    sub = parser.add_subparsers(dest="command", required=True)
+    copy = sub.add_parser("copy", help="copy components from a ci-workflows checkout into a caller repo")
+    copy.add_argument("--from", dest="src", required=True, help="ci-workflows checkout (a release tag)")
+    copy.add_argument("--to", dest="dst", required=True, help="caller repo root")
+    copy.add_argument("--component", action="append", default=[], help="component name (repeatable); default: what the caller already vendors")
+    copy.add_argument("--version", help="release version vX.Y.Z (default: the tag at HEAD of the source)")
+    copy.add_argument("--sha", help="release commit SHA (default: HEAD of the source)")
+    copy.add_argument("--allow-dirty", action="store_true", help="do not require a clean source checkout")
+    check = sub.add_parser("check", help="verify the vendored files of a caller repo")
+    check.add_argument("--root", default=".", help="caller repo root (default: the current directory)")
+    args = parser.parse_args(argv[1:])
+    try:
+        return cmd_copy(args) if args.command == "copy" else cmd_check(args)
+    except Fail as error:
+        print("::error::%s" % error)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

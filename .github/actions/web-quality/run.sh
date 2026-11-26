@@ -4,7 +4,7 @@
 #
 # Env (all WQ_* are set by action.yml; RUNNER_NAME is the GitHub runner name):
 #   WQ_CONFIG WQ_A11Y_BASELINE WQ_SNAPSHOTS_DIR      files and dirs, relative to the current dir
-#   WQ_START_COMMAND WQ_READY_URL WQ_READY_TIMEOUT   server started by this script (own process group)
+#   WQ_START_COMMAND WQ_READY_URL WQ_READY_TIMEOUT   server started by this script (own process group); ready = ready-url answers 2xx
 #   WQ_BASE_URL                                      test an already running URL instead (no server)
 #   WQ_A11Y WQ_VISUAL                                true | false | off (kill switch); empty means true
 #   WQ_VISUAL_RUNNER_PREFIX                          visual runs only when RUNNER_NAME starts with it ('' = any)
@@ -174,9 +174,12 @@ else
   printf '%s' "$READY_URL" | grep -Eq '^https?://[^/[:space:]]+' || fail "ready-url must start with http:// or https://"
   BASE_URL="$(printf '%s' "$READY_URL" | sed -E 's#^(https?://[^/]+).*#\1#')"
 
-  http_code() { curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$1" 2>/dev/null || true; }
+  # shellcheck source=ready.sh
+  . "$ACTION_DIR/ready.sh"
 
-  case "$(http_code "$READY_URL")" in
+  # A busy port is busy, whatever it answers: 2xx and 3xx both refuse the start.
+  wq_probe "$READY_URL"
+  case "$WQ_CODE" in
     2??|3??) fail "ready-url already answers before start-command ran (port in use or stale server); refusing to test an unknown server" ;;
   esac
 
@@ -191,21 +194,11 @@ else
   fi
   SERVER_PID=$!
 
-  deadline=$((SECONDS + READY_TIMEOUT))
-  while :; do
-    case "$(http_code "$READY_URL")" in
-      2??|3??) break ;;
-    esac
-    if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-      tail -n 40 "$SERVER_LOG" || true
-      fail "start-command exited before $READY_URL became ready (it must stay in the foreground)"
-    fi
-    if [ "$SECONDS" -ge "$deadline" ]; then
-      tail -n 40 "$SERVER_LOG" || true
-      fail "$READY_URL not ready within ${READY_TIMEOUT}s"
-    fi
-    sleep 1
-  done
+  # Ready means 2xx only (ready.sh): a 3xx answer is a redirect to a setup or login page, not a served app.
+  if ! wq_wait_ready "$READY_URL" "$READY_TIMEOUT" "$SERVER_PID"; then
+    tail -n 40 "$SERVER_LOG" || true
+    fail "$WQ_READY_ERROR"
+  fi
   log "server ready at $READY_URL"
 fi
 
