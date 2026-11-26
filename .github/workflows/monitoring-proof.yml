@@ -1,4 +1,4 @@
-# ci-workflows template monitoring-proof.yml v1.2.2 sha256:e03eff606550aa9a9b7357088acafb7a0ad092973a307b8c6a6f73414e98bd6b
+# ci-workflows template monitoring-proof.yml v1.2.3 sha256:5fd0cc661ea2541bd1a89f9f1700e047634fe80a0391debac34a5ea27834bca3
 # Controlled-failure workflow for the monitoring evidence (a-f). Copy to .github/workflows/monitoring-proof.yml.
 # It never touches production: GET only, and the failing cases target https://monitoring-proof.invalid
 # (RFC 2606: the name never resolves). Production releases and rollbacks are not started.
@@ -57,6 +57,9 @@
 # GitHub applies the default, so the run tests .invalid. smoke-pass and the closing red-issue run need the
 # real origin, for example
 #   gh workflow run monitoring-proof.yml -f case=smoke-pass -f base-url=<the production origin>
+# Never put a secret into base-url (no userinfo, no token in the query). The verdict job reads it from the
+# event payload and masks its userinfo, query and fragment, but the run page shows the dispatch inputs, and
+# the smoke job passes it as an action input, which GitHub prints in its step logs.
 #
 # Concurrency: one group per case (`monitoring-proof-<case>`, queue max, no cancel-in-progress), so a
 # queued dispatch of a case is not dropped. Never use one shared group for the whole workflow or in a
@@ -104,8 +107,8 @@ jobs:
     permissions:
       contents: read
       issues: write
-    # Vendored copy of Remeny-Farm/ci-workflows .github/workflows/post-deploy-smoke.yml v1.2.2
-    # (b8805fb299c05afbc3032e1f9143c2958d2858a7).
+    # Vendored copy of Remeny-Farm/ci-workflows .github/workflows/post-deploy-smoke.yml v1.2.3
+    # (1de76632dff35ccb46c793ac4d5bd3b47cd1bcf1).
     uses: ./.github/workflows/post-deploy-smoke.yml
     with:
       # GitHub-hosted runner (public repo).
@@ -133,7 +136,6 @@ jobs:
         shell: bash
         env:
           CASE: ${{ inputs.case }}
-          BASE_URL: ${{ inputs.base-url }}
           SMOKE_JOB: ${{ needs.smoke.result }}
           SMOKE_RESULT: ${{ needs.smoke.outputs.result }}
           SMOKE_FAILURE_KINDS: ${{ needs.smoke.outputs.failure-kinds }}
@@ -142,6 +144,31 @@ jobs:
           SMOKE_ISSUE_STATE: ${{ needs.smoke.outputs.issue-state }}
         run: |
           set -euo pipefail
+          # base-url is read from the event payload, never passed as a step env: GitHub prints the env of a step
+          # in its log. Its userinfo, query and fragment are masked before anything else is printed. A key
+          # missing from the payload is the input default. The dispatch inputs stay visible on the run page,
+          # and the smoke job's log shows base-url as an action input: never put a secret into base-url.
+          if command -v jq >/dev/null 2>&1; then
+            BASE_URL="$(jq -r '.inputs["base-url"] // "" | strings' "$GITHUB_EVENT_PATH")"
+          else
+            BASE_URL="$(python3 -I -c 'import json, sys; v = (json.load(open(sys.argv[1])).get("inputs") or {}).get("base-url"); print(v if isinstance(v, str) else "", end="")' "$GITHUB_EVENT_PATH")"
+          fi
+          [ -n "$BASE_URL" ] || BASE_URL="https://monitoring-proof.invalid"
+          mask() {
+            local line
+            while IFS= read -r line; do
+              [ -z "$line" ] || echo "::add-mask::${line}"
+            done <<< "$1"
+          }
+          url_rest="${BASE_URL#*://}"
+          case "$url_rest" in
+            *@*)
+              userinfo="${url_rest%@*}"
+              mask "$userinfo"
+              case "$userinfo" in *:*) mask "${userinfo#*:}" ;; esac ;;
+          esac
+          case "$BASE_URL" in *\?*) mask "${BASE_URL#*\?}" ;; esac
+          case "$BASE_URL" in *#*) mask "${BASE_URL#*#}" ;; esac
           mismatch() {
             echo "VERDICT MISMATCH - $1" >> "$GITHUB_STEP_SUMMARY"
             echo "::error::$1"
@@ -154,16 +181,21 @@ jobs:
           # Host of base-url (read by smoke-pass and red-issue only). The smoke action parses the URL with the
           # WHATWG parser (Node URL), which decodes %-escapes, maps Unicode and drops tabs and newlines, so a
           # host that is not plain ASCII can be .invalid there and a real host here. The assert accepts only
-          # http(s)://<plain host> or a bare host without a colon: strip the scheme, cut at the first / \ ? #,
-          # strip userinfo (up to the last @), the port and one trailing dot, lower-case. The host must then be
-          # letters, digits, dots and dashes (or a bracketed IPv6 literal); anything else is a mismatch. The
-          # host is .invalid or ends in .invalid. No message prints base-url itself (its userinfo and query can
-          # hold secrets): only the parsed host, with every other character shown as `?`.
+          # http(s)://<plain host> or a bare host without a colon: strip the scheme, cut at the first / \ ? #
+          # (the end of the authority, as in the URL parser), strip userinfo (up to the last @), the port and one
+          # trailing dot, lower-case. The port must be empty or digits; anything else is a mismatch. The host must
+          # then be letters, digits, dots and dashes (or a bracketed IPv6 literal); anything else is a mismatch.
+          # The host is .invalid or ends in .invalid. No message prints base-url itself (its userinfo and query
+          # can hold secrets): only the parsed host, with every other character shown as `?`. An unescaped
+          # / ? # \ inside a userinfo ends the authority early, so the cut part can be userinfo: when an @
+          # follows the cut, the host is never shown (`shown` is a fixed text), and a : without a port number is
+          # a mismatch that shows no host.
           export LC_ALL=C
           host=""
+          shown=""
           invalid=false
           parse_base_url() {
-            local rest lower hostport
+            local rest lower hostport authority port
             lower="$(printf '%s' "$BASE_URL" | tr '[:upper:]' '[:lower:]')"
             case "$lower" in
               http://*|https://*) rest="${BASE_URL#*://}" ;;
@@ -173,14 +205,24 @@ jobs:
             case "$rest" in
               /*|\\*) mismatch "case ${CASE}: base-url has more than two slashes or a backslash after the scheme. Pass https://<host>." ;;
             esac
-            rest="${rest%%[/\\?#]*}"
-            hostport="${rest##*@}"
+            authority="${rest%%[/\\?#]*}"
+            hostport="${authority##*@}"
             case "$hostport" in
-              \[*) host="${hostport%%]*}]" ;;
+              \[*\]|\[*\]:*) host="${hostport%%]*}]" ;;
+              \[*) host="$hostport" ;;
               *) host="${hostport%%:*}" ;;
+            esac
+            port="${hostport:${#host}}"
+            case "$port" in
+              ''|:) ;;
+              :*[!0-9]*|[!:]*) mismatch "case ${CASE}: the port of base-url is not a number (a : in the host part, or an unescaped / ? # \\ inside a userinfo). The host is not shown. Pass https://<host>, and percent-encode a userinfo." ;;
             esac
             host="${host%.}"
             host="$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')"
+            case "${rest:${#authority}}" in
+              *@*) shown="(not shown: an @ follows the host part of base-url, so it may be userinfo)" ;;
+              *) shown="$(printf '%s' "$host" | tr -c 'a-z0-9.-' '?')" ;;
+            esac
             case "$host" in
               \[*\]) case "${host:1:${#host}-2}" in ''|*[!0-9a-f:.]*) ;; *) return 0 ;; esac ;;
               ''|*[!a-z0-9.-]*) ;;
@@ -188,7 +230,7 @@ jobs:
                 case "$host" in invalid|*.invalid) invalid=true ;; esac
                 return 0 ;;
             esac
-            mismatch "case ${CASE}: the host of base-url ('$(printf '%s' "$host" | tr -c 'a-z0-9.-' '?')') is not a plain ASCII host name (percent-encoded, non-ASCII, whitespace or another character the URL parser rewrites). Pass the plain host name, e.g. https://monitoring-proof.invalid or the repo's production origin."
+            mismatch "case ${CASE}: the host of base-url ('${shown}') is not a plain ASCII host name (percent-encoded, non-ASCII, whitespace or another character the URL parser rewrites). Pass the plain host name, e.g. https://monitoring-proof.invalid or the repo's production origin."
           }
           # want_actions: the accepted issue-action values; the dash means "empty output".
           note=""
@@ -197,7 +239,7 @@ jobs:
             smoke-pass)
               parse_base_url
               if [ "$invalid" = true ]; then
-                mismatch "case smoke-pass ran against the host ${host}, which never resolves. Dispatch it with the repo's own production origin: gh workflow run monitoring-proof.yml -f case=smoke-pass -f base-url=<the production origin> (an empty base-url is replaced by the .invalid default)."
+                mismatch "case smoke-pass ran against the host ${shown}, which never resolves. Dispatch it with the repo's own production origin: gh workflow run monitoring-proof.yml -f case=smoke-pass -f base-url=<the production origin> (an empty base-url is replaced by the .invalid default)."
               fi
               want_job=success; want_result=passed; want_kinds=""; want_actions="-" ;;
             red-issue)

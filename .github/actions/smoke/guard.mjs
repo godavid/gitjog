@@ -55,15 +55,37 @@ export function resolveTunnelPaths(configValue, envValue) {
   return tunnelPathsOf(envValue ?? DEFAULT_TUNNEL_PATHS);
 }
 
+const URL_NOT_SHOWN = '(value not shown: the host could not be read)';
+
+/**
+ * A URL as error messages may show it: scheme and host (with port) only. Userinfo, path, query and
+ * fragment can hold secrets and never reach a message, the report, the step summary or an annotation.
+ * The authority ends at the first / ? # \ (WHATWG), so an unescaped one inside a userinfo makes the part
+ * before it the "host": when an @ follows that cut, the host may be userinfo and nothing is shown. When no
+ * host can be read, the same fixed text stands in for the whole value.
+ */
+export function describeUrl(value) {
+  const rest = String(value ?? '').replace(/^[a-z][a-z0-9+.-]*:[/\\]*/i, '');
+  const cut = rest.search(/[/?#\\]/);
+  if (cut >= 0 && rest.slice(cut).includes('@')) return URL_NOT_SHOWN;
+  try {
+    const url = new URL(value);
+    if (url.host) return JSON.stringify(`${url.protocol}//${url.host}`);
+  } catch {
+    // fall through: nothing of the value is shown
+  }
+  return URL_NOT_SHOWN;
+}
+
 export function normalizeOrigin(value, what) {
   let url;
   try {
     url = new URL(value);
   } catch {
-    throw new Error(`${what}: not a valid URL: ${JSON.stringify(value)}`);
+    throw new Error(`${what}: not a valid URL: ${describeUrl(value)}`);
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error(`${what}: only http(s) is allowed: ${JSON.stringify(value)}`);
+    throw new Error(`${what}: only http(s) is allowed: ${describeUrl(value)}`);
   }
   return url.origin;
 }

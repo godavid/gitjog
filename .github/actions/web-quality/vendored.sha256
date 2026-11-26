@@ -1,10 +1,11 @@
-# ci-workflows template actions/web-quality/vendored.sha256 v1.2.2 sha256:a1ebe88266edb8dc2cd48767dae87728d4abfaf5ceeb0b8c4443bcc00a3dfc6b
-# Vendored from Remeny-Farm/ci-workflows@b8805fb299c05afbc3032e1f9143c2958d2858a7 (v1.2.2): this repo cannot call the internal repo. Edit upstream, then re-copy.
+# ci-workflows template actions/web-quality/vendored.sha256 v1.2.3 sha256:9c52c2c6b041d987cfc471b0ff50eb70e4020cb02b46ffef725ab3a8a3c82b6a
+# Vendored from Remeny-Farm/ci-workflows@1de76632dff35ccb46c793ac4d5bd3b47cd1bcf1 (v1.2.3): this repo cannot call the internal repo. Edit upstream, then re-copy.
 c0cceef9d14efa820a2947eb999cc87b50edc4c4930e159c35e78b86606ba945  a11y-match.mjs
+1d1879d48d023b789cc3c885bc3381798fa6e000454d46fb92515f8895beee60  install-deps.sh
 1b880c9345faa742b4042328339a6a909215f2a560b8f60324bdca6e4b91f4b0  package-lock.json
 9b21a0b44cc5c1dd698dd8995ae125565e05cdecc7297e1be4e502bbc988eaf9  package.json
 207ed4502fa55c511a7d9af96cd6ee4cb2573a2ca95e45ede5582599ccdc5f77  playwright.config.mjs
 0b61c85717a458b85bcda484c646bf7cb5b4d492e72294e1662c3f4373f8a2e4  quality-config.mjs
 e59c8e5df5144cb3d9792400fbc99157f6d92be95d4d47540245e5a9e7356be6  quality.spec.mjs
-e0ef4ba2462df5204a5ee381a72dc88439d4aea38395a5395844520c70d09966  ready.sh
-816f58f4b238351aa8cfd576d1e81ec62382bb70ff685c2ec626ef98787ca532  run.sh
+c1601e3d26b8afc9148d9243a91d0e1b0a52529a985b1fb76af738a36df4bae3  ready.sh
+7381c6615b32422a1af687efde8fa9200fc1d3266a182bc6a4d2a3d4ef5992d2  run.sh

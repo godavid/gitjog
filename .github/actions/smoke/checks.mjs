@@ -6,7 +6,7 @@
 //   dns, connection, timeout, request (other network error), http (status, location or header
 //   mismatch), content (selector or text), console, guard, config, internal.
 
-import { normalizeOrigin, resolveTunnelPaths } from './guard.mjs';
+import { describeUrl, normalizeOrigin, resolveTunnelPaths } from './guard.mjs';
 
 export const VIEWPORTS = {
   mobile: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true },
@@ -36,7 +36,7 @@ export function parseConfig(raw, { baseUrlInput = '', tunnelEnv = process.env.PR
     const u = new URL(normalizeOrigin(baseUrlInput, 'base-url'));
     const full = new URL(baseUrlInput);
     if ((full.pathname !== '/' && full.pathname !== '') || full.search || full.hash) {
-      fail(`base-url must be an origin without path, query or fragment: ${JSON.stringify(baseUrlInput)}`);
+      fail(`base-url must be an origin without path, query or fragment: ${describeUrl(baseUrlInput)} has one (not shown)`);
     }
     origin = u.origin;
   } else if (typeof raw.origin === 'string' && raw.origin) {

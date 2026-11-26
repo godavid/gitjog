@@ -1,5 +1,5 @@
-# ci-workflows template .github/workflows/red-issue.yml v1.2.2 sha256:19647e2e735166966437661ff8d6c7edb7b9e0b9d11bf6c537f5119f87d66e71
-# Vendored from Remeny-Farm/ci-workflows@b8805fb299c05afbc3032e1f9143c2958d2858a7 (v1.2.2): this repo cannot call the internal repo. Edit upstream, then re-copy.
+# ci-workflows template .github/workflows/red-issue.yml v1.2.3 sha256:50ff63a96e08bc1e6208cd5a780722c1b0bc31d1cf7a7241ae86e60c0e466229
+# Vendored from Remeny-Farm/ci-workflows@1de76632dff35ccb46c793ac4d5bd3b47cd1bcf1 (v1.2.3): this repo cannot call the internal repo. Edit upstream, then re-copy.
 name: red-issue
 
 # Reusable: one GitHub issue per title. A red result opens the issue or adds a

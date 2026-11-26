@@ -1,5 +1,5 @@
-# ci-workflows template actions/security-baseline v1.2.2 sha256:42df7e7d643c5b9bb3620cff2e8e27c23d5c95fcd4e701598446c25860f9f2a9
-# Vendored from Remeny-Farm/ci-workflows@b8805fb299c05afbc3032e1f9143c2958d2858a7 (v1.2.2): this repo cannot call the internal repo. Edit upstream, then re-copy.
+# ci-workflows template actions/security-baseline v1.2.3 sha256:69e508b803cf8ab6b28fc4b72fd3332fb0a821aecd43ab7026a588ffb465ed95
+# Vendored from Remeny-Farm/ci-workflows@1de76632dff35ccb46c793ac4d5bd3b47cd1bcf1 (v1.2.3): this repo cannot call the internal repo. Edit upstream, then re-copy.
 name: security-baseline
 description: >-
   Runs pinned actionlint and zizmor on the caller's workflows plus a check for a

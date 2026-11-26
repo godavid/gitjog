@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ci-workflows template scripts/vendor-sync v1.2.2 sha256:6f465b86b6ee7f698c5acfa99947e093067a33e700139e4878cd02ae14938498
+# ci-workflows template scripts/vendor-sync v1.2.3 sha256:6f465b86b6ee7f698c5acfa99947e093067a33e700139e4878cd02ae14938498
 """vendor-sync: copy and check vendored ci-workflows components (stdlib only, Python 3.9+).
 
 A public or personal repository cannot call the internal Remeny-Farm/ci-workflows repository, so it
