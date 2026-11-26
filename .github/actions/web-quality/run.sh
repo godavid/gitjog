@@ -95,7 +95,7 @@ case "$REPORT_NAME" in
 esac
 RATIO="${WQ_MAX_DIFF_PIXEL_RATIO:-0.01}"
 printf '%s' "$RATIO" | grep -Eq '^(0(\.[0-9]+)?|1(\.0+)?)$' || fail "max-diff-pixel-ratio must be a number from 0 to 1 (got '$RATIO')"
-READY_TIMEOUT="${WQ_READY_TIMEOUT:-120}"
+READY_TIMEOUT="${WQ_READY_TIMEOUT:-600}"
 printf '%s' "$READY_TIMEOUT" | grep -Eq '^[1-9][0-9]{0,4}$' || fail "ready-timeout-seconds must be a positive integer"
 
 SWITCH=true

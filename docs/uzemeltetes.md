@@ -417,10 +417,10 @@ godavid/gitjog` issue nyílik (`prod-incident`, `sev:high`, `routine`, `triaged`
 kommentet kap; a következő zöld smoke lezárja. Kikapcsolás: `MONITORING_SMOKE=off`
 repo-változó.
 
-**Monitoring-sablon.** A `Remeny-Farm/ci-workflows` (v1.2.2) belső repó, a publikus gitjog
+**Monitoring-sablon.** A `Remeny-Farm/ci-workflows` (v1.2.3) belső repó, a publikus gitjog
 nem hívhatja, ezért vendorolt másolat van: `.github/actions/smoke`, `web-quality`,
 `security-baseline`, és a `post-deploy-smoke.yml`, `red-issue.yml` workflow. A
-vendorolt fájlok első két sora a kiadott fejléc (`ci-workflows template <név> v1.2.2
+vendorolt fájlok első két sora a kiadott fejléc (`ci-workflows template <név> v1.2.3
 sha256:…` és `Vendored from …@<sha>`), az actionök többi fájlja a `vendored.sha256`-ban.
 Kézzel nem szerkeszthetők; a `kapuk` workflow `vendor-sync check`-je ezt őrzi. Frissítés
 egy ci-workflows kiadásról, annak tiszta checkoutjából:
@@ -433,7 +433,8 @@ workflow-k: `security-baseline.yml` (actionlint + zizmor, csak új találat bukt
 indoklással a `.monitoring/security-baseline-allow.yml`-ben), `web-quality.yml` (a11y és
 vizuális snapshot helyi buildre, `.monitoring/quality.json`; kikapcsolás
 `MONITORING_A11Y=off`, `MONITORING_VISUAL=off`), `monitoring-proof.yml` (kontrollált hiba
-`workflow_dispatch`-csel, a `https://monitoring-proof.invalid` címre). Egyik sem kötelező
+`workflow_dispatch`-csel, a `https://monitoring-proof.invalid` címre; a `base-url`-be soha nem
+kerül titok, mert a futás oldala a dispatch-bemeneteket mutatja). Egyik sem kötelező
 check. A vizuális baseline-t (`.monitoring/visual/`) csak a tulajdonos OK-ja után
 másolja be a `scripts/promote-actuals`; `--update-snapshots` soha. A bizonyítékok:
 `.monitoring/evidence/`.
