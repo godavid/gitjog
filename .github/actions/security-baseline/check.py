@@ -11,7 +11,9 @@ Blocking rules:
   * every zizmor finding with severity High
   * "missing-top-level-permissions" (own check: no top-level `permissions:` and
     not every job has its own `permissions:`)
-Every other zizmor finding is a warning.
+Every other zizmor finding is a warning. A finding that is a known gap of the pinned tool
+(KNOWN_TOOL_GAPS, e.g. actionlint 1.7.12 and `concurrency.queue`) has the status "tool-gap":
+not blocking, no allow entry needed, a notice annotation.
 
 Allow-file shape (nothing else is accepted):
 
@@ -45,6 +47,30 @@ ALLOW_OPTIONAL_KEYS = ("match",)
 STATUS_BLOCKING = "blocking"
 STATUS_ALLOWED = "allowed"
 STATUS_WARNING = "warning"
+STATUS_TOOL_GAP = "tool-gap"
+
+# Known gaps of the pinned tools: a message the tool prints for something GitHub accepts.
+# A finding whose rule and whole message match is not blocking and needs no allow entry; it
+# stays in the report with status "tool-gap" and prints a ::notice::. Only an exact message
+# is covered, so every other error of the same rule still blocks. Remove an item when the
+# pinned tool version knows the feature.
+KNOWN_TOOL_GAPS = (
+    {
+        "id": "concurrency-queue",
+        "rule": RULE_ACTIONLINT,
+        "message": re.compile(
+            r'unexpected key "queue" for "concurrency" section\. expected one of "cancel-in-progress", "group"'),
+        # the workflow line of the finding must be exactly `queue: max` (the only value GitHub accepts today)
+        # (YAML: a comment needs whitespace before `#`; `max#x` is the value "max#x")
+        "line": re.compile(r"""\s*queue\s*:\s*(?:max|"max"|'max')(?:\s+#.*)?\s*"""),
+        "reason": "actionlint 1.7.12 does not know `concurrency.queue` (GitHub accepts `queue: max`)",
+        "url": "https://github.blog/changelog/2026-05-07-github-actions-concurrency-groups-now-allow-larger-queues",
+    },
+)
+
+# zizmor rules whose Primary location is the `uses:` reference itself: the reference is added
+# to the message, so an allow entry's `match` can single out one reference.
+USES_REFERENCE_RULES = ("unpinned-uses",)
 
 
 # --------------------------------------------------------------------------
@@ -262,6 +288,16 @@ def read_actionlint(text, root=None):
     return findings
 
 
+def _zizmor_reference(finding):
+    """The `uses:` reference of the Primary location (concrete.feature), or "" when not a plain one."""
+    for loc in finding.get("locations") or []:
+        if (loc.get("symbolic") or {}).get("kind") == "Primary":
+            feature = ((loc.get("concrete") or {}).get("feature") or "").strip()
+            if feature and "\n" not in feature and len(feature) <= 200:
+                return feature
+    return ""
+
+
 def _zizmor_location(finding):
     locations = finding.get("locations") or []
     chosen = None
@@ -292,6 +328,10 @@ def read_zizmor(text, root=None):
         file, line, column, annotation = _zizmor_location(item)
         desc = (item.get("desc") or "").strip()
         message = desc if not annotation else "%s: %s" % (desc, annotation)
+        if item.get("ident") in USES_REFERENCE_RULES:
+            reference = _zizmor_reference(item)
+            if reference:
+                message += " [uses: %s]" % reference
         findings.append(make_finding(
             item.get("ident", "zizmor"), "zizmor",
             normalize_path(file, root), line, column,
@@ -403,10 +443,41 @@ def is_blocking(finding):
     return False
 
 
-def merge(findings, allow_entries):
+def _source_line(root, finding):
+    """The workflow line of the finding (file:line under root), or None when it cannot be read."""
+    if root is None:
+        return None
+    try:
+        with open(os.path.join(root, finding["file"]), encoding="utf-8", errors="replace") as handle:
+            lines = handle.read().splitlines()
+        return lines[finding["line"] - 1] if finding["line"] >= 1 else None
+    except (OSError, IndexError):
+        return None
+
+
+def known_tool_gap(finding, root=None):
+    """The KNOWN_TOOL_GAPS item that covers this finding, else None.
+
+    Rule and whole message must match and, for an item with a "line" pattern, the workflow
+    line at file:line under root must match it (fail closed: an unreadable file or line is
+    no gap). So `queue: <invalid value>` stays blocking although actionlint prints the same message.
+    """
+    for gap in KNOWN_TOOL_GAPS:
+        if finding["rule"] != gap["rule"] or not gap["message"].fullmatch(finding["message"]):
+            continue
+        if "line" in gap:
+            text = _source_line(root, finding)
+            if text is None or not gap["line"].fullmatch(text):
+                continue
+        return gap
+    return None
+
+
+def merge(findings, allow_entries, root=None):
     """Deduplicate, classify and apply the allow entries.
 
-    Returns (classified findings, stale entries). Each finding gets a "status".
+    Returns (classified findings, stale entries). Each finding gets a "status". root is the
+    repository root: a known tool gap that depends on the workflow line reads it from there.
     """
     seen = set()
     unique = []
@@ -422,7 +493,13 @@ def merge(findings, allow_entries):
     out = []
     for f in unique:
         f = dict(f)
-        if not is_blocking(f):
+        gap = known_tool_gap(f, root) if is_blocking(f) else None
+        if gap is not None:
+            f["status"] = STATUS_TOOL_GAP
+            f["tool_gap"] = gap["id"]
+            f["tool_gap_reason"] = gap["reason"]
+            f["tool_gap_url"] = gap["url"]
+        elif not is_blocking(f):
             f["status"] = STATUS_WARNING
         else:
             f["status"] = STATUS_BLOCKING
@@ -470,9 +547,12 @@ def build_summary(findings, stale, errors, result, allow_file):
     blocking = [f for f in findings if f["status"] == STATUS_BLOCKING]
     allowed = [f for f in findings if f["status"] == STATUS_ALLOWED]
     warnings = [f for f in findings if f["status"] == STATUS_WARNING]
+    gaps = [f for f in findings if f["status"] == STATUS_TOOL_GAP]
     lines = ["## security-baseline: %s" % result, ""]
     lines.append("%d blocking, %d allowed by `%s`, %d warnings, %d stale allow entries, %d allow-file errors."
                  % (len(blocking), len(allowed), allow_file, len(warnings), len(stale), len(errors)))
+    if gaps:
+        lines.append("%d known tool gaps (not blocking, no allow entry needed)." % len(gaps))
     lines.append("")
     if findings or stale or errors:
         lines.append("| Status | Rule | Location | Severity | Message |")
@@ -481,6 +561,8 @@ def build_summary(findings, stale, errors, result, allow_file):
             msg = f["message"]
             if f["status"] == STATUS_ALLOWED:
                 msg += " (allowed: %s)" % f["allow_reason"]
+            elif f["status"] == STATUS_TOOL_GAP:
+                msg += " (known tool gap: %s; %s)" % (f["tool_gap_reason"], f["tool_gap_url"])
             lines.append("| %s | `%s` | `%s:%d` | %s | %s |" % (
                 f["status"], f["rule"], f["file"], f["line"], f["severity"], _cell(msg)))
         for e in stale:
@@ -505,7 +587,7 @@ def evaluate(root, path, actionlint_text, zizmor_text, allow_text, allow_file):
     entries, errors = ([], [])
     if allow_text is not None:
         entries, errors = parse_allow(allow_text)
-    classified, stale = merge(findings, entries)
+    classified, stale = merge(findings, entries, root)
 
     blocking = sum(1 for f in classified if f["status"] == STATUS_BLOCKING)
     if errors:
@@ -521,6 +603,10 @@ def evaluate(root, path, actionlint_text, zizmor_text, allow_text, allow_file):
             notes.append(annotation("error", "[%s] %s" % (f["rule"], f["message"]), f["file"], f["line"]))
         elif f["status"] == STATUS_WARNING:
             notes.append(annotation("warning", "[%s] %s" % (f["rule"], f["message"]), f["file"], f["line"]))
+        elif f["status"] == STATUS_TOOL_GAP:
+            notes.append(annotation(
+                "notice", "[%s] %s (known tool gap, not blocking: %s; %s)"
+                % (f["rule"], f["message"], f["tool_gap_reason"], f["tool_gap_url"]), f["file"], f["line"]))
     for e in stale:
         notes.append(annotation(
             "warning", "stale allow entry: rule %s in %s%s matched no blocking finding; remove it"
@@ -540,6 +626,7 @@ def evaluate(root, path, actionlint_text, zizmor_text, allow_text, allow_file):
         "blocking": blocking,
         "allowed": sum(1 for f in classified if f["status"] == STATUS_ALLOWED),
         "warnings": sum(1 for f in classified if f["status"] == STATUS_WARNING),
+        "tool_gaps": sum(1 for f in classified if f["status"] == STATUS_TOOL_GAP),
         "stale": [{"rule": e["rule"], "file": e["file"], "line": e["line"]} for e in stale],
         "whole_file_allow": [{"rule": e["rule"], "file": e["file"], "line": e["line"]} for e in whole_file],
         "allow_file_errors": [{"line": n, "message": m} for n, m in errors],

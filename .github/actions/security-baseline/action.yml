@@ -1,5 +1,5 @@
-# ci-workflows template actions/security-baseline v1.1.0 sha256:50096e5491ec6a0b609e54732d203e7001af35c59a9582903609049bbed631bf
-# Vendored from Remeny-Farm/ci-workflows@6419be1744cf60d5f97addac0d6d20d29e0b0625 (v1.1.0): godavid/gitjog is public and cannot call the internal repo. Edit upstream, then re-copy.
+# ci-workflows template actions/security-baseline v1.2.1 sha256:f09d2198d4682154a4640c539f3fb4aa66b4f1d8ef7ca920552117ad32be2ace
+# Vendored from Remeny-Farm/ci-workflows@8e0a535499cf9b1d956b91e38f89aea972083511 (v1.2.1): this repo cannot call the internal repo. Edit upstream, then re-copy.
 name: security-baseline
 description: >-
   Runs pinned actionlint and zizmor on the caller's workflows plus a check for a

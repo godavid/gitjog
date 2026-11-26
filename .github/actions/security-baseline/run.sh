@@ -71,13 +71,17 @@ else
   echo "::warning::security-baseline: no workflow files found under '$path'."
 fi
 
-# zizmor config: every external `uses:` must be pinned to a full commit SHA.
+# zizmor config: every external `uses:` must be pinned to a full commit SHA. The audit
+# `self-repository` (a Low "use GitHub's dedicated self-repository syntax" warning for every
+# `./` local `uses:`) is off: a local action path is the normal form.
 cat > "$work/zizmor.yml" <<'YAML'
 rules:
   unpinned-uses:
     config:
       policies:
         "*": hash-pin
+  self-repository:
+    disable: true
 YAML
 # Composite actions live next to the workflows directory (.github/actions for the default path).
 inputs=("$path")

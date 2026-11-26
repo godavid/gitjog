@@ -1,7 +1,12 @@
 // Built-in prod guard of actions/smoke.
 //
 // Installed on every browser context. It aborts
-//   - analytics and error-reporting beacons (any method), and
+//   - analytics and error-reporting beacons (any method; includes Cloudflare Web Analytics:
+//     `cloudflareinsights.com` hosts and the `/cdn-cgi/rum` path on any origin),
+//   - the analytics and Sentry tunnels that the product serves on its own origin (paths in
+//     PROD_GUARD_TUNNEL_PATHS or `prodGuard.tunnelPaths`, default "/monitoring,/ingest"), any
+//     method, only on the origin under test and the extra origins (same rule as
+//     templates/prod-guard.ts, reason `analytics-or-sentry-tunnel`), and
 //   - every request that is not GET/HEAD to the origin under test, to the configured
 //     extra origins and to Supabase `rest/v1` and `functions/v1`
 //     (except POST `rest/v1/rpc/<name>` with <name> in `readOnlyRpc`).
@@ -17,9 +22,38 @@ const ANALYTICS_HOST_SUFFIXES = [
   'doubleclick.net',
   'vitals.vercel-insights.com',
   'sentry.io',
+  'cloudflareinsights.com',
 ];
 const ANALYTICS_HOST_PARTS = ['posthog'];
-const ANALYTICS_PATH_PREFIXES = ['/_vercel/insights', '/_vercel/speed-insights'];
+// `/cdn-cgi/rum` is the Cloudflare Web Analytics beacon path; Cloudflare serves it on the
+// site's own origin, so it is matched on any origin.
+const ANALYTICS_PATH_PREFIXES = ['/_vercel/insights', '/_vercel/speed-insights', '/cdn-cgi/rum'];
+
+// Must equal DEFAULT_TUNNEL_PATHS of templates/prod-guard.ts (guard.test.mjs compares them).
+export const DEFAULT_TUNNEL_PATHS = '/monitoring,/ingest';
+
+/**
+ * Normalises a comma list (string) or an array of tunnel paths like templates/prod-guard.ts:
+ * "monitoring/" and "/monitoring" both become "/monitoring"; "/" and "" are dropped (they
+ * would match everything). An empty list disables the tunnel rule.
+ */
+export function tunnelPathsOf(value) {
+  const parts = Array.isArray(value) ? value : String(value ?? '').split(',');
+  return parts
+    .map((part) => String(part).trim())
+    .filter(Boolean)
+    .map((part) => `/${part.replace(/^\/+|\/+$/g, '')}`)
+    .filter((part) => part !== '/');
+}
+
+/**
+ * Config value (`prodGuard.tunnelPaths`) wins over the env value (PROD_GUARD_TUNNEL_PATHS);
+ * either one REPLACES the default list, and an empty one disables the rule.
+ */
+export function resolveTunnelPaths(configValue, envValue) {
+  if (configValue !== undefined) return tunnelPathsOf(configValue);
+  return tunnelPathsOf(envValue ?? DEFAULT_TUNNEL_PATHS);
+}
 
 export function normalizeOrigin(value, what) {
   let url;
@@ -46,8 +80,9 @@ export function isAnalytics(url) {
 }
 
 /** Pure classifier shared by the route handler and the independent counter. */
-export function makeClassifier({ origin, extraOrigins = [], readOnlyRpc = [] }) {
+export function makeClassifier({ origin, extraOrigins = [], readOnlyRpc = [], tunnelPaths = tunnelPathsOf(DEFAULT_TUNNEL_PATHS) }) {
   const guardedOrigins = new Set([origin, ...extraOrigins]);
+  const tunnels = tunnelPathsOf(tunnelPaths);
   const rpcAllow = new Set(readOnlyRpc);
   const supabaseHost = /^[a-z0-9-]+\.supabase\.co$/i;
 
@@ -56,6 +91,12 @@ export function makeClassifier({ origin, extraOrigins = [], readOnlyRpc = [] }) 
     return (
       supabaseHost.test(url.hostname) &&
       (url.pathname.startsWith('/rest/v1/') || url.pathname.startsWith('/functions/v1/'))
+    );
+  }
+
+  function isTunnel(url) {
+    return (
+      guardedOrigins.has(url.origin) && tunnels.some((p) => url.pathname === p || url.pathname.startsWith(`${p}/`))
     );
   }
 
@@ -76,6 +117,7 @@ export function makeClassifier({ origin, extraOrigins = [], readOnlyRpc = [] }) 
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return { abort: false };
     const method = String(methodRaw).toUpperCase();
     if (isAnalytics(url)) return { abort: true, reason: 'analytics' };
+    if (isTunnel(url)) return { abort: true, reason: 'analytics-or-sentry-tunnel' };
     if (method === 'GET' || method === 'HEAD') return { abort: false };
     if (!isGuardedTarget(url)) return { abort: false };
     if (isAllowedRpc(url, method)) return { abort: false, allowedRpc: true };

@@ -1,11 +1,13 @@
 // Playwright configuration of the web-quality action. Fully driven by env (set by run.sh):
 //   WQ_BASE_URL, WQ_CONFIG, WQ_SNAPSHOTS_DIR, WQ_REPORT_DIR, WQ_MAX_DIFF_PIXEL_RATIO, WQ_WORKERS
-// Config keys (all optional): viewports, mask, hide, waitFor; mask, hide and waitFor also per page.
+// Config keys (all optional): viewports, mask, hide, waitFor, waitForHidden, networkIdle; all but viewports also per page.
+// The optional keys are validated in quality-config.mjs.
 // Snapshot updates are hard-coded off: a missing or changed baseline is a failure, never an update.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from '@playwright/test';
+import { validateOptionalKeys, validatePagePaths } from './quality-config.mjs';
 
 function need(name) {
   const value = process.env[name];
@@ -43,31 +45,13 @@ for (const page of quality.pages) {
   }
   if (ids.has(page.id)) throw new Error(`web-quality: duplicate page id "${page.id}"`);
   ids.add(page.id);
-  if (typeof page.path !== 'string' || !page.path.startsWith('/')) {
-    throw new Error(`web-quality: page "${page.id}" needs a "path" starting with "/"`);
-  }
 }
+validatePagePaths(quality, baseURL);
 const viewports = quality.viewports === undefined ? ['mobile', 'desktop'] : quality.viewports;
 if (!Array.isArray(viewports) || viewports.length === 0 || viewports.some((name) => !(name in VIEWPORTS))) {
   throw new Error('web-quality: "viewports" must be a non-empty list of "mobile" and/or "desktop"');
 }
-// Optional selector lists (global and per page): mask, hide, waitFor.
-function selectorList(value, where, key) {
-  if (value === undefined) return;
-  // mask is a v1.0.0 key: v1.0.0 accepted any string, so an empty mask selector stays valid (it is skipped).
-  const allowEmpty = key === 'mask';
-  if (!Array.isArray(value) || value.some((s) => typeof s !== 'string' || (!allowEmpty && s.trim() === ''))) {
-    throw new Error(`web-quality: ${where} "${key}" must be a list of ${allowEmpty ? '' : 'non-empty '}CSS selectors`);
-  }
-  // "hide" selectors end up in a generated style sheet: no braces, no ";" so a selector cannot add rules.
-  if (key === 'hide' && value.some((s) => /[{};]/.test(s))) {
-    throw new Error(`web-quality: ${where} "hide" selectors must not contain "{", "}" or ";"`);
-  }
-}
-for (const key of ['mask', 'hide', 'waitFor']) {
-  selectorList(quality[key], 'the config', key);
-  for (const page of quality.pages) selectorList(page[key], `page "${page.id}"`, key);
-}
+validateOptionalKeys(quality);
 
 export default defineConfig({
   testDir: here,

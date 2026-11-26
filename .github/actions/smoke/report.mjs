@@ -37,7 +37,7 @@ table{border-collapse:collapse;width:100%;margin:.5rem 0}
 th,td{border:1px solid #d0d0d0;padding:.3rem .5rem;text-align:left;vertical-align:top}
 th{background:#f3f3f3}code{font:12px ui-monospace,monospace;word-break:break-all}
 .badge{display:inline-block;padding:.1rem .6rem;border-radius:1rem;color:#fff}
-.badge.passed{background:#0a6b2d}.badge.failed{background:#b00020}.badge.skipped{background:#666}
+.badge.passed{background:#0a6b2d}.badge.failed{background:#b00020}.badge.skipped{background:#666}.badge.tool-error{background:#8a5a00}
 `;
 
 function cls(ok) {
@@ -76,7 +76,8 @@ export function renderHtml(report) {
 <h1>Smoke report <span class="badge ${e(report.result)}">${e(report.result)}</span></h1>
 <p>Origin: <code>${e(report.origin)}</code>${report.baseUrlOverride ? ' (base-url override)' : ''}<br>
 Viewports: ${e(report.viewports.join(', '))}<br>
-Failures: <strong>${e(report.failures)}</strong> of ${e(report.checkCount)} checks<br>
+Failures: <strong>${e(report.failures)}</strong> of ${e(report.checkCount)} checks${report.failureKinds?.length ? ` (kinds: ${e(report.failureKinds.join(', '))})` : ''}<br>
+${report.toolError ? `Tool error: ${e(report.toolError)}<br>\n` : ''}
 Prod guard: ${e(report.guard.aborted.length)} aborted request(s), unaborted writes
 <strong class="${cls(report.guard.unabortedWrites === 0)}">${e(report.guard.unabortedWrites)}</strong><br>
 Generated: ${e(report.generatedAt)}</p>

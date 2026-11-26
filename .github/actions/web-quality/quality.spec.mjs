@@ -5,6 +5,7 @@ import path from 'node:path';
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { loadBaseline, matchFindings, toFinding } from './a11y-match.mjs';
+import { selectorsFor, waitForLoaded } from './quality-config.mjs';
 
 const reportDir = process.env.WQ_REPORT_DIR;
 const quality = JSON.parse(fs.readFileSync(process.env.WQ_CONFIG, 'utf8'));
@@ -12,8 +13,8 @@ const RUN_A11Y = process.env.WQ_RUN_A11Y === 'true';
 const RUN_VISUAL = process.env.WQ_RUN_VISUAL === 'true';
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
-// Global lists plus the page's own list (config keys mask, hide, waitFor; validated in playwright.config.mjs).
-const selectors = (entry, key) => [...(quality[key] || []), ...(entry[key] || [])];
+// Global lists plus the page's own list (config keys mask, hide, waitFor, waitForHidden; validated in quality-config.mjs).
+const selectors = (entry, key) => selectorsFor(quality, entry, key);
 
 // One finding per axe node (no de-duplication: the baseline counts with multiplicity, see a11y-match.mjs).
 function toFindings(violations, pagePath, viewport) {
@@ -27,16 +28,8 @@ async function open(page, pagePath) {
   return status;
 }
 
-// Elements that must be visible before a11y and visual run (late content, hydration).
-async function waitForElements(page, entry) {
-  for (const selector of selectors(entry, 'waitFor')) {
-    try {
-      await page.locator(selector).first().waitFor({ state: 'visible', timeout: 30_000 });
-    } catch (error) {
-      throw new Error(`waitFor "${selector}" on ${entry.path} did not become visible within 30 s: ${String(error.message).split('\n')[0]}`);
-    }
-  }
-}
+// The loaded state (waitFor, waitForHidden, networkIdle) that must hold before a11y and visual run: see quality-config.mjs.
+const waitForElements = (page, entry) => waitForLoaded(page, quality, entry);
 
 // Style sheet that keeps the layout and hides the volatile elements during the screenshot only.
 function hideCss(entry) {

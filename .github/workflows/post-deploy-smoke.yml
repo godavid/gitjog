@@ -1,5 +1,5 @@
-# ci-workflows template .github/workflows/post-deploy-smoke.yml v1.1.0 sha256:b7b748fc7fb570b304e6510ec2ff15e9cffc0f7dc4645b1c9460c64f2584b559
-# Vendored from Remeny-Farm/ci-workflows@6419be1744cf60d5f97addac0d6d20d29e0b0625 (v1.1.0): godavid/gitjog is public and cannot call the internal repo. Edit upstream, then re-copy.
+# ci-workflows template .github/workflows/post-deploy-smoke.yml v1.2.1 sha256:865867a908f7b05cc197988dd110847111d375c9941404a7164b16ecc3a5c0e3
+# Vendored from Remeny-Farm/ci-workflows@8e0a535499cf9b1d956b91e38f89aea972083511 (v1.2.1): this repo cannot call the internal repo. Edit upstream, then re-copy.
 name: Post-deploy smoke
 
 # Reusable workflow around actions/smoke. Docs: docs/components/smoke.md.
@@ -50,13 +50,45 @@ on:
         type: string
         required: false
         default: ''
+      report-name:
+        description: >-
+          Name of the report directory and of the uploaded artifact. Give every call of one
+          workflow run (matrix, several origins) its own name, or the reports overwrite each other.
+        type: string
+        required: false
+        default: smoke-report
+      enabled:
+        description: >-
+          false skips the smoke (green, result skipped), like the MONITORING_SMOKE=off kill
+          switch. The checkout still runs.
+        type: boolean
+        required: false
+        default: true
     outputs:
       result:
-        description: passed, failed or skipped (empty when the job failed before the smoke ran).
+        description: >-
+          passed, failed, skipped or tool-error (an infrastructure step or the Chromium launch
+          failed: no incident). Empty when the job broke before the smoke action ran.
         value: ${{ jobs.smoke.outputs.result }}
       failures:
-        description: Number of failing checks.
+        description: Number of failing checks (0 when passed, skipped or tool-error).
         value: ${{ jobs.smoke.outputs.failures }}
+      failure-kinds:
+        description: >-
+          Comma-separated, sorted, unique kinds of the failing checks (dns, connection, timeout,
+          request, http, content, console, guard, config, internal). Empty unless result is failed.
+        value: ${{ jobs.smoke.outputs.failure-kinds }}
+      issue:
+        description: Number of the red issue that was opened, commented, closed or left open (empty when red-issue is off or its job failed).
+        value: ${{ jobs.red-issue.outputs.issue }}
+      issue-action:
+        description: opened, commented, closed or none (empty when red-issue is off or its job failed).
+        value: ${{ jobs.red-issue.outputs.action }}
+      issue-state:
+        description: >-
+          State of the issue read back from GitHub after the red-issue job: open or closed, unknown
+          when the read-back failed. Empty when there is no issue, red-issue is off or its job failed.
+        value: ${{ jobs.red-issue.outputs.state }}
 
 permissions: {}
 
@@ -70,6 +102,7 @@ jobs:
     outputs:
       result: ${{ steps.smoke.outputs.result }}
       failures: ${{ steps.smoke.outputs.failures }}
+      failure-kinds: ${{ steps.smoke.outputs.failure-kinds }}
     steps:
       - name: Check inputs
         if: inputs.red-issue
@@ -83,7 +116,8 @@ jobs:
             exit 1
           fi
 
-      # Vendored: the checkout always runs, because the local action below lives in the checkout.
+      # Unconditional: a caller that vendors this workflow points the Smoke step at a local
+      # `./.github/actions/smoke`, which must exist even when the smoke is switched off.
       - name: Check out the caller repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -95,7 +129,8 @@ jobs:
         with:
           config: ${{ inputs.config }}
           base-url: ${{ inputs.base-url }}
-          enabled: ${{ vars.MONITORING_SMOKE != 'off' }}
+          report-name: ${{ inputs.report-name }}
+          enabled: ${{ inputs.enabled && vars.MONITORING_SMOKE != 'off' }}
 
   red-issue:
     name: red-issue
@@ -104,12 +139,15 @@ jobs:
     permissions:
       issues: write
       contents: read
-    # A skipped smoke (kill switch) must neither open nor close an issue.
+    # Only a verdict reaches red-issue: passed -> success, failed -> failure. skipped (kill switch),
+    # tool-error (infrastructure) and an empty result (the job broke before the action) pass through
+    # unchanged and red-issue does nothing for them. Never needs.smoke.result: a failing
+    # npm ci or Chromium download would open an incident on a healthy site.
     uses: ./.github/workflows/red-issue.yml
     with:
       title: "${{ inputs.issue-title || format('post-deploy smoke: {0}', github.repository) }}"
       labels: ${{ inputs.issue-labels }}
-      result: ${{ needs.smoke.outputs.result == 'skipped' && 'skipped' || needs.smoke.result }}
+      result: ${{ needs.smoke.outputs.result == 'passed' && 'success' || needs.smoke.outputs.result == 'failed' && 'failure' || needs.smoke.outputs.result || 'unknown' }}
       sha: ${{ github.sha }}
       write-runner: ${{ inputs.write-runner }}
       body: ${{ format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}

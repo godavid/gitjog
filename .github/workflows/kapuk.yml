@@ -1,7 +1,8 @@
 # Kapuk: az AGENTS.md prózában őrzött szabályait grep-pel kényszerítik ki.
 # Titok nem kell, szándékosan `pull_request` (nem `pull_request_target`).
 # Kapuk: importhatár (Kódterületek), márkaszó (Ne tedd #10), keresési kiemelés
-# STX/ETX-szel (Ne tedd #7), és hetente a napi-delta.yml két példányának
+# STX/ETX-szel (Ne tedd #7), a vendorolt ci-workflows fájlok változatlansága
+# (`vendor-sync check`), és hetente a napi-delta.yml két példányának
 # byte-azonossága (Ne tedd #3).
 name: Kapuk
 
@@ -155,10 +156,24 @@ jobs:
             exit 1
           fi
 
+  # A vendorolt ci-workflows fájlok (.github/actions/*, post-deploy-smoke.yml, red-issue.yml)
+  # kézzel nem szerkeszthetők: frissítés csak `vendor-sync copy`-val egy ci-workflows kiadásról.
+  vendor-sync:
+    name: Vendorolt ci-workflows fájlok
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: A vendorolt fájlok változatlanok
+        shell: bash
+        run: python3 .github/scripts/vendor-sync check
+
   kapuk:
     name: kapuk
     if: always()
-    needs: [import-hatar, marka, kiemeles, napi-delta-masolat]
+    needs: [import-hatar, marka, kiemeles, napi-delta-masolat, vendor-sync]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

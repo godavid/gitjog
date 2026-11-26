@@ -1,0 +1,8 @@
+# ci-workflows template actions/smoke/vendored.sha256 v1.2.1 sha256:3d3db524476656a10a426d5478c35fbd48f3e9e5e26adc274d8ad797809bfdeb
+# Vendored from Remeny-Farm/ci-workflows@8e0a535499cf9b1d956b91e38f89aea972083511 (v1.2.1): this repo cannot call the internal repo. Edit upstream, then re-copy.
+bafb72d153e5d6f6802b3c8ab043b0f849d3c44cb0132a82ce05df65170bc0c9  checks.mjs
+346b3c97853909283c74cbd8ad57f808aa3cc3e3c6c879e5e146d6e7f711a818  guard.mjs
+99199950edbb0a21695cb563fbd6ee13c3789c529b0ffa11ffb2a7abdacf1da3  package-lock.json
+005a5ae5f852ad93887cd213fbea894ecc5819d162e1435f05d9bd033e4a0313  package.json
+7c429fae35b5783a3d188f3efb512d52b9654f5ac4d7073579e12c76575fc07a  report.mjs
+5e13383023075a0797f3bc5c236da9a36b44c65b7ff195a7f7a89d39b5646f11  smoke.mjs

@@ -1,10 +1,11 @@
 # a11y (axe, WCAG 2.1 A és AA) és vizuális snapshot a nyilvános oldalakon, mobil és asztali
 # nézetben, helyi buildre. Vendorolt sablon (`.github/actions/web-quality`, Remeny-Farm/ci-workflows
-# v1.1.0). Nem kötelező check és nem kapuzza a deployt: egy még el nem fogadott baseline a main-en
+# v1.2.1, `vendor-sync`). Nem kötelező check és nem kapuzza a deployt: egy még el nem fogadott baseline a main-en
 # a release-t nem állíthatja meg. Az oldallista: `.monitoring/quality.json`.
 #
 # Titok nélkül, GitHub-hosted runneren (publikus repó). A vizuális rész ezért itt a hosted
 # image-en fut (`visual-runner-prefix: ""`); a baseline is ezen a runneren készül.
+# A ready-url csak 2xx-re kész (v1.2.1): a `/` helyben 200-at ad, átirányítás nélkül.
 # A build a publikus adat-repóból olvas (raw.githubusercontent.com), adatbázis nem kell;
 # a /kereses ezért nincs a listán.
 #

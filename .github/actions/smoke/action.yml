@@ -1,10 +1,11 @@
-# ci-workflows template actions/smoke v1.1.0 sha256:e37159bfccc2938c6f5b859495c78233efd5e60646230777b7c652b461bcac9d
-# Vendored from Remeny-Farm/ci-workflows@6419be1744cf60d5f97addac0d6d20d29e0b0625 (v1.1.0): godavid/gitjog is public and cannot call the internal repo. Edit upstream, then re-copy.
+# ci-workflows template actions/smoke v1.2.1 sha256:973bcf720ed2826414f00334c7e406f9c71ce2ec9e2ff9ec6f89a8f756900d55
+# Vendored from Remeny-Farm/ci-workflows@8e0a535499cf9b1d956b91e38f89aea972083511 (v1.2.1): this repo cannot call the internal repo. Edit upstream, then re-copy.
 name: Smoke
 description: >-
   Playwright smoke of the pages listed in a smoke.json: status or redirect, selector, text,
   headers and a console error budget, in a mobile and a desktop viewport, behind a built-in
-  prod guard. Uploads report.json and report.html.
+  prod guard. Uploads report.json and report.html. An infrastructure failure (Node, npm ci,
+  Chromium download or launch) ends green with result tool-error, never as a failed smoke.
 
 inputs:
   config:
@@ -28,11 +29,18 @@ inputs:
 
 outputs:
   result:
-    description: passed, failed or skipped.
-    value: ${{ steps.run.outputs.result || steps.skip.outputs.result }}
+    description: >-
+      passed, failed, skipped or tool-error (an infrastructure step or the Chromium launch
+      failed; says nothing about the site).
+    value: ${{ steps.run.outputs.result || steps.toolerr.outputs.result || steps.skip.outputs.result }}
   failures:
-    description: Number of failing checks (0 when passed or skipped).
-    value: ${{ steps.run.outputs.failures || steps.skip.outputs.failures }}
+    description: Number of failing checks (0 when passed, skipped or tool-error).
+    value: ${{ steps.run.outputs.failures || steps.toolerr.outputs.failures || steps.skip.outputs.failures }}
+  failure-kinds:
+    description: >-
+      Comma-separated, sorted, unique kinds of the failing checks (dns, connection, timeout,
+      request, http, content, console, guard, config, internal). Empty unless result is failed.
+    value: ${{ steps.run.outputs.failure-kinds }}
 
 runs:
   using: composite
@@ -78,45 +86,95 @@ runs:
         overwrite: true
         if-no-files-found: error
 
+    # The infrastructure steps carry continue-on-error: a failure there is not a verdict on the
+    # site. The step "Detect a tool error" reads their outcomes and ends the action green with
+    # result tool-error (warning, summary, marker artifact); the run step is then skipped.
     - name: Set up Node
+      id: node
       if: inputs.enabled == 'true'
+      continue-on-error: true
       uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version: '22'
 
     - name: Install smoke dependencies
-      if: inputs.enabled == 'true'
+      id: deps
+      if: inputs.enabled == 'true' && steps.node.outcome == 'success'
+      continue-on-error: true
       shell: bash
       run: |
         set -euo pipefail
         cd "$GITHUB_ACTION_PATH"
         npm ci --ignore-scripts --no-audit --no-fund
 
-    - name: Cache Playwright browsers
-      if: inputs.enabled == 'true'
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+    # Restore and save are separate steps: a failed Chromium install (tool-error, green job) must never
+    # save a half-written browser directory under the key, or every later run would restore it.
+    - name: Restore the Playwright browser cache
+      id: browser-cache
+      if: inputs.enabled == 'true' && steps.deps.outcome == 'success'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ms-playwright
         key: pw-chromium-1.65.1-${{ runner.os }}-${{ runner.arch }}
 
     - name: Install Chromium
-      if: inputs.enabled == 'true'
+      id: browser
+      if: inputs.enabled == 'true' && steps.deps.outcome == 'success'
+      continue-on-error: true
       shell: bash
       run: |
         set -euo pipefail
         cd "$GITHUB_ACTION_PATH"
         npx playwright install --with-deps chromium
 
+    - name: Save the Playwright browser cache
+      if: inputs.enabled == 'true' && steps.browser.outcome == 'success' && steps.browser-cache.outputs.cache-hit != 'true'
+      continue-on-error: true
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: pw-chromium-1.65.1-${{ runner.os }}-${{ runner.arch }}
+
+    - name: Detect a tool error
+      id: toolerr
+      if: inputs.enabled == 'true' && (steps.node.outcome == 'failure' || steps.deps.outcome == 'failure' || steps.browser.outcome == 'failure')
+      shell: bash
+      env:
+        NODE_OUTCOME: ${{ steps.node.outcome }}
+        DEPS_OUTCOME: ${{ steps.deps.outcome }}
+        BROWSER_OUTCOME: ${{ steps.browser.outcome }}
+        MARKER_DIR: ${{ runner.temp }}/monitoring-result-smoke
+      run: |
+        set -euo pipefail
+        failed=""
+        [ "$NODE_OUTCOME" != failure ] || failed="${failed:+$failed, }setup-node"
+        [ "$DEPS_OUTCOME" != failure ] || failed="${failed:+$failed, }npm ci"
+        [ "$BROWSER_OUTCOME" != failure ] || failed="${failed:+$failed, }Chromium install"
+        echo "::warning::smoke tool-error: ${failed} failed. The site was not checked; no incident is opened and this is not a successful run."
+        {
+          echo "### Smoke: tool-error"
+          echo ""
+          echo "The smoke tool failed, not the site: ${failed} failed, so no page was checked. No incident is opened. This is not a successful run; read the step log of the failed step."
+        } >> "$GITHUB_STEP_SUMMARY"
+        mkdir -p "$MARKER_DIR"
+        printf 'tool-error\n' > "$MARKER_DIR/result.txt"
+        {
+          echo "result=tool-error"
+          echo "failures=0"
+        } >> "$GITHUB_OUTPUT"
+
     # smoke.mjs writes the report and the outputs and exits 1 on failures. The step
     # swallows that exit code so the report upload always runs first; the last step fails.
+    # A Chromium launch failure inside smoke.mjs is a tool-error too (exit 0, marker written).
     - name: Run smoke
       id: run
-      if: inputs.enabled == 'true'
+      if: inputs.enabled == 'true' && steps.toolerr.outputs.result != 'tool-error'
       shell: bash
       env:
         SMOKE_CONFIG: ${{ inputs.config }}
         SMOKE_BASE_URL: ${{ inputs.base-url }}
         SMOKE_REPORT_NAME: ${{ inputs.report-name }}
+        SMOKE_MARKER_DIR: ${{ runner.temp }}/monitoring-result-smoke
       run: |
         set -euo pipefail
         node "$GITHUB_ACTION_PATH/smoke.mjs" || echo "smoke.mjs exited with $?"
@@ -125,11 +183,14 @@ runs:
           {
             echo "result=failed"
             echo "failures=1"
+            echo "failure-kinds=internal"
           } >> "$GITHUB_OUTPUT"
         fi
 
     - name: Upload smoke report
+      id: upload
       if: ${{ !cancelled() && inputs.enabled == 'true' && steps.run.outcome != 'skipped' }}
+      continue-on-error: true
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: ${{ inputs.report-name }}
@@ -138,8 +199,25 @@ runs:
         overwrite: true
         if-no-files-found: warn
 
+    # A lost report is not a verdict on the site: the result stays as the run step set it.
+    - name: Warn when the report upload failed
+      if: ${{ !cancelled() && steps.upload.outcome == 'failure' }}
+      shell: bash
+      run: echo "::warning::smoke report upload failed; the result is unchanged (see the step log of Upload smoke report)"
+
+    - name: Upload tool-error marker
+      if: ${{ !cancelled() && inputs.enabled == 'true' && (steps.toolerr.outputs.result == 'tool-error' || steps.run.outputs.result == 'tool-error') }}
+      continue-on-error: true
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: monitoring-result.smoke.tool-error.${{ github.job }}.${{ github.run_attempt }}.${{ inputs.report-name }}
+        path: ${{ runner.temp }}/monitoring-result-smoke/result.txt
+        retention-days: 30
+        overwrite: true
+        if-no-files-found: error
+
     - name: Fail on smoke failures
-      if: inputs.enabled == 'true' && steps.run.outputs.result != 'passed'
+      if: inputs.enabled == 'true' && steps.run.outputs.result == 'failed'
       shell: bash
       env:
         RESULT: ${{ steps.run.outputs.result }}
