@@ -4,7 +4,7 @@
   "integration": "smoke",
   "status": "É",
   "date": "2026-11-26",
-  "sha": "805c91d1d568d3a74feadfb1f25377d961247b80",
+  "sha": "d74b9dafe778582236ab478be275815195761ce3",
   "cells": {
     "a": {
       "link": "https://github.com/godavid/gitjog/actions/runs/45673182419",
@@ -12,9 +12,9 @@
       "note": "release-production on main (8db3011cc, vendored v1.1.0 copy): Build -> Deploy green, then the separate Smoke job green. The v1.2.1 move (PR #58) changes only workflows and starts no deploy; the next release run is the live smoke on the v1.2.1 copy"
     },
     "b": {
-      "link": "https://github.com/godavid/gitjog/actions/runs/45730536963",
+      "link": "https://github.com/godavid/gitjog/actions/runs/45884422588",
       "mode": "live",
-      "note": "v1.2.1 monitoring-proof case smoke-failure on 805c91d: smoke against https://monitoring-proof.invalid red, VERDICT OK (result failed, failure-kinds dns, no issue)"
+      "note": "v1.2.3 monitoring-proof case smoke-failure on d74b9da (PR #67 branch, landed as ac94003): base-url https://<userinfo>@monitoring-proof.invalid, smoke red, VERDICT OK (result failed, failure-kinds dns, no issue); the verdict job reads base-url from the event, no BASE_URL step env, the userinfo appears nowhere in the verdict job log"
     },
     "c": {
       "link": "https://github.com/godavid/gitjog/issues/57",
@@ -32,9 +32,9 @@
       "note": "red-issue case against https://gitjog.remenyfarm.hu (run 45730805349): VERDICT OK, smoke passed, issue-action closed, issue-state closed"
     },
     "f": {
-      "link": "https://github.com/godavid/gitjog/actions/runs/45730540645",
+      "link": "https://github.com/godavid/gitjog/actions/runs/45884426902",
       "mode": "live",
-      "note": "v1.2.1 smoke-pass against https://gitjog.remenyfarm.hu, VERDICT OK: report unabortedWrites 0; the guard aborted 4 requests, all analytics (/_vercel/insights/script.js); GET only; the smoke job holds no secret"
+      "note": "v1.2.3 smoke-pass against https://gitjog.remenyfarm.hu on d74b9da, VERDICT OK (result passed); GET only; the smoke job holds no secret"
     }
   }
 }
