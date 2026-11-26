@@ -2,15 +2,21 @@
   "_template": "ci-workflows template monitoring/evidence.example.json v1.1.0 sha256:28d6c63d629a9dd30732659906588628cb5856f19e13a1ab1e62e76c88065e8a",
   "version": 1,
   "integration": "visual",
-  "status": "J",
-  "date": "2026-11-25",
-  "sha": "8db3011cc3813117d2afde1342b4134f49ceffa2",
-  "pending_owner": "baseline approval of the 8 actual images (run 45671503872, artifact web-quality-report); MONITORING_VISUAL=off until then; promote-actuals only after the OK, never --update-snapshots",
+  "status": "I",
+  "date": "2026-11-26",
+  "sha": "eeb59f6d1e55ad9cc4432a0fa9063db959dfc89d",
+  "owner_approval": {
+    "quote": "Mind a 14 OK",
+    "by": "owner (Dávid), godavid/boss owner session",
+    "at": "2026-11-26T07:50Z",
+    "record": "https://github.com/godavid/boss/issues/249",
+    "scope": "the 8 *-actual.png of web-quality run 45676257808 attempt 1, artifact web-quality-report (id 15052861103), promoted unchanged with scripts/promote-actuals into .monitoring/visual/ (never --update-snapshots)"
+  },
   "cells": {
     "a": {
-      "link": "https://github.com/godavid/gitjog/actions/runs/45671503872",
+      "link": "https://github.com/godavid/gitjog/actions/runs/45676257808/attempts/1",
       "mode": "live",
-      "note": "first web-quality run (PR #52, attempt 1): visual red as expected without a baseline; artifact web-quality-report holds the 8 *-actual.png (home, agenteknek, adatok, jogszabaly x mobile, desktop)"
+      "note": "approved run: web-quality workflow_dispatch on main at eeb59f6d1e55 (attempt 1), visual red as expected without a baseline; artifact web-quality-report (15052861103) holds the 8 *-actual.png (home, agenteknek, adatok, jogszabaly x mobile, desktop), now the baseline in .monitoring/visual/. MONITORING_VISUAL stays off until this lands; the live visual runs on main come next"
     }
   }
 }
