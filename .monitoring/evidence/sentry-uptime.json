@@ -1,0 +1,40 @@
+{
+  "_template": "ci-workflows template monitoring/evidence.example.json v1.1.0 sha256:28d6c63d629a9dd30732659906588628cb5856f19e13a1ab1e62e76c88065e8a",
+  "version": 1,
+  "integration": "sentry-uptime",
+  "status": "É",
+  "date": "2026-11-27",
+  "sha": "046965717a5232709d150bd246d08734ff743721",
+  "cells": {
+    "a": {
+      "link": "https://remeny-farm.sentry.io/monitors/2749714/",
+      "mode": "live",
+      "note": "Sentry uptime monitor 2749714 for https://gitjog.remenyfarm.hu in the sites-uptime project: GET, every 60 s, environment production, the SOS: site down (uptime) alert (1535343) applies; on 2026-11-27 status active, uptimeStatus ok, recent checks HTTP 200"
+    },
+    "b": {
+      "link": "https://github.com/godavid/boss/issues/249#issuecomment-7162458870",
+      "mode": "live",
+      "note": "shared T0.5 proof: a temporary probe monitor (2749733) in the same project with the same alert, pointed at a non-existent path (/__monitoring-proof-404/), reported failed"
+    },
+    "c": {
+      "link": "https://github.com/godavid/boss/issues/249#issuecomment-7162458870",
+      "mode": "live",
+      "note": "the SOS: site down (uptime) alert fired for the probe (lastTriggered 2026-11-25T12:26:41Z) and reached the #sentry-sos channel"
+    },
+    "d": {
+      "link": "https://github.com/godavid/boss/issues/249#issuecomment-7162458870",
+      "mode": "live",
+      "note": "the downtime became one Sentry issue (SITES-UPTIME-1, 1 occurrence); the alert fired once"
+    },
+    "e": {
+      "link": "https://github.com/godavid/boss/issues/249#issuecomment-7162458870",
+      "mode": "live",
+      "note": "the probe monitor switched to a URL that returns 200: the issue resolved; the probe monitor was then deleted"
+    },
+    "f": {
+      "link": "https://github.com/godavid/boss/issues/249#issuecomment-7162458870",
+      "mode": "live",
+      "note": "the uptime checks send GET only (the probe hit a non-existent path), no request body, no headers, no secret"
+    }
+  }
+}
